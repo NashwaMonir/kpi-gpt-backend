@@ -1,7 +1,7 @@
 // api/kpi.ts
 import type { VercelRequest, VercelResponse } from '@vercel/node'
 
-// -------- Types matching the GPT Action schema --------
+// --------- Types matching the GPT Action schema --------
 
 type KpiRowIn = {
   row_id: number
