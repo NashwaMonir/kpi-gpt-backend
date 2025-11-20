@@ -39,99 +39,13 @@ type KpiResponse = {
 // -------- Simple placeholder engine (to be replaced by v10.7.5 logic later) --------
 
 function processRow(row: KpiRowIn): KpiRowOut {
-  const {
-    row_id,
-    task_name,
-    team_role,
-    task_type,
-    dead_line,
-    strategic_benefit
-  } = row
-
-  console.log('DEBUG_KPI_ROW', JSON.stringify({ row_id, team_role, task_type, task_name, dead_line, strategic_benefit }));
-
-  // ------------------------
-  // 1) Validate mandatory fields
-  // ------------------------
-  const missingFields: string[] = []
-
-  if (!task_name || !String(task_name).trim()) {
-    missingFields.push('Task Name')
-  }
-  if (!task_type || !String(task_type).trim()) {
-    missingFields.push('Task Type')
-  }
- if (team_role === undefined || team_role === null || String(team_role).trim() === '') {
-    missingFields.push('Team Role')
-  }
-  if (!dead_line || !String(dead_line).trim()) {
-    missingFields.push('Deadline')
-  }
-  if (!strategic_benefit || !String(strategic_benefit).trim()) {
-    missingFields.push('Strategic Benefit')
-  }
-
-  console.log('DEBUG_MISSING_FIELDS', JSON.stringify({ row_id, missingFields }));
-
-  if (missingFields.length > 0) {
-    const reason = `Invalid: Missing mandatory field(s): ${missingFields.join(
-      ', '
-    )}.`
-
-    return {
-      row_id,
-      simple_objective: '',
-      complex_objective: '',
-      status: 'INVALID',
-      comments: reason,
-      summary_reason: reason
-    }
-  }
-
-  // ------------------------
-  // 2) Validate deadline = current calendar year
-  // ------------------------
-  let deadlineYear: number | null = null
-  try {
-    const parts = String(dead_line).split('-')
-    if (parts.length === 3) {
-      deadlineYear = Number(parts[0])
-    }
-  } catch {
-    deadlineYear = null
-  }
-
-  const currentYear = new Date().getFullYear()
-
-  if (!deadlineYear || deadlineYear !== currentYear) {
-    const reason = 'Invalid: Deadline outside current year.'
-
-    return {
-      row_id,
-      simple_objective: '',
-      complex_objective: '',
-      status: 'INVALID',
-      comments: reason,
-      summary_reason: reason
-    }
-  }
-
-  // ------------------------
-  // 3) Temporary placeholder objective (will be replaced in later steps)
-  // ------------------------
-  const simple_objective =
-    `Deliver '${task_name}' for ${team_role} by ${dead_line} ` +
-    `to support ${strategic_benefit}.`
-
   return {
-    row_id,
-    simple_objective,
+    row_id: row.row_id,
+    simple_objective: '',
     complex_objective: '',
-    status: 'NEEDS_REVIEW',
-    comments:
-      'Placeholder objectives only. v10.7.5 KPI logic not yet implemented.',
-    summary_reason:
-      'Engine skeleton responding without full KPI rules.'
+    status: 'INVALID',
+    comments: 'TEST_INVALID – forced by engine.',
+    summary_reason: 'TEST_INVALID – forced by engine.'
   }
 }
 
