@@ -43,10 +43,78 @@ function processRow(row: KpiRowIn): KpiRowOut {
     row_id,
     task_name,
     team_role,
+    task_type,
     dead_line,
     strategic_benefit
   } = row
 
+  // ------------------------
+  // 1) Validate mandatory fields
+  // ------------------------
+  const missingFields: string[] = []
+
+  if (!task_name || !String(task_name).trim()) {
+    missingFields.push('Task Name')
+  }
+  if (!task_type || !String(task_type).trim()) {
+    missingFields.push('Task Type')
+  }
+  if (!team_role || !String(team_role).trim()) {
+    missingFields.push('Team Role')
+  }
+  if (!dead_line || !String(dead_line).trim()) {
+    missingFields.push('Deadline')
+  }
+  if (!strategic_benefit || !String(strategic_benefit).trim()) {
+    missingFields.push('Strategic Benefit')
+  }
+
+  if (missingFields.length > 0) {
+    const reason = `Invalid: Missing mandatory field(s): ${missingFields.join(
+      ', '
+    )}.`
+
+    return {
+      row_id,
+      simple_objective: '',
+      complex_objective: '',
+      status: 'INVALID',
+      comments: reason,
+      summary_reason: reason
+    }
+  }
+
+  // ------------------------
+  // 2) Validate deadline = current calendar year
+  // ------------------------
+  let deadlineYear: number | null = null
+  try {
+    const parts = String(dead_line).split('-')
+    if (parts.length === 3) {
+      deadlineYear = Number(parts[0])
+    }
+  } catch {
+    deadlineYear = null
+  }
+
+  const currentYear = new Date().getFullYear()
+
+  if (!deadlineYear || deadlineYear !== currentYear) {
+    const reason = 'Invalid: Deadline outside current year.'
+
+    return {
+      row_id,
+      simple_objective: '',
+      complex_objective: '',
+      status: 'INVALID',
+      comments: reason,
+      summary_reason: reason
+    }
+  }
+
+  // ------------------------
+  // 3) Temporary placeholder objective (will be replaced in later steps)
+  // ------------------------
   const simple_objective =
     `Deliver '${task_name}' for ${team_role} by ${dead_line} ` +
     `to support ${strategic_benefit}.`
@@ -62,6 +130,7 @@ function processRow(row: KpiRowIn): KpiRowOut {
       'Engine skeleton responding without full KPI rules.'
   }
 }
+
 
 // -------- Vercel handler --------
 
