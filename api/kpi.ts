@@ -37,7 +37,44 @@ type KpiResponse = {
 }
 
 // -------- Simple placeholder engine (to be replaced by v10.7.5 logic later) --------
+// -------- Default metrics by role (v10.7.5 skeleton) --------
 
+function getRoleMetricDefaults(team_role: string | undefined) {
+  const role = (team_role || '').toLowerCase()
+
+  if (role.includes('content')) {
+    return {
+      output: 'Publish 95% of planned content on time',
+      quality: 'Keep content error rate below 2%',
+      improvement: 'Increase content engagement by 15%'
+    }
+  }
+
+  if (role.includes('design')) {
+    return {
+      output: 'Maintain ≥95% adherence to the design system',
+      quality: 'Ensure WCAG AA accessibility compliance',
+      improvement: 'Increase task success rate in key flows by 15%'
+    }
+  }
+
+  if (role.includes('development')) {
+    return {
+      output: 'Reduce critical defects by 30% in the target scope',
+      quality: 'Maintain 99.9% service uptime on impacted systems',
+      improvement: 'Increase performance scores by 20% on key journeys'
+    }
+  }
+
+  // Generic fallback
+  return {
+    output: 'Deliver agreed scope within the planned timeline',
+    quality: 'Meet acceptance criteria with ≤5% defect rate',
+    improvement: 'Improve customer satisfaction by 10%'
+  }
+}
+
+// --------  fields Validation --------
 function processRow(row: KpiRowIn): KpiRowOut {
   const {
     row_id,
@@ -45,7 +82,10 @@ function processRow(row: KpiRowIn): KpiRowOut {
     team_role,
     task_type,
     dead_line,
-    strategic_benefit
+    strategic_benefit,
+    output_metric: inputOutput,
+    quality_metric: inputQuality,
+    improvement_metric: inputImprovement
   } = row
 
   // ------------------------
@@ -59,7 +99,7 @@ function processRow(row: KpiRowIn): KpiRowOut {
   if (!task_type || !String(task_type).trim()) {
     missingFields.push('Task Type')
   }
- if (!team_role || !String(team_role).trim()) {
+  if (!team_role || !String(team_role).trim()) {
     missingFields.push('Team Role')
   }
   if (!dead_line || !String(dead_line).trim()) {
@@ -113,7 +153,49 @@ function processRow(row: KpiRowIn): KpiRowOut {
   }
 
   // ------------------------
-  // 3) Temporary placeholder objective (will be replaced in later steps)
+  // 3) Metrics logic (auto-suggest from Role Metric Matrix skeleton)
+  // ------------------------
+  const defaults = getRoleMetricDefaults(team_role)
+
+  let output_metric = inputOutput
+  let quality_metric = inputQuality
+  let improvement_metric = inputImprovement
+
+  const autoSuggestedFields: string[] = []
+
+  if (!output_metric || !String(output_metric).trim()) {
+    output_metric = defaults.output
+    autoSuggestedFields.push('Output')
+  }
+  if (!quality_metric || !String(quality_metric).trim()) {
+    quality_metric = defaults.quality
+    autoSuggestedFields.push('Quality')
+  }
+  if (!improvement_metric || !String(improvement_metric).trim()) {
+    improvement_metric = defaults.improvement
+    autoSuggestedFields.push('Improvement')
+  }
+
+  // Base status and comments for the skeleton engine
+  let status: 'VALID' | 'NEEDS_REVIEW' | 'INVALID' = 'NEEDS_REVIEW'
+  let comments =
+    'Placeholder objectives only. v10.7.5 KPI logic not yet fully implemented.'
+  let summary_reason =
+    'Engine skeleton responding without full KPI rules.'
+
+  if (autoSuggestedFields.length === 3) {
+    comments = 'Metrics auto-suggested (Output / Quality / Improvement).'
+    summary_reason = 'Metrics auto-suggested (Output / Quality / Improvement).'
+    status = 'NEEDS_REVIEW'
+  } else if (autoSuggestedFields.length > 0) {
+    const joined = autoSuggestedFields.join(' / ')
+    comments = `Metrics auto-suggested for: ${joined}.`
+    summary_reason = `Metrics auto-suggested for: ${joined}.`
+    status = 'NEEDS_REVIEW'
+  }
+
+  // ------------------------
+  // 4) Temporary placeholder objective (will be replaced in later steps)
   // ------------------------
   const simple_objective =
     `Deliver '${task_name}' for ${team_role} by ${dead_line} ` +
@@ -123,11 +205,9 @@ function processRow(row: KpiRowIn): KpiRowOut {
     row_id,
     simple_objective,
     complex_objective: '',
-    status: 'NEEDS_REVIEW',
-    comments:
-      'Placeholder objectives only. v10.7.5 KPI logic not yet implemented.',
-    summary_reason:
-      'Engine skeleton responding without full KPI rules.'
+    status,
+    comments,
+    summary_reason
   }
 }
 
