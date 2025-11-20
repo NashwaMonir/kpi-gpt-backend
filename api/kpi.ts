@@ -141,7 +141,17 @@ export default function handler(req: VercelRequest, res: VercelResponse) {
   }
 
   try {
-    const body = (req.body || {}) as KpiRequest
+    let body: KpiRequest
+
+    try {
+    body = typeof req.body === 'string' ? JSON.parse(req.body) : req.body
+    } catch {
+    return res.status(400).json({ error: 'Invalid JSON body.' })
+    }
+    
+    if (!body || typeof body !== 'object') {
+    return res.status(400).json({ error: 'Invalid request structure.' })
+    }
 
     if (!body.rows || !Array.isArray(body.rows)) {
       return res.status(400).json({ error: 'Missing or invalid rows array.' })
