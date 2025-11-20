@@ -140,29 +140,30 @@ export default function handler(req: VercelRequest, res: VercelResponse) {
     return res.status(405).json({ error: 'Method Not Allowed' })
   }
 
+  let body: KpiRequest
+
+  // --- Parse JSON safely ---
   try {
-    let body: KpiRequest
-
-    try {
     body = typeof req.body === 'string' ? JSON.parse(req.body) : req.body
-    } catch {
+  } catch {
     return res.status(400).json({ error: 'Invalid JSON body.' })
-    }
-    
-    if (!body || typeof body !== 'object') {
-    return res.status(400).json({ error: 'Invalid request structure.' })
-    }
-
-    if (!body.rows || !Array.isArray(body.rows)) {
-      return res.status(400).json({ error: 'Missing or invalid rows array.' })
-    }
-
-    const rowsOut: KpiRowOut[] = body.rows.map((row) => processRow(row))
-    const response: KpiResponse = { rows: rowsOut }
-
-    return res.status(200).json(response)
-  } catch (err) {
-    console.error('KPI engine error:', err)
-    return res.status(500).json({ error: 'Internal KPI engine error.' })
   }
+
+// --- Validate structure ---
+if (!body || typeof body !== 'object') {
+  return res.status(400).json({ error: 'Invalid request structure.' })
+}
+
+if (!body.rows || !Array.isArray(body.rows)) {
+  return res.status(400).json({ error: 'Missing or invalid rows array.' })
+}
+
+try {
+  const rowsOut: KpiRowOut[] = body.rows.map((row) => processRow(row))
+  const response: KpiResponse = { rows: rowsOut }
+  return res.status(200).json(response)
+} catch (err) {
+  console.error('KPI engine error:', err)
+  return res.status(500).json({ error: 'Internal KPI engine error.' })
+}
 }
