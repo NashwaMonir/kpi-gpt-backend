@@ -59,7 +59,7 @@ function processRow(row: KpiRowIn): KpiRowOut {
   if (!task_type || !String(task_type).trim()) {
     missingFields.push('Task Type')
   }
-  if (!team_role || !String(team_role).trim()) {
+ if (team_role === undefined || team_role === null || String(team_role).trim() === '') {
     missingFields.push('Team Role')
   }
   if (!dead_line || !String(dead_line).trim()) {
