@@ -48,8 +48,6 @@ function processRow(row: KpiRowIn): KpiRowOut {
     strategic_benefit
   } = row
 
-  console.log('DEBUG_KPI_ROW', JSON.stringify({ row_id, team_role, task_type, task_name, dead_line, strategic_benefit }));
-
   // ------------------------
   // 1) Validate mandatory fields
   // ------------------------
@@ -61,7 +59,7 @@ function processRow(row: KpiRowIn): KpiRowOut {
   if (!task_type || !String(task_type).trim()) {
     missingFields.push('Task Type')
   }
- if (team_role === undefined || team_role === null || String(team_role).trim() === '') {
+ if (!team_role || !String(team_role).trim()) {
     missingFields.push('Team Role')
   }
   if (!dead_line || !String(dead_line).trim()) {
@@ -70,8 +68,6 @@ function processRow(row: KpiRowIn): KpiRowOut {
   if (!strategic_benefit || !String(strategic_benefit).trim()) {
     missingFields.push('Strategic Benefit')
   }
-
-  console.log('DEBUG_MISSING_FIELDS', JSON.stringify({ row_id, missingFields }));
 
   if (missingFields.length > 0) {
     const reason = `Invalid: Missing mandatory field(s): ${missingFields.join(
