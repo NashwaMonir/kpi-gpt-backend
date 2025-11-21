@@ -76,7 +76,7 @@ function getRoleMetricDefaults(team_role: string | undefined) {
 
 // --------  fields Validation --------
 function processRow(row: KpiRowIn): KpiRowOut {
-  const {
+    const {
     row_id,
     task_name,
     team_role,
@@ -85,8 +85,9 @@ function processRow(row: KpiRowIn): KpiRowOut {
     strategic_benefit,
     output_metric: inputOutput,
     quality_metric: inputQuality,
-    improvement_metric: inputImprovement
-  } = row
+    improvement_metric: inputImprovement,
+    mode
+    } = row
 
   // ------------------------
   // 1) Validate mandatory fields
@@ -193,20 +194,38 @@ function processRow(row: KpiRowIn): KpiRowOut {
     }
 
   // ------------------------
-  // 4) Temporary placeholder objective (will be replaced in later steps)
-  // ------------------------
-  const simple_objective =
+    // 4) Temporary objectives with mode handling
+    // ------------------------
+
+    // Base simple objective (we will make this smarter later)
+    const simpleTemplate =
     `Deliver '${task_name}' for ${team_role} by ${dead_line} ` +
     `to support ${strategic_benefit}.`
 
-  return {
+    let simple_objective = ''
+    let complex_objective = ''
+
+    const normalizedMode: 'simple' | 'complex' | 'both' =
+    mode === 'simple' || mode === 'complex' || mode === 'both' ? mode : 'both'
+
+    // For now we only have a real simple objective
+    if (normalizedMode === 'simple' || normalizedMode === 'both') {
+    simple_objective = simpleTemplate
+    }
+
+    // Complex objective will be implemented later
+    if (normalizedMode === 'complex' || normalizedMode === 'both') {
+    complex_objective = ''
+    }
+
+    return {
     row_id,
     simple_objective,
-    complex_objective: '',
+    complex_objective,
     status,
     comments,
     summary_reason
-  }
+    }
 }
 
 
