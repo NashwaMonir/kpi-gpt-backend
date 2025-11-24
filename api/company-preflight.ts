@@ -61,7 +61,17 @@ type PreflightResult = AnalyzeResponse | RewriteResponse
 ----------------------------------------------------------- */
 
 function normalize(str: string | null | undefined): string {
-  return (str || '').trim().toLowerCase()
+  const raw = (str || '').trim().toLowerCase()
+  if (!raw) return ''
+
+  // Strip English-style possessive endings: "acme's", "acme’s"
+  let cleaned = raw.replace(/['’]s\b/g, '')
+
+  // Normalize known generic tokens so they can be treated consistently
+  if (cleaned === 'organization') return 'the organization'
+  if (cleaned === 'company') return 'the company'
+
+  return cleaned
 }
 
 // Very simple company-token detector inside strategic_benefit
