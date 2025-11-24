@@ -11,6 +11,15 @@ interface RowIn {
   row_id: number
   company: string
   strategic_benefit: string
+
+  task_name?: string
+  task_type?: string
+  team_role?: string
+  dead_line?: string
+  output_metric?: string
+  quality_metric?: string
+  improvement_metric?: string
+  mode?: string
 }
 
 interface AnalyzeRequest {
@@ -56,19 +65,29 @@ function normalize(str: string | null | undefined): string {
 }
 
 // Very simple company-token detector inside strategic_benefit
-function detectCompanyInBenefit(text: string): string | null {
-  if (!text) return null
-
+function detectCompanyInBenefit(text: string): string[] {
+  if (!text) return []
   const tokens = text.split(/[\s,.;:]+/)
   const patterns = [
     'inc','ltd','corp','ab','llc','bank','telecom','group','company','corporation'
   ]
-
+  const found: string[] = []
   for (const t of tokens) {
     const lower = t.toLowerCase()
-    if (patterns.some(p => lower.includes(p))) return t
+    if (patterns.some(p => lower.includes(p))) {
+      found.push(t)
+    }
   }
-  return null
+  return found
+}
+
+function splitCompanyField(raw: string | null | undefined): string[] {
+  if (!raw) return []
+  // Split on common multi-company separators: ',', '/', '&', ' and '
+  return raw
+    .split(/,|\/|&|\band\b/gi)
+    .map(part => part.trim())
+    .filter(part => part.length > 0)
 }
 
 /* -----------------------------------------------------------
@@ -85,38 +104,57 @@ function runAnalyze(payload: AnalyzeRequest): AnalyzeResponse {
   const perRow: AnalyzeResponse['per_row_status'] = []
 
   for (const row of rows) {
-    const colCompany = row.company || ''
-    const benefitCompany = detectCompanyInBenefit(row.strategic_benefit) || ''
+    const colCompanies = splitCompanyField(row.company)
+    const benefitCompanies = detectCompanyInBenefit(row.strategic_benefit)
 
-    const colNorm = normalize(colCompany)
-    const benefitNorm = normalize(benefitCompany)
-    const hasAny = (!!colNorm) || (!!benefitNorm)
+    // All detected companies in display form
+    const allCompanies: string[] = []
+    allCompanies.push(...colCompanies)
+    allCompanies.push(...benefitCompanies)
+
+    const normalizedAll = allCompanies.map(c => normalize(c))
+    const hasAny = allCompanies.length > 0
 
     let status: 'MATCH_SELECTED' | 'MATCH_GENERIC' | 'MISSING' | 'MISMATCH'
-    let detected_company = colCompany || benefitCompany || ''
+    let detected_company = ''
 
     if (!hasAny) {
       status = 'MISSING'
       missing.push(row.row_id)
+      detected_company = ''
     } else {
-      const effective = colNorm || benefitNorm
-      const raw = colCompany || benefitCompany
+      // Check generic tags
+      const allGeneric = normalizedAll.length > 0 &&
+        normalizedAll.every(n => n === 'the company' || n === 'the organization')
 
-      const isGeneric =
-        effective === 'the company' ||
-        effective === 'the organization'
-
-      if (generic_mode && isGeneric) {
+      if (generic_mode && allGeneric) {
         status = 'MATCH_GENERIC'
-      } else if (!selectedNorm) {
-        status = 'MATCH_GENERIC' // generic mode with no selected name
+        detected_company = allCompanies.join('; ')
       } else {
-        if (effective === selectedNorm) {
+        // Non-generic evaluation vs selected company
+        const allMatchSelected =
+          !!selectedNorm &&
+          normalizedAll.length > 0 &&
+          normalizedAll.every(n => n === selectedNorm || n === '')
+
+        if (allMatchSelected) {
           status = 'MATCH_SELECTED'
+          detected_company = allCompanies.join('; ')
         } else {
           status = 'MISMATCH'
           mismatched.push(row.row_id)
-          if (raw) externalNames.add(raw)
+          detected_company = allCompanies.join('; ')
+          for (const c of allCompanies) {
+            const normC = normalize(c)
+            if (
+              normC &&
+              normC !== selectedNorm &&
+              normC !== 'the company' &&
+              normC !== 'the organization'
+            ) {
+              externalNames.add(c)
+            }
+          }
         }
       }
     }
@@ -135,7 +173,6 @@ function runAnalyze(payload: AnalyzeRequest): AnalyzeResponse {
     per_row_status: perRow
   }
 }
-
 /* -----------------------------------------------------------
    REWRITE LOGIC
 ----------------------------------------------------------- */
@@ -151,19 +188,17 @@ function runRewrite(payload: RewriteRequest): RewriteResponse {
   const updated = rows.map(row => {
     let { company, strategic_benefit } = row
 
-    const colCompany = company || ''
-    const benefitCompany = detectCompanyInBenefit(strategic_benefit) || ''
+    const colCompanies = splitCompanyField(company)
+    const benefitCompanies = detectCompanyInBenefit(strategic_benefit)
 
-    const colNorm = normalize(colCompany)
-    const benefitNorm = normalize(benefitCompany)
-    const hasAny = (!!colNorm) || (!!benefitNorm)
+    const allCompanies: string[] = []
+    allCompanies.push(...colCompanies)
+    allCompanies.push(...benefitCompanies)
 
-    const effectiveName = colNorm || benefitNorm
-    const effectiveRaw = colCompany || benefitCompany
-    const isGenericTag =
-      effectiveName === 'the company' || effectiveName === 'the organization'
-    const isMismatch =
-      !!selectedNorm && !!effectiveName && effectiveName !== selectedNorm && !isGenericTag
+    const colNorms = colCompanies.map(c => normalize(c))
+    const benefitNorms = benefitCompanies.map(c => normalize(c))
+    const hasAny = allCompanies.length > 0
+
 
     /* -------------------------
        Missing company?
@@ -185,20 +220,22 @@ function runRewrite(payload: RewriteRequest): RewriteResponse {
     /* -------------------------
        Mismatched?
     -------------------------- */
-    if (mismatched_strategy === 'overwrite' && isMismatch) {
-      if (generic_mode) {
-        company = ''
-        strategic_benefit = strategic_benefit.replace(effectiveRaw, 'the organization')
-      } else {
-        company = selected_company
-        strategic_benefit = strategic_benefit.replace(effectiveRaw, selected_company)
+    for (const comp of allCompanies) {
+      if (mismatched_strategy === 'overwrite' && normalize(comp) !== selectedNorm) {
+        if (generic_mode) {
+          company = ''
+          strategic_benefit = strategic_benefit.replace(comp, 'the organization')
+        } else {
+          company = selected_company
+          strategic_benefit = strategic_benefit.replace(comp, selected_company)
+        }
       }
     }
 
     // keep = no change
 
     return {
-      row_id: row.row_id,
+      ...row,
       company,
       strategic_benefit
     }
@@ -228,6 +265,10 @@ export default function handler(req: VercelRequest, res: VercelResponse) {
 
   if (!body || typeof body !== 'object') {
     return res.status(400).json({ error: 'Invalid request structure.' })
+  }
+
+  if (!('rows' in body) || !Array.isArray((body as any).rows)) {
+    return res.status(400).json({ error: 'Missing or invalid rows array.' })
   }
 
   try {

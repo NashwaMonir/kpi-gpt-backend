@@ -38,6 +38,9 @@ type KpiResponse = {
 
 // -------- Simple placeholder engine (to be replaced by v10.7.5 logic later) --------
 // -------- Default metrics by role (v10.7.5 skeleton) --------
+// TODO v10.8:
+// Replace hard-coded defaults with values loaded from role_metric_matrix.json
+// so backend and GPT share the same matrix source of truth.
 
 function getRoleMetricDefaults(team_role: string | undefined) {
   const role = (team_role || '').toLowerCase()
@@ -88,6 +91,24 @@ function processRow(row: KpiRowIn): KpiRowOut {
     improvement_metric: inputImprovement,
     mode
     } = row
+  // Normalize metric inputs to safe trimmed strings
+  const safeOutput = (inputOutput ?? '').toString().trim()
+  const safeQuality = (inputQuality ?? '').toString().trim()
+  const safeImprovement = (inputImprovement ?? '').toString().trim()
+
+  // Normalize mode to simple | complex | both (fallback = both)
+  const rawMode = (mode || '').toString().toLowerCase().trim()
+  const normalizedMode: 'simple' | 'complex' | 'both' =
+  rawMode === 'simple' || rawMode === 'complex' || rawMode === 'both'
+  ? (rawMode as 'simple' | 'complex' | 'both')
+  : 'both'
+  // Note: normalizedMode is not yet used by the backend (text generation is handled in GPT),
+  // but this keeps backend behavior consistent with the v10.7.5 mode rules.
+
+  // Optional: warn about unsupported mode values (for future debugging / v10.8).
+  if (rawMode && !['simple', 'complex', 'both'].includes(rawMode)) {
+  console.warn(`Unsupported mode '${rawMode}' for row_id=${row_id}; falling back to 'both'.`)
+  }
 
   // ------------------------
   // 1) Validate mandatory fields
@@ -111,9 +132,7 @@ function processRow(row: KpiRowIn): KpiRowOut {
   }
 
   if (missingFields.length > 0) {
-    const reason = `Invalid: Missing mandatory field(s): ${missingFields.join(
-      ', '
-    )}.`
+    const reason = `Missing mandatory field(s): ${missingFields.join(', ')}.`
 
     return {
       row_id,
@@ -125,54 +144,53 @@ function processRow(row: KpiRowIn): KpiRowOut {
     }
   }
 
-  // ------------------------
-  // 2) Validate deadline = current calendar year
-  // ------------------------
-  let deadlineYear: number | null = null
-  try {
-    const parts = String(dead_line).split('-')
-    if (parts.length === 3) {
-      deadlineYear = Number(parts[0])
-    }
-  } catch {
-    deadlineYear = null
+ // ------------------------
+// 2) Validate deadline = current calendar year
+// ------------------------
+let deadlineYear: number | null = null
+try {
+  const match = String(dead_line).match(/(\d{4})/)
+  if (match) {
+    deadlineYear = Number(match[1])
   }
+} catch {
+  deadlineYear = null
+}
 
-  const currentYear = new Date().getFullYear()
+const currentYear = new Date().getFullYear()
+if (!deadlineYear || deadlineYear !== currentYear) {
+  const reason = 'Deadline outside valid calendar year.'
 
-  if (!deadlineYear || deadlineYear !== currentYear) {
-    const reason = 'Invalid: Deadline outside current year.'
-
-    return {
-      row_id,
-      simple_objective: '',
-      complex_objective: '',
-      status: 'INVALID',
-      comments: reason,
-      summary_reason: reason
-    }
+  return {
+    row_id,
+    simple_objective: '',
+    complex_objective: '',
+    status: 'INVALID',
+    comments: reason,
+    summary_reason: reason
   }
+}
 
   // ------------------------
   // 3) Metrics logic (auto-suggest from Role Metric Matrix skeleton)
   // ------------------------
   const defaults = getRoleMetricDefaults(team_role)
 
-  let output_metric = inputOutput
-  let quality_metric = inputQuality
-  let improvement_metric = inputImprovement
+  let output_metric = safeOutput
+  let quality_metric = safeQuality
+  let improvement_metric = safeImprovement
 
   const autoSuggestedFields: string[] = []
 
-  if (!output_metric || !String(output_metric).trim()) {
+  if (!output_metric) {
     output_metric = defaults.output
     autoSuggestedFields.push('Output')
   }
-  if (!quality_metric || !String(quality_metric).trim()) {
+  if (!quality_metric) {
     quality_metric = defaults.quality
     autoSuggestedFields.push('Quality')
   }
-  if (!improvement_metric || !String(improvement_metric).trim()) {
+  if (!improvement_metric) {
     improvement_metric = defaults.improvement
     autoSuggestedFields.push('Improvement')
   }
@@ -194,38 +212,20 @@ function processRow(row: KpiRowIn): KpiRowOut {
     }
 
   // ------------------------
-    // 4) Temporary objectives with mode handling
-    // ------------------------
+  // 4) Objectives (placeholders only in v10.7.5)
+  // ------------------------
 
-    // Base simple objective (we will make this smarter later)
-    const simpleTemplate =
-    `Deliver '${task_name}' for ${team_role} by ${dead_line} ` +
-    `to support ${strategic_benefit}.`
+  const simple_objective = ''
+  const complex_objective = ''
 
-    let simple_objective = ''
-    let complex_objective = ''
-
-    const normalizedMode: 'simple' | 'complex' | 'both' =
-    mode === 'simple' || mode === 'complex' || mode === 'both' ? mode : 'both'
-
-    // For now we only have a real simple objective
-    if (normalizedMode === 'simple' || normalizedMode === 'both') {
-    simple_objective = simpleTemplate
-    }
-
-    // Complex objective will be implemented later
-    if (normalizedMode === 'complex' || normalizedMode === 'both') {
-    complex_objective = ''
-    }
-
-    return {
+  return {
     row_id,
     simple_objective,
     complex_objective,
     status,
     comments,
     summary_reason
-    }
+  }
 }
 
 
@@ -253,6 +253,16 @@ if (!body || typeof body !== 'object') {
 
 if (!body.rows || !Array.isArray(body.rows)) {
   return res.status(400).json({ error: 'Missing or invalid rows array.' })
+}
+
+// Optional: warn if engine_version is missing (GPT should always send it).
+if (!body.engine_version) {
+  console.warn('Warning: engine_version missing; proceeding with default v10.7.5 semantics.')
+}
+
+// Optional: warn if default_company is not a string.
+if (body.default_company !== undefined && typeof body.default_company !== 'string') {
+  console.warn('Warning: default_company should be a string; received type:', typeof body.default_company)
 }
 
 try {
