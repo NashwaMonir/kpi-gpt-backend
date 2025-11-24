@@ -69,7 +69,17 @@ function detectCompanyInBenefit(text: string): string[] {
   if (!text) return []
   const tokens = text.split(/[\s,.;:]+/)
   const patterns = [
-    'inc','ltd','corp','ab','llc','bank','telecom','group','company','corporation'
+  'inc',
+  'ltd',
+  'corp',
+  'ab',
+  'llc',
+  'bank',
+  'telecom',
+  'group',
+  'company',
+  'corporation',
+  'organization' // NEW: detect “organization’s” etc. as a generic org token
   ]
   const found: string[] = []
   for (const t of tokens) {
@@ -94,6 +104,19 @@ function splitCompanyField(raw: string | null | undefined): string[] {
    ANALYZE LOGIC
 ----------------------------------------------------------- */
 
+/* Helper: extracts instance of the selected company from strategic_benefit if mentioned explicitly */
+function selectedFromBenefitExtractor(text: string, selectedNorm: string): string[] {
+  if (!text || !selectedNorm) return []
+  const tokens = text.split(/[\s,.;:]+/)
+  const matches: string[] = []
+  for (const t of tokens) {
+    if (t.toLowerCase().includes(selectedNorm)) {
+      matches.push(t)
+    }
+  }
+  return matches
+}
+
 function runAnalyze(payload: AnalyzeRequest): AnalyzeResponse {
   const { selected_company, generic_mode, rows } = payload
   const selectedNorm = normalize(selected_company)
@@ -106,11 +129,17 @@ function runAnalyze(payload: AnalyzeRequest): AnalyzeResponse {
   for (const row of rows) {
     const colCompanies = splitCompanyField(row.company)
     const benefitCompanies = detectCompanyInBenefit(row.strategic_benefit)
+    const selectedFromBenefit = selectedFromBenefitExtractor(row.strategic_benefit, selectedNorm)
 
     // All detected companies in display form
     const allCompanies: string[] = []
     allCompanies.push(...colCompanies)
     allCompanies.push(...benefitCompanies)
+    
+    // If the benefit explicitly mentions the selected company, ensure it is included
+    if (selectedFromBenefit.length > 0) {
+      allCompanies.push(...selectedFromBenefit)
+    }
 
     const normalizedAll = allCompanies.map(c => normalize(c))
     const hasAny = allCompanies.length > 0
@@ -173,6 +202,7 @@ function runAnalyze(payload: AnalyzeRequest): AnalyzeResponse {
     per_row_status: perRow
   }
 }
+
 /* -----------------------------------------------------------
    REWRITE LOGIC
 ----------------------------------------------------------- */
@@ -190,10 +220,14 @@ function runRewrite(payload: RewriteRequest): RewriteResponse {
 
     const colCompanies = splitCompanyField(company)
     const benefitCompanies = detectCompanyInBenefit(strategic_benefit)
+    const selectedFromBenefit = selectedFromBenefitExtractor(strategic_benefit, selectedNorm)
 
     const allCompanies: string[] = []
     allCompanies.push(...colCompanies)
     allCompanies.push(...benefitCompanies)
+    if (selectedFromBenefit.length > 0) {
+      allCompanies.push(...selectedFromBenefit)
+    }
 
     const colNorms = colCompanies.map(c => normalize(c))
     const benefitNorms = benefitCompanies.map(c => normalize(c))
