@@ -38,9 +38,6 @@ type KpiResponse = {
 
 // -------- Simple placeholder engine (to be replaced by v10.7.5 logic later) --------
 // -------- Default metrics by role (v10.7.5 skeleton) --------
-// TODO v10.8:
-// Replace hard-coded defaults with values loaded from role_metric_matrix.json
-// so backend and GPT share the same matrix source of truth.
 
 const ALLOWED_TASK_TYPES = [
   'Project',
@@ -130,6 +127,7 @@ function processRow(row: KpiRowIn): KpiRowOut {
   // 1) Validate mandatory fields (presence + semantic) AND deadline
   // ------------------------
   const missingFields: string[] = []
+  const invalidFields: string[] = []
 
   const safeTaskName = (task_name ?? '').toString().trim()
   const safeTaskType = (task_type ?? '').toString().trim()
@@ -137,74 +135,128 @@ function processRow(row: KpiRowIn): KpiRowOut {
   const safeDeadline = (dead_line ?? '').toString().trim()
   const safeStrategicBenefit = (strategic_benefit ?? '').toString().trim()
 
+  // Task Name
   if (!safeTaskName) {
     missingFields.push('Task Name')
   }
 
-  // Treat empty or invalid task_type as missing mandatory Task Type
-  if (!safeTaskType || !ALLOWED_TASK_TYPES.includes(safeTaskType)) {
+  // Task Type: missing vs invalid
+  if (!safeTaskType) {
     missingFields.push('Task Type')
+  } else if (!ALLOWED_TASK_TYPES.includes(safeTaskType)) {
+    invalidFields.push('Task Type')
   }
 
-  // Extract base role before any "–" dash
-  const baseTeamRole = safeTeamRole.split('–')[0].trim()
-  // Missing or invalid team role
-  if (!baseTeamRole || !ALLOWED_TEAM_ROLES.includes(baseTeamRole)) {
+  // Team Role: missing vs invalid
+  if (!safeTeamRole) {
     missingFields.push('Team Role')
+  } else {
+    const baseTeamRole = safeTeamRole.split('–')[0].trim()
+    if (!baseTeamRole || !ALLOWED_TEAM_ROLES.includes(baseTeamRole)) {
+      invalidFields.push('Team Role')
+    }
   }
 
-  if (!safeDeadline) {
-    missingFields.push('Deadline')
-  }
-
+  // Strategic Benefit
   if (!safeStrategicBenefit) {
     missingFields.push('Strategic Benefit')
   }
 
-  // Deadline validation: must be current year and not bare-year/quarter-only
-  const rawDeadline = safeDeadline
-  let deadlineYear: number | null = null
-  try {
-    const match = rawDeadline.match(/(\d{4})/)
-    if (match) {
-      deadlineYear = Number(match[1])
+  // ------------------------
+  // Deadline validation (flexible multi-format parsing)
+  // ------------------------
+  let deadlineInvalidFormat = false
+  let deadlineWrongYear = false
+
+  if (!safeDeadline) {
+    missingFields.push('Deadline')
+  } else {
+    const deadlineStr = safeDeadline
+    let parsedDate: Date | null = null
+
+    // Try ISO: YYYY-MM-DD
+    const isoRegex = /^\d{4}-\d{2}-\d{2}$/
+    if (isoRegex.test(deadlineStr)) {
+      parsedDate = new Date(deadlineStr)
     }
-  } catch {
-    deadlineYear = null
+
+    // Try Slash: YYYY/MM/DD
+    const slashRegex = /^\d{4}\/\d{2}\/\d{2}$/
+    if (!parsedDate && slashRegex.test(deadlineStr)) {
+      const normalized = deadlineStr.replace(/\//g, '-')
+      parsedDate = new Date(normalized)
+    }
+
+    // Try Dot: YYYY.MM.DD
+    const dotRegex = /^\d{4}\.\d{2}\.\d{2}$/
+    if (!parsedDate && dotRegex.test(deadlineStr)) {
+      const normalized = deadlineStr.replace(/\./g, '-')
+      parsedDate = new Date(normalized)
+    }
+
+    // Try Text month: YYYY-MMM-DD (e.g., 2025-Sep-30) or YYYY-MMMM-DD
+    const textMonthRegex = /^\d{4}-[A-Za-z]{3,9}-\d{2}$/
+    if (!parsedDate && textMonthRegex.test(deadlineStr)) {
+      parsedDate = new Date(deadlineStr)
+    }
+
+    // Try space-separated text month: YYYY MMM DD (2025 Sep 30)
+    const spaceTextRegex = /^\d{4} [A-Za-z]{3,9} \d{2}$/
+    if (!parsedDate && spaceTextRegex.test(deadlineStr)) {
+      parsedDate = new Date(deadlineStr)
+    }
+
+    // Final validation: if still null or invalid date → invalid format
+    if (!parsedDate || isNaN(parsedDate.getTime())) {
+      deadlineInvalidFormat = true
+    } else {
+      // Format OK → check year
+      const year = parsedDate.getFullYear()
+      const currentYear = new Date().getFullYear()
+      if (year !== currentYear) {
+        deadlineWrongYear = true
+      }
+    }
   }
 
-  const currentYear = new Date().getFullYear()
-
-  // Explicitly block these patterns:
-  // 1) bare 4-digit year: "2025"
-  // 2) quarter notation: "Q1 2025", "Q2 2025", ..., "Q4 2025"
-  const isBareYear = /^\d{4}$/.test(rawDeadline)
-  const isQuarterString = /^Q[1-4]\s*\d{4}$/i.test(rawDeadline)
-
-  // FY25 has no 4-digit year → deadlineYear will be null → already invalid
-  const isInvalidShape = isBareYear || isQuarterString
-  const deadlineInvalid = !deadlineYear || deadlineYear !== currentYear || isInvalidShape
-
-  if (missingFields.length > 0 || deadlineInvalid) {
+  // ------------------------
+  // Build failure output (missing + invalid + deadline)
+  // ------------------------
+  if (
+    missingFields.length > 0 ||
+    invalidFields.length > 0 ||
+    deadlineInvalidFormat ||
+    deadlineWrongYear
+  ) {
     const parts: string[] = []
 
     if (missingFields.length > 0) {
       parts.push(`Missing mandatory field(s): ${missingFields.join(', ')}.`)
     }
-    if (deadlineInvalid) {
+
+    if (invalidFields.length > 0) {
+      parts.push(`Invalid value(s) for: ${invalidFields.join(', ')}.`)
+    }
+
+    if (deadlineInvalidFormat) {
+      parts.push('Invalid deadline format.')
+    }
+
+    if (deadlineWrongYear) {
       parts.push('Deadline outside valid calendar year.')
     }
 
     const reason = parts.join(' ')
-  return {
-    row_id,
-    simple_objective: '',
-    complex_objective: '',
-    status: 'INVALID',
-    comments: reason,
-    summary_reason: reason
+
+    return {
+      row_id,
+      simple_objective: '',
+      complex_objective: '',
+      status: 'INVALID',
+      comments: reason,
+      summary_reason: reason
+    }
   }
-}
   // ------------------------
   // 3) Metrics logic (auto-suggest from Role Metric Matrix skeleton)
   // ------------------------
