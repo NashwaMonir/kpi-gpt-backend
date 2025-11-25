@@ -230,11 +230,27 @@ function processRow(row: KpiRowIn): KpiRowOut {
   ) {
     const parts: string[] = []
 
+    // Sort fields into a canonical order for consistent messaging
+    const FIELD_ORDER = [
+      'Task Name',
+      'Task Type',
+      'Team Role',
+      'Deadline',
+      'Strategic Benefit'
+    ]
+
+    const INVALID_ORDER = [
+      'Task Type',
+      'Team Role'
+    ]
+
     if (missingFields.length > 0) {
+      missingFields.sort((a, b) => FIELD_ORDER.indexOf(a) - FIELD_ORDER.indexOf(b))
       parts.push(`Missing mandatory field(s): ${missingFields.join(', ')}.`)
     }
 
     if (invalidFields.length > 0) {
+      invalidFields.sort((a, b) => INVALID_ORDER.indexOf(a) - INVALID_ORDER.indexOf(b))
       parts.push(`Invalid value(s) for: ${invalidFields.join(', ')}.`)
     }
 
@@ -246,7 +262,10 @@ function processRow(row: KpiRowIn): KpiRowOut {
       parts.push('Deadline outside valid calendar year.')
     }
 
-    const reason = parts.join(' ')
+    // Explicitly state that objectives are not generated when validation fails
+    parts.push('Objectives not generated due to validation errors.')
+
+    const reason = parts.join('\n').trim()
 
     return {
       row_id,
