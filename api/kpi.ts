@@ -42,6 +42,22 @@ type KpiResponse = {
 // Replace hard-coded defaults with values loaded from role_metric_matrix.json
 // so backend and GPT share the same matrix source of truth.
 
+const ALLOWED_TASK_TYPES = [
+  'Project',
+  'Change Request',
+  'Consultation',
+  'Maintenance'
+]
+
+const ALLOWED_TEAM_ROLES = [
+  'Content',
+  'Design',
+  'Development',
+  'Content Lead',
+  'Design Lead',
+  'Development Lead'
+]
+
 function getRoleMetricDefaults(team_role: string | undefined) {
   const role = (team_role || '').toLowerCase()
 
@@ -111,56 +127,75 @@ function processRow(row: KpiRowIn): KpiRowOut {
   }
 
   // ------------------------
-  // 1) Validate mandatory fields
+  // 1) Validate mandatory fields (presence + semantic) AND deadline
   // ------------------------
   const missingFields: string[] = []
 
-  if (!task_name || !String(task_name).trim()) {
+  const safeTaskName = (task_name ?? '').toString().trim()
+  const safeTaskType = (task_type ?? '').toString().trim()
+  const safeTeamRole = (team_role ?? '').toString().trim()
+  const safeDeadline = (dead_line ?? '').toString().trim()
+  const safeStrategicBenefit = (strategic_benefit ?? '').toString().trim()
+
+  if (!safeTaskName) {
     missingFields.push('Task Name')
   }
-  if (!task_type || !String(task_type).trim()) {
+
+  // Treat empty or invalid task_type as missing mandatory Task Type
+  if (!safeTaskType || !ALLOWED_TASK_TYPES.includes(safeTaskType)) {
     missingFields.push('Task Type')
   }
-  if (!team_role || !String(team_role).trim()) {
+
+  // Extract base role before any "–" dash
+  const baseTeamRole = safeTeamRole.split('–')[0].trim()
+  // Missing or invalid team role
+  if (!baseTeamRole || !ALLOWED_TEAM_ROLES.includes(baseTeamRole)) {
     missingFields.push('Team Role')
   }
-  if (!dead_line || !String(dead_line).trim()) {
+
+  if (!safeDeadline) {
     missingFields.push('Deadline')
   }
-  if (!strategic_benefit || !String(strategic_benefit).trim()) {
+
+  if (!safeStrategicBenefit) {
     missingFields.push('Strategic Benefit')
   }
 
-  if (missingFields.length > 0) {
-    const reason = `Missing mandatory field(s): ${missingFields.join(', ')}.`
-
-    return {
-      row_id,
-      simple_objective: '',
-      complex_objective: '',
-      status: 'INVALID',
-      comments: reason,
-      summary_reason: reason
+  // Deadline validation: must be current year and not bare-year/quarter-only
+  const rawDeadline = safeDeadline
+  let deadlineYear: number | null = null
+  try {
+    const match = rawDeadline.match(/(\d{4})/)
+    if (match) {
+      deadlineYear = Number(match[1])
     }
+  } catch {
+    deadlineYear = null
   }
 
- // ------------------------
-// 2) Validate deadline = current calendar year
-// ------------------------
-let deadlineYear: number | null = null
-try {
-  const match = String(dead_line).match(/(\d{4})/)
-  if (match) {
-    deadlineYear = Number(match[1])
-  }
-} catch {
-  deadlineYear = null
-}
+  const currentYear = new Date().getFullYear()
 
-const currentYear = new Date().getFullYear()
-if (!deadlineYear || deadlineYear !== currentYear) {
-  const reason = 'Deadline outside valid calendar year.'
+  // Explicitly block these patterns:
+  // 1) bare 4-digit year: "2025"
+  // 2) quarter notation: "Q1 2025", "Q2 2025", ..., "Q4 2025"
+  const isBareYear = /^\d{4}$/.test(rawDeadline)
+  const isQuarterString = /^Q[1-4]\s*\d{4}$/i.test(rawDeadline)
 
+  // FY25 has no 4-digit year → deadlineYear will be null → already invalid
+  const isInvalidShape = isBareYear || isQuarterString
+  const deadlineInvalid = !deadlineYear || deadlineYear !== currentYear || isInvalidShape
+
+  if (missingFields.length > 0 || deadlineInvalid) {
+    const parts: string[] = []
+
+    if (missingFields.length > 0) {
+      parts.push(`Missing mandatory field(s): ${missingFields.join(', ')}.`)
+    }
+    if (deadlineInvalid) {
+      parts.push('Deadline outside valid calendar year.')
+    }
+
+    const reason = parts.join(' ')
   return {
     row_id,
     simple_objective: '',
@@ -170,7 +205,6 @@ if (!deadlineYear || deadlineYear !== currentYear) {
     summary_reason: reason
   }
 }
-
   // ------------------------
   // 3) Metrics logic (auto-suggest from Role Metric Matrix skeleton)
   // ------------------------
