@@ -140,21 +140,33 @@ function processRow(row: KpiRowIn): KpiRowOut {
     missingFields.push('Task Name')
   }
 
-  // Task Type: missing vs invalid
+  // Task Type: missing vs invalid (case‑insensitive normalization)
+  let normalizedTaskType = safeTaskType.toLowerCase();
+  const allowedTaskTypesLower = ALLOWED_TASK_TYPES.map(t => t.toLowerCase());
+
   if (!safeTaskType) {
-    missingFields.push('Task Type')
-  } else if (!ALLOWED_TASK_TYPES.includes(safeTaskType)) {
-    invalidFields.push('Task Type')
+    missingFields.push('Task Type');
+  } else if (!allowedTaskTypesLower.includes(normalizedTaskType)) {
+    invalidFields.push('Task Type');
+  } else {
+    // Normalize to canonical form (title case from ALLOWED_TASK_TYPES)
+    const idx = allowedTaskTypesLower.indexOf(normalizedTaskType);
+    row.task_type = ALLOWED_TASK_TYPES[idx];
   }
 
-  // Team Role: missing vs invalid
-  if (!safeTeamRole) {
-    missingFields.push('Team Role')
+  // Team Role: missing vs invalid (case‑insensitive normalization)
+  const rawTeamRole = safeTeamRole.split('–')[0].trim();
+  let normalizedTeamRole = rawTeamRole.toLowerCase();
+  const allowedTeamRolesLower = ALLOWED_TEAM_ROLES.map(r => r.toLowerCase());
+
+  if (!rawTeamRole) {
+    missingFields.push('Team Role');
+  } else if (!allowedTeamRolesLower.includes(normalizedTeamRole)) {
+    invalidFields.push('Team Role');
   } else {
-    const baseTeamRole = safeTeamRole.split('–')[0].trim()
-    if (!baseTeamRole || !ALLOWED_TEAM_ROLES.includes(baseTeamRole)) {
-      invalidFields.push('Team Role')
-    }
+    // Normalize to canonical form
+    const idx = allowedTeamRolesLower.indexOf(normalizedTeamRole);
+    row.team_role = ALLOWED_TEAM_ROLES[idx];
   }
 
   // Strategic Benefit
@@ -185,6 +197,15 @@ function processRow(row: KpiRowIn): KpiRowOut {
     if (!parsedDate && slashRegex.test(deadlineStr)) {
       const normalized = deadlineStr.replace(/\//g, '-')
       parsedDate = new Date(normalized)
+    }
+
+    // Try Egyptian/European format: DD/MM/YYYY
+    const ddmmyyyyRegex = /^\d{2}\/\d{2}\/\d{4}$/;
+    if (!parsedDate && ddmmyyyyRegex.test(deadlineStr)) {
+      // Convert DD/MM/YYYY → YYYY-MM-DD
+      const [dd, mm, yyyy] = deadlineStr.split('/');
+      const normalized = `${yyyy}-${mm}-${dd}`;
+      parsedDate = new Date(normalized);
     }
 
     // Try Dot: YYYY.MM.DD
