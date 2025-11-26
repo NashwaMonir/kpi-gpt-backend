@@ -286,7 +286,7 @@ function processRow(row: KpiRowIn): KpiRowOut {
     // Explicitly state that objectives are not generated when validation fails
     parts.push('Objectives not generated due to validation errors.')
 
-    const reason = parts.join('\n').trim()
+   const reason = parts.join(' ').trim()
 
     return {
       row_id,
