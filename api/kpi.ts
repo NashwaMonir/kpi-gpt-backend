@@ -55,39 +55,46 @@ const ALLOWED_TEAM_ROLES = [
   'Development Lead'
 ]
 
-function getRoleMetricDefaults(team_role: string | undefined) {
-  const role = (team_role || '').toLowerCase()
+function containsDangerousContent(value: string): boolean {
+  const str = (value ?? '').toString();
+  if (!str.trim()) return false;
 
-  if (role.includes('content')) {
-    return {
-      output: 'Publish 95% of planned content on time',
-      quality: 'Keep content error rate below 2%',
-      improvement: 'Increase content engagement by 15%'
-    }
+  // HTML tags
+  if (/<[^>]+>/.test(str)) return true;
+
+  // Script / XSS patterns
+  if (/(<script\b|onerror\s*=|javascript:)/i.test(str)) return true;
+
+  // Obvious SQL keywords
+  if (/\b(select|insert|update|delete|drop|alter)\b/i.test(str)) return true;
+
+  // JSON-like object or array (very rough check)
+  const trimmed = str.trim();
+  if (
+    (trimmed.startsWith('{') && trimmed.endsWith('}')) ||
+    (trimmed.startsWith('[') && trimmed.endsWith(']'))
+  ) {
+    return true;
   }
 
-  if (role.includes('design')) {
-    return {
-      output: 'Maintain ≥95% adherence to the design system',
-      quality: 'Ensure WCAG AA accessibility compliance',
-      improvement: 'Increase task success rate in key flows by 15%'
-    }
-  }
+  // Spreadsheet / CSV formula injection
+  if (/^[=+@].+/i.test(trimmed)) return true;
 
-  if (role.includes('development')) {
-    return {
-      output: 'Reduce critical defects by 30% in the target scope',
-      quality: 'Maintain 99.9% service uptime on impacted systems',
-      improvement: 'Increase performance scores by 20% on key journeys'
-    }
-  }
+  // Control / non-printable characters
+  if (/[\u0000-\u001F\u007F-\u009F]/.test(str)) return true;
 
-  // Generic fallback
-  return {
-    output: 'Deliver agreed scope within the planned timeline',
-    quality: 'Meet acceptance criteria with ≤5% defect rate',
-    improvement: 'Improve customer satisfaction by 10%'
-  }
+  return false;
+}
+
+function isLowSemanticText(value: string): boolean {
+  const str = (value ?? '').toString().trim();
+  if (!str) return true; // caller should normally treat empty as "missing" instead
+
+  // If it has any letter or digit, we consider it potentially meaningful
+  if (/[A-Za-z0-9]/.test(str)) return false;
+
+  // Otherwise it's punctuation / emoji / symbols only → low semantic
+  return true;
 }
 
 // --------  fields Validation --------
@@ -110,18 +117,27 @@ function processRow(row: KpiRowIn): KpiRowOut {
   const safeImprovement = (inputImprovement ?? '').toString().trim()
 
   // Normalize mode to simple | complex | both (fallback = both)
-  const rawMode = (mode || '').toString().toLowerCase().trim()
-  const normalizedMode: 'simple' | 'complex' | 'both' =
-  rawMode === 'simple' || rawMode === 'complex' || rawMode === 'both'
-  ? (rawMode as 'simple' | 'complex' | 'both')
-  : 'both'
+  const rawMode = (mode || '').toString().toLowerCase().trim();
+  const validModes: Array<'simple' | 'complex' | 'both'> = ['simple', 'complex', 'both'];
+  let normalizedMode: 'simple' | 'complex' | 'both' = 'both';
+  let modeWasInvalid = false;
+
+  if (!rawMode) {
+    normalizedMode = 'both';
+  } else if (validModes.includes(rawMode as 'simple' | 'complex' | 'both')) {
+    normalizedMode = rawMode as 'simple' | 'complex' | 'both';
+  } else {
+    modeWasInvalid = true;
+    normalizedMode = 'both';
+    console.warn(`Unsupported mode '${rawMode}' for row_id=${row_id}; falling back to 'both'.`);
+  }
   // Note: normalizedMode is not yet used by the backend (text generation is handled in GPT),
   // but this keeps backend behavior consistent with the v10.7.5 mode rules.
 
   // Optional: warn about unsupported mode values (for future debugging / v10.8).
-  if (rawMode && !['simple', 'complex', 'both'].includes(rawMode)) {
-  console.warn(`Unsupported mode '${rawMode}' for row_id=${row_id}; falling back to 'both'.`)
-  }
+  // if (rawMode && !['simple', 'complex', 'both'].includes(rawMode)) {
+  // console.warn(`Unsupported mode '${rawMode}' for row_id=${row_id}; falling back to 'both'.`)
+  // }
 
   // ------------------------
   // 1) Validate mandatory fields (presence + semantic) AND deadline
@@ -134,6 +150,8 @@ function processRow(row: KpiRowIn): KpiRowOut {
   const safeTeamRole = (team_role ?? '').toString().trim()
   const safeDeadline = (dead_line ?? '').toString().trim()
   const safeStrategicBenefit = (strategic_benefit ?? '').toString().trim()
+  const safeCompany = (row.company ?? '').toString().trim()
+  const invalidTextFields: string[] = []
 
   // Task Name
   if (!safeTaskName) {
@@ -175,6 +193,35 @@ function processRow(row: KpiRowIn): KpiRowOut {
   }
 
   // ------------------------
+  // Content validation for metrics, company, and strategic benefit
+  // ------------------------
+
+  // Company: optional but must be safe if provided
+  if (safeCompany) {
+    if (containsDangerousContent(safeCompany) || isLowSemanticText(safeCompany)) {
+      invalidTextFields.push('Company')
+    }
+  }
+
+  // Strategic Benefit: mandatory and must be semantically meaningful + safe
+  if (safeStrategicBenefit) {
+    if (containsDangerousContent(safeStrategicBenefit) || isLowSemanticText(safeStrategicBenefit)) {
+      invalidTextFields.push('Strategic Benefit')
+    }
+  }
+
+  // Metrics: non-empty values must be safe. Empty values are handled by auto-suggest later.
+  if (safeOutput && containsDangerousContent(safeOutput)) {
+    invalidTextFields.push('Output')
+  }
+  if (safeQuality && containsDangerousContent(safeQuality)) {
+    invalidTextFields.push('Quality')
+  }
+  if (safeImprovement && containsDangerousContent(safeImprovement)) {
+    invalidTextFields.push('Improvement')
+  }
+
+  // ------------------------
   // Deadline validation (flexible multi-format parsing)
   // ------------------------
   let deadlineInvalidFormat = false
@@ -200,10 +247,26 @@ function processRow(row: KpiRowIn): KpiRowOut {
     }
 
     // Try Egyptian/European format: DD/MM/YYYY
-    const ddmmyyyyRegex = /^\d{2}\/\d{2}\/\d{4}$/;
-    if (!parsedDate && ddmmyyyyRegex.test(deadlineStr)) {
+    const ddmmyyyySlashRegex = /^\d{2}\/\d{2}\/\d{4}$/;
+    if (!parsedDate && ddmmyyyySlashRegex.test(deadlineStr)) {
       // Convert DD/MM/YYYY → YYYY-MM-DD
       const [dd, mm, yyyy] = deadlineStr.split('/');
+      const normalized = `${yyyy}-${mm}-${dd}`;
+      parsedDate = new Date(normalized);
+    }
+
+    // Try DD-MM-YYYY
+    const ddmmyyyyDashRegex = /^\d{2}-\d{2}-\d{4}$/;
+    if (!parsedDate && ddmmyyyyDashRegex.test(deadlineStr)) {
+      const [dd, mm, yyyy] = deadlineStr.split('-');
+      const normalized = `${yyyy}-${mm}-${dd}`;
+      parsedDate = new Date(normalized);
+    }
+
+    // Try DD.MM.YYYY
+    const ddmmyyyyDot2Regex = /^\d{2}\.\d{2}\.\d{4}$/;
+    if (!parsedDate && ddmmyyyyDot2Regex.test(deadlineStr)) {
+      const [dd, mm, yyyy] = deadlineStr.split('.');
       const normalized = `${yyyy}-${mm}-${dd}`;
       parsedDate = new Date(normalized);
     }
@@ -227,6 +290,18 @@ function processRow(row: KpiRowIn): KpiRowOut {
       parsedDate = new Date(deadlineStr)
     }
 
+    // Try day-first text month: DD-MMM-YYYY or DD-MMMM-YYYY (e.g., 30-Sep-2025, 30-September-2025)
+    const ddTextMonthDashRegex = /^\d{2}-[A-Za-z]{3,9}-\d{4}$/;
+    if (!parsedDate && ddTextMonthDashRegex.test(deadlineStr)) {
+      parsedDate = new Date(deadlineStr);
+    }
+
+    // Try day-first text month space-separated: DD MMM YYYY or DD MMMM YYYY (e.g., 30 Sep 2025, 30 September 2025)
+    const ddTextMonthSpaceRegex = /^\d{2} [A-Za-z]{3,9} \d{4}$/;
+    if (!parsedDate && ddTextMonthSpaceRegex.test(deadlineStr)) {
+      parsedDate = new Date(deadlineStr);
+    }
+
     // Final validation: if still null or invalid date → invalid format
     if (!parsedDate || isNaN(parsedDate.getTime())) {
       deadlineInvalidFormat = true
@@ -246,6 +321,7 @@ function processRow(row: KpiRowIn): KpiRowOut {
   if (
     missingFields.length > 0 ||
     invalidFields.length > 0 ||
+    invalidTextFields.length > 0 ||
     deadlineInvalidFormat ||
     deadlineWrongYear
   ) {
@@ -265,6 +341,14 @@ function processRow(row: KpiRowIn): KpiRowOut {
       'Team Role'
     ]
 
+    const INVALID_TEXT_ORDER = [
+      'Company',
+      'Output',
+      'Quality',
+      'Improvement',
+      'Strategic Benefit'
+    ];
+
     if (missingFields.length > 0) {
       missingFields.sort((a, b) => FIELD_ORDER.indexOf(a) - FIELD_ORDER.indexOf(b))
       parts.push(`Missing mandatory field(s): ${missingFields.join(', ')}.`)
@@ -273,6 +357,13 @@ function processRow(row: KpiRowIn): KpiRowOut {
     if (invalidFields.length > 0) {
       invalidFields.sort((a, b) => INVALID_ORDER.indexOf(a) - INVALID_ORDER.indexOf(b))
       parts.push(`Invalid value(s) for: ${invalidFields.join(', ')}.`)
+    }
+
+    if (invalidTextFields.length > 0) {
+      invalidTextFields.sort(
+        (a, b) => INVALID_TEXT_ORDER.indexOf(a) - INVALID_TEXT_ORDER.indexOf(b)
+      );
+      parts.push(`Invalid text format for ${invalidTextFields.join(', ')}.`);
     }
 
     if (deadlineInvalidFormat) {
@@ -336,6 +427,25 @@ function processRow(row: KpiRowIn): KpiRowOut {
     summary_reason = `Metrics auto-suggested for: ${joined}.`
     status = 'NEEDS_REVIEW'
     }
+
+  // Mode fallback informational message (does not invalidate the row)
+  if (modeWasInvalid) {
+    const modeNote = "Mode fallback applied: defaulting to 'both'.";
+    if (status === 'VALID') {
+      comments = `${modeNote} All SMART criteria met.`;
+    } else if (status === 'NEEDS_REVIEW') {
+      comments = `${modeNote} ${comments}`;
+    }
+  }
+
+  // Ensure summary_reason follows v10.7.5 rules:
+  // - VALID  → empty
+  // - NEEDS_REVIEW → mirrors comments
+  if (status === 'VALID') {
+    summary_reason = '';
+  } else if (status === 'NEEDS_REVIEW') {
+    summary_reason = comments;
+  }
 
   // ------------------------
   // 4) Objectives (placeholders only in v10.7.5)
