@@ -18,7 +18,8 @@ This repository contains TypeScript sources under `api/` and `engine/`. A lightw
    ```bash
    npm run typecheck
    ```
-   This runs `tsc --noEmit`, ensuring the codebase type checks without producing build artifacts.
+   This runs `tsc --noEmit`, ensuring the codebase type checks without producing build artifacts. You can also run `npm test` as
+   a shorthand for the same compatibility check.
 
 ## Notes
 
