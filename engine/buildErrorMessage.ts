@@ -197,9 +197,9 @@ export function buildFinalMessage(
   }
 
   // 2.7 Domain-level closing line for INVALID
-  if (status === 'INVALID') {
-    commentsParts.push('Objectives not generated due to validation errors.');
-  }
+  //if (status === 'INVALID') {
+   // commentsParts.push('Objectives not generated due to validation errors.');
+  //}
 
   // Normalize spaces and join into single-line comments
   const comments = commentsParts
