@@ -1,11 +1,11 @@
 // api/company-preflight.ts
 import type { VercelRequest, VercelResponse } from '@vercel/node'
-
+type PreflightErrorResponse = {
+  error: string;
+};
 /* -----------------------------------------------------------
    Types
 ----------------------------------------------------------- */
-
-type PreflightMode = 'analyze' | 'rewrite'
 
 interface RowIn {
   row_id: number
@@ -54,7 +54,6 @@ interface RewriteResponse {
 }
 
 type PreflightRequest = AnalyzeRequest | RewriteRequest
-type PreflightResult = AnalyzeResponse | RewriteResponse
 
 /* -----------------------------------------------------------
    Helpers
@@ -295,41 +294,51 @@ function runRewrite(payload: RewriteRequest): RewriteResponse {
 export default function handler(req: VercelRequest, res: VercelResponse) {
   if (req.method !== 'POST') {
     res.setHeader('Allow', 'POST')
-    return res.status(405).json({ error: 'Method Not Allowed' })
+    const errorBody: PreflightErrorResponse = { error: 'Method Not Allowed' }
+    return res.status(405).json(errorBody)
   }
+  
 
-  let body: PreflightRequest
+  let body: PreflightRequest;
+
+  // Parse JSON safely
   try {
     body = typeof req.body === 'string'
       ? JSON.parse(req.body)
-      : (req.body as PreflightRequest)
+      : (req.body as PreflightRequest);
   } catch {
-    return res.status(400).json({ error: 'Invalid JSON body.' })
+    const errorBody: PreflightErrorResponse = { error: 'Invalid JSON body.' }
+    return res.status(400).json(errorBody)
   }
-
+  // Basic structure validation
   if (!body || typeof body !== 'object') {
-    return res.status(400).json({ error: 'Invalid request structure.' })
+    const errorBody: PreflightErrorResponse = { error: 'Invalid request structure.' }
+    return res.status(400).json(errorBody)
   }
 
   if (!('rows' in body) || !Array.isArray((body as any).rows)) {
-    return res.status(400).json({ error: 'Missing or invalid rows array.' })
+    const errorBody: PreflightErrorResponse = { error: 'Missing or invalid rows array.' }
+    return res.status(400).json(errorBody)
   }
 
   try {
     if (body.mode === 'analyze') {
-      const out = runAnalyze(body)
-      return res.status(200).json(out)
+      const out = runAnalyze(body);
+      return res.status(200).json(out);
     }
 
     if (body.mode === 'rewrite') {
-      const out = runRewrite(body)
-      return res.status(200).json(out)
+      const out = runRewrite(body);
+      return res.status(200).json(out);
     }
 
-    return res.status(400).json({ error: 'Invalid mode.' })
-
+    const errorBody: PreflightErrorResponse = { error: 'Invalid mode.' }
+    return res.status(400).json(errorBody)
   } catch (err) {
     console.error('company-preflight error:', err)
-    return res.status(500).json({ error: 'Internal company-preflight error.' })
+    const errorBody: PreflightErrorResponse = {
+      error: 'Internal company-preflight error.'
+    }
+    return res.status(500).json(errorBody)
   }
 }
