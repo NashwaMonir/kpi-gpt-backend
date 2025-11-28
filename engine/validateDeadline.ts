@@ -64,10 +64,11 @@ export function validateDeadline(
   errorCodes: ErrorCode[]
 ): DeadlineParseResult {
   const value = (raw ?? '').toString().trim();
-
+ console.log('DEBUG deadline raw:', JSON.stringify(value));
   // Security: HTML, script, emoji should never be treated as valid dates.
 // Treat as E305 textual deadlines.
 if (containsForbiddenChars(value)) {
+  console.log('DEBUG deadline hit containsForbiddenChars');
   addErrorCode(errorCodes, ErrorCodes.DEADLINE_TEXTUAL_DEADLINE);
   return { valid: false, wrongYear: false, date: null };
 }
@@ -80,6 +81,7 @@ if (containsForbiddenChars(value)) {
   // Textual / ambiguous deadlines (e.g., "Q1 2025", "FY25", "End of Q4", "before 2025 ends")
   // must be rejected with a dedicated textual-deadline error (E305) per 10_Deadline_Parsing_Spec.
   if (isTextualDeadline(value)) {
+    console.log('DEBUG deadline classified as textual by isTextualDeadline');
     addErrorCode(errorCodes, ErrorCodes.DEADLINE_TEXTUAL_DEADLINE);
     return { valid: false, wrongYear: false, date: null };
   }
@@ -87,6 +89,7 @@ if (containsForbiddenChars(value)) {
   const parsed = tryParseAllFormats(value);
 
   if (!parsed || isNaN(parsed.getTime())) {
+    console.log('DEBUG deadline classified as textual by isTextualDeadline');
     // Invalid date format → E304
     addErrorCode(errorCodes, ErrorCodes.DEADLINE_INVALID_FORMAT);
     return { valid: false, wrongYear: false, date: null };
