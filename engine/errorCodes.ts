@@ -84,6 +84,37 @@ export const ErrorCodeDescriptions: Record<ErrorCode, string> = {
   [ErrorCodes.INVALID_TRANSPORT_SANITIZATION]: 'Request contains unsafe or non-JSON-safe characters.'
 };
 
+export const ERROR_COMMENTS: Record<ErrorCode, string> = {
+  [ErrorCodes.MISSING_TASK_NAME]: 'Missing mandatory field(s): Task Name.',
+  [ErrorCodes.MISSING_TASK_TYPE]: 'Missing mandatory field(s): Task Type.',
+  [ErrorCodes.MISSING_TEAM_ROLE]: 'Missing mandatory field(s): Team Role.',
+  [ErrorCodes.MISSING_DEADLINE]: 'Missing mandatory field(s): Deadline.',
+  [ErrorCodes.MISSING_STRATEGIC_BENEFIT]: 'Missing mandatory field(s): Strategic Benefit.',
+
+  [ErrorCodes.INVALID_TASK_TYPE]: 'Invalid value(s) for: Task Type.',
+  [ErrorCodes.INVALID_TEAM_ROLE]: 'Invalid value(s) for: Team Role.',
+  [ErrorCodes.DEADLINE_WRONG_YEAR]: 'Deadline outside valid calendar year.',
+  [ErrorCodes.DEADLINE_INVALID_FORMAT]: 'Invalid deadline format.',
+  [ErrorCodes.DEADLINE_TEXTUAL_DEADLINE]: 'Deadline contains non-parsable/textual content.',
+  [ErrorCodes.INVALID_MODE_VALUE]: 'Mode fallback applied: defaulting to "both".',
+
+  [ErrorCodes.DANGEROUS_TEXT]: 'Invalid text format for field (dangerous content).',
+  [ErrorCodes.LOW_SIGNAL_TEXT]: 'Invalid text format for field (low semantic signal).',
+  [ErrorCodes.FORBIDDEN_CHARS]: 'Invalid text format for field (forbidden characters).',
+  [ErrorCodes.CORRUPTED_TEXT]: 'Invalid text format for field (corrupted/unrecognized).',
+  [ErrorCodes.RESERVED_TEXT_RULE]: 'Invalid text format due to reserved parsing rule.',
+
+  [ErrorCodes.METRICS_AUTOSUGGEST_ALL]: 'Metrics auto-suggested (Output, Quality, Improvement).',
+  [ErrorCodes.METRICS_AUTOSUGGEST_PARTIAL]: 'Metrics auto-suggested (one or more missing).',
+
+  [ErrorCodes.INVALID_JSON_BODY]: 'Invalid JSON body.',
+  [ErrorCodes.INVALID_REQUEST_STRUCTURE]: 'Invalid request structure.',
+  [ErrorCodes.INVALID_ROWS_ARRAY]: 'Missing or invalid rows array.',
+  [ErrorCodes.EMPTY_ROWS_ARRAY]: 'Rows array must not be empty.',
+  [ErrorCodes.INVALID_TRANSPORT_PAYLOAD]: 'Row entries must be objects.',
+  [ErrorCodes.INVALID_TRANSPORT_SANITIZATION]: 'Request contains unsafe or non-JSON-safe characters.'
+};
+
 // Helper: add an error code only once, preserving insertion order
 export function addErrorCode(list: string[], code: ErrorCode): void {
   if (!list.includes(code)) {
