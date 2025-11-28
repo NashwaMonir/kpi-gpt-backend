@@ -238,14 +238,14 @@ export function validateDomain(
   //  - Any dangerous/low-signal text issues (E4xx)
   //  - Any deadline issues (BAD_FORMAT or WRONG_YEAR)
   // must mark the row as INVALID at the domain layer.
-  const hasBlockingErrors: boolean =
-    fieldChecks.missing.length > 0 ||
-    fieldChecks.invalid.length > 0 ||
-    fieldChecks.invalidText.length > 0 ||
-    !deadlineResult.valid; // wrongYear is not blocking under Rule C
+  const hasBlockingErrors =
+  fieldChecks.missing.length > 0 ||
+  fieldChecks.invalid.length > 0 ||
+  fieldChecks.invalidText.length > 0 ||
+  !deadlineResult.valid ||
+  deadlineResult.wrongYear;  // wrong-year is now blocking again (v10.7.5 rule)
 
-  const statusHint: 'VALID' | 'INVALID' = hasBlockingErrors ? 'INVALID' : 'VALID';
-
+const statusHint: 'VALID' | 'INVALID' = hasBlockingErrors ? 'INVALID' : 'VALID';
   // ---------------------------------------------
   // 8) Return structured result
   // ---------------------------------------------
