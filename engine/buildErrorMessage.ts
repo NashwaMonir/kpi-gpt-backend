@@ -214,30 +214,22 @@ export function buildFinalMessage(
   //  - NEEDS_REVIEW  → metrics review text if present, else mode fallback, else generic
   //  - VALID         → empty string (per v10.7.5 spec)
   // ---------------------------------------------------------------------------
+ 
   let summary_reason = '';
 
-if (status === 'INVALID') {
-  const base = commentsParts[0];
-
-  if (!base) {
-    // Safety fallback: no domain message, only the generic tail
+  if (status === 'INVALID') {
+    // v10.7.5 UX: one clear, stable summary for all invalid rows.
     summary_reason = 'Objectives not generated due to validation errors.';
+
+  } else if (status === 'NEEDS_REVIEW') {
+
+    // v10.7.5 UX: one clear, consistent summary for NEEDS_REVIEW
+    summary_reason = 'Objective metrics were auto-suggested based on the role matrix. Please review before approval.';
+
   } else {
-    // Ensure we don’t duplicate the tail if it’s already in the first message
-    if (base.includes('Objectives not generated due to validation errors.')) {
-      summary_reason = base;
-    } else {
-      summary_reason = `${base} Objectives not generated due to validation errors.`;
-    }
+    // VALID → no summary in v10.7.5
+    summary_reason = '';
   }
-} else if (status === 'NEEDS_REVIEW') {
-  // Existing NEEDS_REVIEW logic:
-  // - use metricsResult.reviewText or mode fallback
-  summary_reason = metricsResult.reviewText || modeFallbackText || '';
-} else {
-  // VALID → no summary
-  summary_reason = '';
-}
 
   // ---------------------------------------------------------------------------
   // 4. VALID comments override (no domain or metrics issues)
