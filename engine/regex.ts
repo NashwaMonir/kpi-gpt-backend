@@ -31,13 +31,16 @@ export const DEADLINE_DD_MM_YYYY_DOT = /^\d{2}\.\d{2}\.\d{4}$/;
 export const DEADLINE_YYYY_TEXT_MONTH_DD = /^\d{4}-(Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Sept|Oct|Nov|Dec)[a-z]*-\d{2}$/;
 
 // Text month, space-separated year-first: 2025 Sep 30 or 2025 September 30
-export const DEADLINE_YYYY_TEXT_MONTH_DD_SPACE = /^\d{4}\s+(Jan|Feb|...)[a-z]*\s+\d{1,2}$/;
+export const DEADLINE_YYYY_TEXT_MONTH_DD_SPACE =
+  /^\d{4}\s+(Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Sept|Oct|Nov|Dec)[a-z]*\s+\d{1,2}$/;
 
 // Text month, day-first dash: 30-Sep-2025 or 30-September-2025
-export const DEADLINE_DD_TEXT_MONTH_YYYY_DASH  = /^\d{2}-(Jan|Feb|...)[a-z]*-\d{4}$/;
+export const DEADLINE_DD_TEXT_MONTH_YYYY_DASH =
+  /^\d{1,2}-(Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Sept|Oct|Nov|Dec)[a-z]*-\d{4}$/;
 
 // Text month, day-first space: 30 Sep 2025 or 30 September 2025
-export const DEADLINE_DD_TEXT_MONTH_YYYY_SPACE = /^\d{2}\s+(Jan|Feb|...)[a-z]*\s+\d{4}$/;
+export const DEADLINE_DD_TEXT_MONTH_YYYY_SPACE =
+  /^\d{1,2}\s+(Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Sept|Oct|Nov|Dec)[a-z]*\s+\d{4}$/;
 
 // New: Month-first, e.g. "September 1 2025"
 export const DEADLINE_TEXT_MONTH_DD_YYYY_SPACE =
