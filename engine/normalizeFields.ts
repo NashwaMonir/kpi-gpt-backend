@@ -9,8 +9,9 @@ import type { Mode } from './types';
 import {
   ALLOWED_TASK_TYPES,
   ALLOWED_TASK_TYPES_LOWER,
-  ALLOWED_TEAM_ROLES,
-  ALLOWED_TEAM_ROLES_LOWER
+  //ALLOWED_TEAM_ROLES,
+  //ALLOWED_TEAM_ROLES_LOWER,
+  ALLOWED_TEAM_ROLE_PREFIXES
 } from './constants';
 
 // ---- Runtime imports ----
@@ -70,17 +71,35 @@ export function normalizeTeamRole(raw: unknown): { normalized: string; isAllowed
     return { normalized: '', isAllowed: false };
   }
 
-  // Extract base role before any "–" separator (e.g., "Design – Project")
-  const base = safe.split(/[–-]/)[0].trim();
-  const lowerBase = base.toLowerCase();
-  const idx = ALLOWED_TEAM_ROLES_LOWER.indexOf(lowerBase);
+  // Extract base role before dash
+  const baseLower = safe.split(/[–-]/)[0].trim().toLowerCase();
 
-  if (idx === -1) {
-    return { normalized: base || safe, isAllowed: false };
+  // Detect which family ("content", "design", "development")
+  let family: 'content' | 'design' | 'development' | null = null;
+  for (const prefix of ALLOWED_TEAM_ROLE_PREFIXES) {
+    if (baseLower.startsWith(prefix)) {
+      family = prefix;
+      break;
+    }
   }
 
+  if (!family) {
+    return { normalized: baseLower || safe, isAllowed: false };
+  }
+
+  // Detect if "lead" suffix exists
+  const isLead = safe.toLowerCase().includes('lead');
+
+  // Build canonical
+  const normalized =
+    family === 'content'
+      ? (isLead ? 'Content Lead' : 'Content')
+      : family === 'design'
+      ? (isLead ? 'Design Lead' : 'Design')
+      : (isLead ? 'Development Lead' : 'Development');
+
   return {
-    normalized: ALLOWED_TEAM_ROLES[idx],
+    normalized,
     isAllowed: true
   };
 }

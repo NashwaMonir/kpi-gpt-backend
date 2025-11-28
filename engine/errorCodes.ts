@@ -23,7 +23,7 @@ export const ErrorCodes = {
   INVALID_TEAM_ROLE: 'E302',
   DEADLINE_WRONG_YEAR: 'E303',
   DEADLINE_INVALID_FORMAT: 'E304',
-  DEADLINE_TEXTUAL_DEADLINE: 'E305',
+  DEADLINE_TEXTUAL_NONDATE: 'E305',
   INVALID_MODE_VALUE: 'E306',
 
   // 4xx – Dangerous / rejected content (10_Sanitization_and_Security_Spec §§3,8)
@@ -64,7 +64,7 @@ export const ErrorCodeDescriptions: Record<ErrorCode, string> = {
   [ErrorCodes.INVALID_TEAM_ROLE]: 'Team Role value is not allowed.',
   [ErrorCodes.DEADLINE_WRONG_YEAR]: 'Deadline year is outside the current calendar year.',
   [ErrorCodes.DEADLINE_INVALID_FORMAT]: 'Deadline is not in a supported date format.',
-  [ErrorCodes.DEADLINE_TEXTUAL_DEADLINE]: 'Deadline contains non-parsable or textual content.',
+  [ErrorCodes.DEADLINE_TEXTUAL_NONDATE]: 'Deadline contains non-parsable or textual content.',
   [ErrorCodes.INVALID_MODE_VALUE]: 'Mode value is not supported and was normalized to "both".',
 
   [ErrorCodes.DANGEROUS_TEXT]: 'Field contains dangerous or injection-like content.',
@@ -95,7 +95,7 @@ export const ERROR_COMMENTS: Record<ErrorCode, string> = {
   [ErrorCodes.INVALID_TEAM_ROLE]: 'Invalid value(s) for: Team Role.',
   [ErrorCodes.DEADLINE_WRONG_YEAR]: 'Deadline outside valid calendar year.',
   [ErrorCodes.DEADLINE_INVALID_FORMAT]: 'Invalid deadline format.',
-  [ErrorCodes.DEADLINE_TEXTUAL_DEADLINE]: 'Deadline contains non-parsable/textual content.',
+  [ErrorCodes.DEADLINE_TEXTUAL_NONDATE]: 'Deadline contains non-parsable or textual content.',
   [ErrorCodes.INVALID_MODE_VALUE]: 'Mode fallback applied: defaulting to "both".',
 
   [ErrorCodes.DANGEROUS_TEXT]: 'Invalid text format for field (dangerous content).',

@@ -166,7 +166,7 @@ export function buildFinalMessage(
 
   // 2.4 Deadline issues (E303–E305)
   if (!deadline.valid) {
-    if (canonicalErrorCodes.includes(ErrorCodes.DEADLINE_TEXTUAL_DEADLINE)) {
+    if (canonicalErrorCodes.includes(ErrorCodes.DEADLINE_TEXTUAL_NONDATE)) {
       commentsParts.push('Deadline contains non-parsable or textual content.');
     } else if (canonicalErrorCodes.includes(ErrorCodes.DEADLINE_INVALID_FORMAT)) {
       commentsParts.push('Invalid deadline format.');

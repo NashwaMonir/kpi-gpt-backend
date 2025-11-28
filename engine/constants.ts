@@ -21,6 +21,14 @@ export const ALLOWED_TEAM_ROLES = [
   'Development Lead'
 ] as const;
 
+export const ALLOWED_TEAM_ROLE_PREFIXES = [
+  'content',
+  'design',
+  'development'
+] as const;
+
+export type TeamRoleFamily = (typeof ALLOWED_TEAM_ROLE_PREFIXES)[number];
+
 // Lowercase lookups for case-insensitive matching
 export const ALLOWED_TASK_TYPES_LOWER = ALLOWED_TASK_TYPES.map(t => t.toLowerCase());
 export const ALLOWED_TEAM_ROLES_LOWER = ALLOWED_TEAM_ROLES.map(r => r.toLowerCase());
@@ -33,9 +41,6 @@ type MetricDefaults = {
   quality: string;
   improvement: string;
 };
-
-export type RoleDefaultKey = 'content' | 'design' | 'development' | 'generic';
-
 // ------------------------------------------------------------
 // Mandatory fields ordering (canonical for error messages)
 // ------------------------------------------------------------
@@ -95,25 +100,61 @@ export function getCurrentEngineYear(): number {
 // Placeholder metric defaults (moved to metricsAutoSuggest.ts)
 // ------------------------------------------------------------
 // These will be enriched in v10.8 with role_metric_matrix mapping.
+// ----------------------------------------------
+// v10.7.5 / v10.8-ready ROLE DEFAULT METRICS
+// ----------------------------------------------
+export type RoleDefaultKey =
+  | 'content'
+  | 'content_lead'
+  | 'design'
+  | 'design_lead'
+  | 'development'
+  | 'development_lead'
+  | 'generic';
 
-export const ROLE_DEFAULT_METRICS: Readonly<Record<RoleDefaultKey, MetricDefaults>> = {
+export const ROLE_DEFAULT_METRICS: Readonly<Record<RoleDefaultKey, {
+  output: string;
+  quality: string;
+  improvement: string;
+}>> = {
   content: {
     output: 'Publish 95% of planned content on time',
     quality: 'Keep content error rate below 2%',
     improvement: 'Increase content engagement by 15%'
   },
+
+  content_lead: {
+    output: 'Ensure editorial roadmap delivery (100% on time)',
+    quality: 'Maintain cross-channel consistency and tone of voice',
+    improvement: 'Improve audience engagement by 20%'
+  },
+
   design: {
     output: 'Maintain ≥95% adherence to the design system',
     quality: 'Ensure WCAG AA accessibility compliance',
-    improvement: 'Increase task success rate in key flows by 15%'
+    improvement: 'Increase task success rate by 15%'
   },
+
+  design_lead: {
+    output: 'Drive end-to-end design consistency across all products',
+    quality: 'Lead accessibility governance (WCAG AA+)',
+    improvement: 'Increase design system adoption by 25%'
+  },
+
   development: {
-    output: 'Reduce critical defects by 30% in the target scope',
-    quality: 'Maintain 99.9% service uptime on impacted systems',
-    improvement: 'Increase performance scores by 20% on key journeys'
+    output: 'Reduce critical defects by 30%',
+    quality: 'Maintain 99.9% uptime',
+    improvement: 'Improve performance scores by 20%'
   },
+
+  development_lead: {
+    output: 'Ensure technical delivery excellence across squads',
+    quality: 'Maintain engineering quality thresholds across products',
+    improvement: 'Improve deployment success rate by 25%'
+  },
+
   generic: {
-    output: 'Deliver agreed scope within the planned timeline',
+    output: 'Deliver agreed scope within planned timeline',
     quality: 'Meet acceptance criteria with ≤5% defect rate',
     improvement: 'Improve customer satisfaction by 10%'
   }

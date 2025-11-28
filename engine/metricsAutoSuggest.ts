@@ -10,20 +10,21 @@
 
 import type { KpiRowIn } from './types';
 import { ROLE_DEFAULT_METRICS } from './constants';
-import { ErrorCodes, addErrorCode } from './errorCodes';
+import { ErrorCodes, addErrorCode, type ErrorCode } from './errorCodes';
 
 export interface MetricResolutionResult {
   output: string;
   quality: string;
   improvement: string;
 
+  
   needsReview: boolean;
   reviewText: string;     // e.g. "Metrics auto-suggested (Output / Quality / Improvement)."
 }
 
 export function resolveMetrics(
   row: KpiRowIn,
-  errorCodes: string[]
+  errorCodes: ErrorCode[]
 ): MetricResolutionResult {
   const roleLower = row.team_role?.toLowerCase() ?? '';
   const defaults = pickRoleDefaults(roleLower);
@@ -103,12 +104,40 @@ export function resolveMetrics(
 }
 
 /**
- * Finds default metrics based on base team role.
- * If role is unrecognized → return generic defaults.
+ * Finds default metrics based on normalized team_role.
+ *
+ * Rules (v10.7.5, v10.8-ready):
+ *  - Detect base family: content | design | development (prefix match).
+ *  - Detect "lead" anywhere in the role string.
+ *  - Map to ROLE_DEFAULT_METRICS:
+ *      content        → ROLE_DEFAULT_METRICS.content
+ *      content lead   → ROLE_DEFAULT_METRICS.content_lead
+ *      design         → ROLE_DEFAULT_METRICS.design
+ *      design lead    → ROLE_DEFAULT_METRICS.design_lead
+ *      development    → ROLE_DEFAULT_METRICS.development
+ *      development lead → ROLE_DEFAULT_METRICS.development_lead
+ *  - Anything else   → ROLE_DEFAULT_METRICS.generic
  */
-export function pickRoleDefaults(roleLower: string) {
-  if (roleLower.includes('content')) return ROLE_DEFAULT_METRICS.content;
-  if (roleLower.includes('design')) return ROLE_DEFAULT_METRICS.design;
-  if (roleLower.includes('development')) return ROLE_DEFAULT_METRICS.development;
+export function pickRoleDefaults(roleLowerRaw: string): typeof ROLE_DEFAULT_METRICS[keyof typeof ROLE_DEFAULT_METRICS] {
+  const base = (roleLowerRaw ?? '').trim().toLowerCase();
+  if (!base) {
+    return ROLE_DEFAULT_METRICS.generic;
+  }
+
+  const isLead = base.includes('lead');
+
+  if (base.startsWith('content')) {
+    return isLead ? ROLE_DEFAULT_METRICS.content_lead : ROLE_DEFAULT_METRICS.content;
+  }
+
+  if (base.startsWith('design')) {
+    return isLead ? ROLE_DEFAULT_METRICS.design_lead : ROLE_DEFAULT_METRICS.design;
+  }
+
+  if (base.startsWith('development')) {
+    return isLead ? ROLE_DEFAULT_METRICS.development_lead : ROLE_DEFAULT_METRICS.development;
+  }
+
+  // Fallback to generic metrics when role family is unknown
   return ROLE_DEFAULT_METRICS.generic;
 }
