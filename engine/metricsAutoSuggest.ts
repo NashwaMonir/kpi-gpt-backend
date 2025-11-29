@@ -16,12 +16,16 @@ export interface MetricResolutionResult {
   output: string;
   quality: string;
   improvement: string;
-
-  
+  missingMetrics: string[];   // "Output", "Quality", "Improvement"
   needsReview: boolean;
-  reviewText: string;     // e.g. "Metrics auto-suggested (Output / Quality / Improvement)."
+  reviewText?: string;        // e.g. "Metrics auto-suggested (Output / Quality / Improvement)."
 }
 
+/**
+ * Resolve metrics for a normalized row:
+ *  - If all present → no changes, VALID from metrics view.
+ *  - If some/all missing → fill from ROLE_DEFAULT_METRICS and mark NEEDS_REVIEW.
+ */
 export function resolveMetrics(
   row: KpiRowIn,
   errorCodes: ErrorCode[]
@@ -29,77 +33,66 @@ export function resolveMetrics(
   const roleLower = row.team_role?.toLowerCase() ?? '';
   const defaults = pickRoleDefaults(roleLower);
 
-  const safeOutput = (row.output_metric ?? '').trim();
-  const safeQuality = (row.quality_metric ?? '').trim();
-  const safeImprovement = (row.improvement_metric ?? '').trim();
+  const currentOutput = (row.output_metric ?? '').trim();
+  const currentQuality = (row.quality_metric ?? '').trim();
+  const currentImprovement = (row.improvement_metric ?? '').trim();
 
-  let output = safeOutput;
-  let quality = safeQuality;
-  let improvement = safeImprovement;
+  let output = currentOutput;
+  let quality = currentQuality;
+  let improvement = currentImprovement;
 
   const missing: string[] = [];
+  if (!currentOutput) missing.push('Output');
+  if (!currentQuality) missing.push('Quality');
+  if (!currentImprovement) missing.push('Improvement');
 
-  // -------------------------
-  // 1. Detect missing metrics
-  // -------------------------
-  if (!safeOutput) {
-    output = defaults.output;
-    missing.push('Output');
-  }
-
-  if (!safeQuality) {
-    quality = defaults.quality;
-    missing.push('Quality');
-  }
-
-  if (!safeImprovement) {
-    improvement = defaults.improvement;
-    missing.push('Improvement');
-  }
-
-  // Normalize all resolved metrics to trimmed strings to guard future packs
-  output = output.trim();
-  quality = quality.trim();
-  improvement = improvement.trim();
-
-  // -------------------------
-  // 2. If none missing → fully valid
-  // -------------------------
+  // Nothing missing → no auto-suggest, no E501/E502
   if (missing.length === 0) {
     return {
       output,
       quality,
       improvement,
+      missingMetrics: [],
       needsReview: false,
       reviewText: ''
     };
   }
 
-  // -------------------------
-  // 3. Some / All missing → NEEDS_REVIEW
-  // -------------------------
+  // 1) Fill missing metrics from defaults
+  if (!output) {
+    output = defaults.output;
+  }
+  if (!quality) {
+    quality = defaults.quality;
+  }
+  if (!improvement) {
+    improvement = defaults.improvement;
+  }
+
+  // Normalize all resolved metrics
+  output = output.trim();
+  quality = quality.trim();
+  improvement = improvement.trim();
+
+  // 2) Mark NEEDS_REVIEW and add error codes
+  let reviewText: string;
   if (missing.length === 3) {
     // All metrics missing → E501
     addErrorCode(errorCodes, ErrorCodes.METRICS_AUTOSUGGEST_ALL);
-
-    return {
-      output,
-      quality,
-      improvement,
-      needsReview: true,
-      reviewText: 'Metrics auto-suggested (Output / Quality / Improvement).'
-    };
+    reviewText = 'Metrics auto-suggested (Output / Quality / Improvement).';
+  } else {
+    // 1 or 2 missing → E502
+    addErrorCode(errorCodes, ErrorCodes.METRICS_AUTOSUGGEST_PARTIAL);
+    reviewText = `Metrics auto-suggested for: ${missing.join(', ')}.`;
   }
-
-  // 1 or 2 missing → E502
-  addErrorCode(errorCodes, ErrorCodes.METRICS_AUTOSUGGEST_PARTIAL);
 
   return {
     output,
     quality,
     improvement,
+    missingMetrics: missing,
     needsReview: true,
-    reviewText: `Metrics auto-suggested for: ${missing.join(' / ')}.`
+    reviewText
   };
 }
 

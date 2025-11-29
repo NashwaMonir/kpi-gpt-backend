@@ -1,5 +1,7 @@
 // api/company-preflight.ts
 import type { VercelRequest, VercelResponse } from '@vercel/node'
+import { checkDangerousText } from '../engine/validateDangerous';
+import type { ErrorCode } from '../engine/errorCodes';
 type PreflightErrorResponse = {
   error: string;
 };
@@ -109,6 +111,21 @@ function splitCompanyField(raw: string | null | undefined): string[] {
     .filter(part => part.length > 0)
 }
 
+// Reuse engine-level dangerous-text heuristics for company values
+function isDangerousCompanyText(value: string | null | undefined): boolean {
+  const trimmed = (value || '').trim();
+  if (!trimmed) return false;
+
+  const dummyErrors: ErrorCode[] = [];
+  const { isDangerous, isLowSemantic } = checkDangerousText(
+    trimmed,
+    'Company',
+    dummyErrors
+  );
+
+  return isDangerous || isLowSemantic;
+}
+
 /* -----------------------------------------------------------
    ANALYZE LOGIC
 ----------------------------------------------------------- */
@@ -136,7 +153,9 @@ function runAnalyze(payload: AnalyzeRequest): AnalyzeResponse {
   const perRow: AnalyzeResponse['per_row_status'] = []
 
   for (const row of rows) {
-    const colCompanies = splitCompanyField(row.company)
+    const colCompanies = splitCompanyField(row.company).filter(
+      c => !isDangerousCompanyText(c)
+    )
     const benefitCompanies = detectCompanyInBenefit(row.strategic_benefit)
     const selectedFromBenefit = selectedFromBenefitExtractor(row.strategic_benefit, selectedNorm)
 
@@ -227,7 +246,9 @@ function runRewrite(payload: RewriteRequest): RewriteResponse {
   const updated = rows.map(row => {
     let { company, strategic_benefit } = row
 
-    const colCompanies = splitCompanyField(company)
+    const colCompanies = splitCompanyField(company).filter(
+      c => !isDangerousCompanyText(c)
+    )
     const benefitCompanies = detectCompanyInBenefit(strategic_benefit)
     const selectedFromBenefit = selectedFromBenefitExtractor(strategic_benefit, selectedNorm)
 

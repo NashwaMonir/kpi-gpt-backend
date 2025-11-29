@@ -76,7 +76,8 @@ export function buildFinalMessage(
     statusHint,
     safeOutput,
     safeQuality,
-    safeImprovement
+    safeImprovement,
+    dangerousMetrics
   } = domainResult;
 
   const reviewText = (metricsResult.reviewText ?? '').trim();
@@ -155,14 +156,24 @@ export function buildFinalMessage(
     );
   }
 
-  // 2.3 Dangerous / low-signal text (E4xx) — use fieldChecks.invalidText
-  if (fieldChecks.invalidText.length > 0) {
+  // 2.3 Dangerous / low-signal text (E4xx)
+  // Combine domain-level invalidText fields (e.g. Company, Strategic Benefit)
+  // with metric-level dangerousMetrics (Output, Quality, Improvement),
+  // and emit a single canonical message.
+  const invalidTextFields = fieldChecks.invalidText ?? [];
+  const allDangerousFields = [
+    ...invalidTextFields,
+    ...(dangerousMetrics ?? [])
+  ];
+  const uniqueDangerousFields = Array.from(new Set(allDangerousFields));
+
+  if (uniqueDangerousFields.length > 0) {
     commentsParts.push(
-      `Invalid text format for: ${fieldChecks.invalidText.join(', ')}.`
+      `Invalid text format for: ${uniqueDangerousFields.join(', ')}.`
     );
-  } else {
-    pushFromCodes(code => code.startsWith('E4'));
   }
+  // We deliberately do not fall back to ERROR_COMMENTS for E4xx,
+  // to keep wording and field lists deterministic.
 
   // 2.4 Deadline issues (E303–E305)
   if (!deadline.valid) {
@@ -197,9 +208,6 @@ export function buildFinalMessage(
   }
 
   // 2.7 Domain-level closing line for INVALID
-  //if (status === 'INVALID') {
-   // commentsParts.push('Objectives not generated due to validation errors.');
-  //}
 
   // Normalize spaces and join into single-line comments
   const comments = commentsParts

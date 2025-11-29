@@ -94,10 +94,30 @@ export function checkDangerousText(
   // ----------------------------------------------------
   // 2. Low-signal / non-semantic content (E402)
   // ----------------------------------------------------
-  // Rule: if the string contains NO alphanumeric characters at all, it is low-signal noise.
+
+  // 2.1 Rule: if the string contains NO alphanumeric characters at all, it is low-signal noise.
+  // This covers emoji-only and pure punctuation content (e.g. "😀", ".", "-").
   if (!/[A-Za-z0-9]/.test(trimmed)) {
     addErrorCode(errorCodes, ErrorCodes.LOW_SIGNAL_TEXT);
     return { isDangerous: false, isLowSemantic: true };
+  }
+
+  // 2.2 Repeated low-signal tokens such as "and and and"
+  // Heuristic:
+  //  - At least 3 tokens.
+  //  - All tokens are the same short word (length <= 4).
+  // This safely classifies patterns like "and and and" (NEG_stopwords_benefit_invalid)
+  // as low-signal while leaving normal sentences untouched.
+  const simpleTokens = trimmed.toLowerCase().split(/\s+/).filter(Boolean);
+  if (simpleTokens.length >= 3) {
+    const uniqueTokens = Array.from(new Set(simpleTokens));
+    if (uniqueTokens.length === 1) {
+      const token = uniqueTokens[0];
+      if (token.length <= 4) {
+        addErrorCode(errorCodes, ErrorCodes.LOW_SIGNAL_TEXT);
+        return { isDangerous: false, isLowSemantic: true };
+      }
+    }
   }
 
   // ----------------------------------------------------
@@ -107,4 +127,64 @@ export function checkDangerousText(
     isDangerous: false,
     isLowSemantic: false
   };
+  
+}
+
+// Metric labels used in error messages
+const METRIC_LABELS = {
+  output: 'Output',
+  quality: 'Quality',
+  improvement: 'Improvement',
+} as const;
+
+export interface MetricsDangerousResult {
+  // Names for the CSV / comments layer: "Output", "Quality", "Improvement"
+  dangerousMetrics: string[];
+}
+
+/**
+ * Evaluate all three metric fields (Output / Quality / Improvement) for
+ * dangerous / low-signal content, but only add ONE dangerous-text / low-signal
+ * error category (E401 / E402) via checkDangerousText.
+ *
+ * - Uses checkDangerousText() for each non-empty metric.
+ * - Relies on addErrorCode() de-duplication to keep a single E401/E402 in the list.
+ * - Returns the *labels* of metrics that were flagged as dangerous or low-signal.
+ */
+export function evaluateMetricsDangerous(
+  output: string | null | undefined,
+  quality: string | null | undefined,
+  improvement: string | null | undefined,
+  errorCodes: ErrorCode[]
+): MetricsDangerousResult {
+  const dangerousMetrics: string[] = [];
+
+  const metrics = [
+    { value: output,      label: METRIC_LABELS.output },
+    { value: quality,     label: METRIC_LABELS.quality },
+    { value: improvement, label: METRIC_LABELS.improvement },
+  ];
+
+  for (const metric of metrics) {
+    const raw = metric.value;
+    if (raw == null) continue;
+
+    // Let checkDangerousText handle trimming and classification.
+    const { isDangerous, isLowSemantic } = checkDangerousText(
+      raw,
+      metric.label,
+      errorCodes
+    );
+
+    // Empty strings are treated as "missing" by domain/metricsAutoSuggest,
+    // so only flag metrics with actual dangerous / low-signal content.
+    const trimmed = String(raw).trim();
+    if (!trimmed) continue;
+
+    if (isDangerous || isLowSemantic) {
+      dangerousMetrics.push(metric.label);
+    }
+  }
+
+  return { dangerousMetrics };
 }

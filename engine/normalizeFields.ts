@@ -9,8 +9,8 @@ import type { Mode } from './types';
 import {
   ALLOWED_TASK_TYPES,
   ALLOWED_TASK_TYPES_LOWER,
-  //ALLOWED_TEAM_ROLES,
-  //ALLOWED_TEAM_ROLES_LOWER,
+  ALLOWED_TEAM_ROLES,
+  ALLOWED_TEAM_ROLES_LOWER,
   ALLOWED_TEAM_ROLE_PREFIXES
 } from './constants';
 
@@ -21,7 +21,11 @@ import { ErrorCodes, addErrorCode } from './errorCodes';
  * Safely coerce any possibly-null value to a trimmed string.
  */
 export function toSafeTrimmedString(value: unknown): string {
-  return (value ?? '').toString().trim();
+  try {
+    return (value ?? '').toString().trim();
+  } catch {
+    return String(value ?? '').trim();
+  }
 }
 
 /**
@@ -58,12 +62,12 @@ export function normalizeTaskType(raw: unknown): { normalized: string; isAllowed
 
 /**
  * Normalize team_role to canonical form using ALLOWED_TEAM_ROLES.
- * - Handles patterns like "Design – Project" by splitting on "–" and using the left part.
- * - Matching is case-insensitive.
  *
- * Returns:
- *  - normalized: canonical team role if allowed, or original trimmed input
- *  - isAllowed: true if the normalized value is one of the allowed roles
+ * Behavior:
+ *  - First, try exact match (case-insensitive) against ALLOWED_TEAM_ROLES.
+ *  - If no direct match, derive a "family" from the part before any dash (content/design/development)
+ *    and a "lead" flag from the presence of the word "lead".
+ *  - Map families into canonical roles: Content / Content Lead / Design / Design Lead / Development / Development Lead.
  */
 export function normalizeTeamRole(raw: unknown): { normalized: string; isAllowed: boolean } {
   const safe = toSafeTrimmedString(raw);
@@ -71,35 +75,52 @@ export function normalizeTeamRole(raw: unknown): { normalized: string; isAllowed
     return { normalized: '', isAllowed: false };
   }
 
-  // Extract base role before dash
+  const lower = safe.toLowerCase();
+
+  // 1) Direct match against allowed roles (case-insensitive)
+  const directIdx = ALLOWED_TEAM_ROLES_LOWER.indexOf(lower);
+  if (directIdx >= 0) {
+    return {
+      normalized: ALLOWED_TEAM_ROLES[directIdx],
+      isAllowed: true
+    };
+  }
+
+  // 2) Heuristic: derive family from the part before dash ("Content – Project" → "content")
   const baseLower = safe.split(/[–-]/)[0].trim().toLowerCase();
 
-  // Detect which family ("content", "design", "development")
   let family: 'content' | 'design' | 'development' | null = null;
   for (const prefix of ALLOWED_TEAM_ROLE_PREFIXES) {
     if (baseLower.startsWith(prefix)) {
-      family = prefix;
+      family = prefix as 'content' | 'design' | 'development';
       break;
     }
   }
 
   if (!family) {
-    return { normalized: baseLower || safe, isAllowed: false };
+    // Unrecognized family → treat as invalid, return original
+    return { normalized: safe, isAllowed: false };
   }
 
-  // Detect if "lead" suffix exists
-  const isLead = safe.toLowerCase().includes('lead');
+  const isLead = lower.includes('lead');
 
-  // Build canonical
-  const normalized =
+  const candidate =
     family === 'content'
       ? (isLead ? 'Content Lead' : 'Content')
       : family === 'design'
       ? (isLead ? 'Design Lead' : 'Design')
       : (isLead ? 'Development Lead' : 'Development');
 
+  const candidateLower = candidate.toLowerCase();
+  const allowedIdx = ALLOWED_TEAM_ROLES_LOWER.indexOf(candidateLower);
+
+  if (allowedIdx === -1) {
+    // Family understood but not part of ALLOWED_TEAM_ROLES → treat as invalid
+    return { normalized: candidate, isAllowed: false };
+  }
+
   return {
-    normalized,
+    normalized: ALLOWED_TEAM_ROLES[allowedIdx],
     isAllowed: true
   };
 }
@@ -131,4 +152,10 @@ export function normalizeMode(
   addErrorCode(errorCodes, ErrorCodes.INVALID_MODE_VALUE);
   return { mode: 'both', wasInvalid: true };
 }
-  
+export function safeStringify(value: any): string {
+  try {
+    return JSON.stringify(value);
+  } catch {
+    return String(value);
+  }
+}

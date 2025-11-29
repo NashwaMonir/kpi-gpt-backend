@@ -55,7 +55,7 @@ export interface DeadlineParseResult {
 export interface FieldCheckResult {
   missing: string[];
   invalid: string[];
-  invalidText: string[];
+  invalidText?: string[];   // ← must exist
 }
 // engine/types.ts
 
@@ -63,11 +63,19 @@ export interface DomainValidationResult {
   // Normalized input row (trimmed/normalized fields).
   normalizedRow: KpiRowIn;
 
-  // Per-field validation details.
+  // Per-field validation details (missing/invalid/invalidText).
   fieldChecks: FieldCheckResult;
+
+  // Metrics flagged as dangerous or low-signal at domain level.
+  // Example values: ['Output', 'Quality', 'Improvement'].
+  dangerousMetrics: string[];
+
+  // Parsed/validated deadline information.
   deadline: DeadlineParseResult;
 
   // Mode after normalization and validation.
+  // If the incoming mode was invalid (e.g. "weird-mode"), modeWasInvalid = true
+  // and mode is normalized to 'both'.
   mode: Mode;
   modeWasInvalid: boolean;
 
@@ -78,7 +86,13 @@ export interface DomainValidationResult {
   safeCompany: string;
   safeStrategicBenefit: string;
 
-  // Domain-level status hint.
+  // Domain-level status hint, before metrics auto-suggest and mode fallback.
+  // 'INVALID' means hasBlockingErrors is true and the row cannot be VALID.
   statusHint: 'VALID' | 'INVALID';
+
+  // True when there are blocking domain errors (missing fields, invalid enums,
+  // invalid text, dangerous metrics, or deadline issues). Used to derive
+  // final status together with metrics auto-suggest and modeWasInvalid.
   hasBlockingErrors: boolean;
+  
 }

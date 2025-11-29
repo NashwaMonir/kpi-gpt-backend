@@ -46,6 +46,7 @@ export const DEADLINE_DD_TEXT_MONTH_YYYY_SPACE =
 export const DEADLINE_TEXT_MONTH_DD_YYYY_SPACE =
   /^(Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Sept|Oct|Nov|Dec)[a-z]*\s+\d{1,2}\s+\d{4}$/;
   
+
 // ------------------------------------------------------------
 // Dangerous / invalid text detection
 // ------------------------------------------------------------
@@ -72,3 +73,13 @@ export const CONTROL_CHAR_REGEX = /[\u0000-\u001F\u007F-\u009F]/;
 
 // Low semantic content: this is handled by logic (letters/digits check),
 // but regex above support the structural noise / control parts.
+
+// Emoji detection: a sequence with no letters/digits but includes emoji ranges
+export const REGEX_EMOJI_ONLY =
+  /^(?:\p{Emoji}|\p{Extended_Pictographic})+$/u;
+
+// General “no letters or digits anywhere”
+export const REGEX_NO_LETTERS_DIGITS = /^[^A-Za-z0-9]+$/;
+
+// Split tokens for repeated-word detection
+export const REGEX_TOKEN_SPLIT = /\s+/;

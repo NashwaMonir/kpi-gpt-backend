@@ -21,6 +21,7 @@ import type {
   FieldCheckResult,
   DomainValidationResult
 } from './types';
+
 import {
   MANDATORY_FIELD_ORDER,
   INVALID_VALUE_ORDER,
@@ -34,8 +35,12 @@ import {
   normalizeTeamRole,
   normalizeMode
 } from './normalizeFields';
-import { checkDangerousText } from './validateDangerous';
+import {
+  checkDangerousText,
+  evaluateMetricsDangerous,
+} from './validateDangerous';
 import { validateDeadline } from './validateDeadline';
+
 
 /**
  * Main entry point: validate a single KPI row at the domain level.
@@ -69,6 +74,17 @@ export function validateDomain(
   const safeOutput = toSafeTrimmedString(row.output_metric ?? '');
   const safeQuality = toSafeTrimmedString(row.quality_metric ?? '');
   const safeImprovement = toSafeTrimmedString(row.improvement_metric ?? '');
+
+
+    // ----------------------------------------------------
+  // Dangerous / low-signal metrics (Output / Quality / Improvement)
+  // ----------------------------------------------------
+  const { dangerousMetrics } = evaluateMetricsDangerous(
+    safeOutput,
+    safeQuality,
+    safeImprovement,
+    errorCodes
+  );
 
   // ---- Task Name (mandatory) ----
   if (!safeTaskName) {
@@ -133,54 +149,23 @@ export function validateDomain(
       'Company',
       errorCodes
     );
-
     if (isDangerous || isLowSemantic) {
       invalidTextFields.push('Company');
     }
-
+    // valid, non-empty company string
     normalizedRow.company = safeCompany;
+  } else {
+    // treat empty/undefined as null in normalized row
+    normalizedRow.company = null;
   }
 
   // -----------------------------
-  // 3) Metrics content validation (if present)
+  // 3) Metrics normalization
   // -----------------------------
-  if (safeOutput) {
-    const { isDangerous, isLowSemantic } = checkDangerousText(
-      safeOutput,
-      'Output',
-      errorCodes
-    );
-    if (isDangerous || isLowSemantic) {
-      invalidTextFields.push('Output');
-    }
-  }
-  // Always normalize to a string (never undefined)
+  // Dangerous / low-signal content is already captured via evaluateMetricsDangerous()
+  // and surfaced as `dangerousMetrics`. Here we only normalize to strings.
   normalizedRow.output_metric = safeOutput || '';
-
-  if (safeQuality) {
-    const { isDangerous, isLowSemantic } = checkDangerousText(
-      safeQuality,
-      'Quality',
-      errorCodes
-    );
-    if (isDangerous || isLowSemantic) {
-      invalidTextFields.push('Quality');
-    }
-  }
-  // Always normalize to a string (never undefined)
   normalizedRow.quality_metric = safeQuality || '';
-
-  if (safeImprovement) {
-    const { isDangerous, isLowSemantic } = checkDangerousText(
-      safeImprovement,
-      'Improvement',
-      errorCodes
-    );
-    if (isDangerous || isLowSemantic) {
-      invalidTextFields.push('Improvement');
-    }
-  }
-  // Always normalize to a string (never undefined)
   normalizedRow.improvement_metric = safeImprovement || '';
 
   // -----------------------------
@@ -224,10 +209,10 @@ export function validateDomain(
   );
 
   const fieldChecks: FieldCheckResult = {
-    missing: missingFields,
-    invalid: invalidFields,
-    invalidText: invalidTextFields
-  };
+  missing: missingFields,
+  invalid: invalidFields,
+  invalidText: invalidTextFields,  // ← this array you push into earlier
+};
 
   // ---------------------------------------------
   // 7) Compute hasBlockingErrors + statusHint
@@ -238,13 +223,14 @@ export function validateDomain(
   //  - Any dangerous/low-signal text issues (E4xx)
   //  - Any deadline issues (BAD_FORMAT or WRONG_YEAR)
   // must mark the row as INVALID at the domain layer.
-  const hasBlockingErrors =
-  fieldChecks.missing.length > 0 ||
-  fieldChecks.invalid.length > 0 ||
-  fieldChecks.invalidText.length > 0 ||
-  !deadlineResult.valid ||
-  deadlineResult.wrongYear;  // wrong-year is now blocking again (v10.7.5 rule)
-
+    const hasBlockingErrors =
+    missingFields.length > 0 ||
+    invalidFields.length > 0 ||
+    invalidTextFields.length > 0 ||
+    dangerousMetrics.length > 0 ||   // dangerous metrics are blocking
+    !deadlineResult.valid ||
+    deadlineResult.wrongYear;
+    
 const statusHint: 'VALID' | 'INVALID' = hasBlockingErrors ? 'INVALID' : 'VALID';
   // ---------------------------------------------
   // 8) Return structured result
@@ -261,6 +247,7 @@ const statusHint: 'VALID' | 'INVALID' = hasBlockingErrors ? 'INVALID' : 'VALID';
     safeCompany,
     safeStrategicBenefit,
     statusHint,
-    hasBlockingErrors
+    hasBlockingErrors,
+    dangerousMetrics        // <--- add it here
   };
 }

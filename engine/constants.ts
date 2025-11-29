@@ -41,6 +41,29 @@ type MetricDefaults = {
   quality: string;
   improvement: string;
 };
+// -------------------------------------------------------
+// LOW-SIGNAL / NON-SEMANTIC DETECTION CONSTANTS
+// -------------------------------------------------------
+
+// Emoji-only or contains no alphanumeric characters
+export const REGEX_NO_ALPHANUMERIC = /[^A-Za-z0-9]/g;
+
+// Punctuation-only strings (one or more punctuation characters)
+export const REGEX_PUNCTUATION_ONLY = /^[\p{P}\p{S}]+$/u;
+
+// Detect sequences like "and and and", "och och och", "the the the"
+export const STOPWORD_REPEAT_CANDIDATES = [
+  'and',
+  'or',
+  'the',
+  'och',
+  'eller',
+  'det',
+  'den'
+];
+
+// Max length for a low-signal repeated stopword
+export const LOW_SIGNAL_WORD_MAX_LENGTH = 4;
 // ------------------------------------------------------------
 // Mandatory fields ordering (canonical for error messages)
 // ------------------------------------------------------------
