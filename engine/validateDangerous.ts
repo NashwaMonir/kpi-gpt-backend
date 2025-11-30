@@ -12,6 +12,7 @@ import {
 
 import { ErrorCodes, addErrorCode } from './errorCodes';
 import type { ErrorCode } from './errorCodes';
+import { toSafeTrimmedString } from './normalizeFields';
 
 /**
  * Checks for dangerous or low-signal content (HTML/JS/SQL/code injection, formulas,
@@ -25,6 +26,8 @@ import type { ErrorCode } from './errorCodes';
  *  - Error codes are category-level (E401 / E402); caller decides which field failed.
  *  - Contract matches 06_System_error_spec, 07_Domain_Validation_Spec, 10_Sanitization_Spec, and 11_Assembler.
  */
+
+
 export function checkDangerousText(
   rawValue: string | undefined | null,
   _fieldName: string,     // kept for logging / diagnostics; not used in code selection
@@ -169,15 +172,12 @@ export function evaluateMetricsDangerous(
     const raw = metric.value;
     if (raw == null) continue;
 
-    // Let checkDangerousText handle trimming and classification.
     const { isDangerous, isLowSemantic } = checkDangerousText(
       raw,
       metric.label,
       errorCodes
     );
 
-    // Empty strings are treated as "missing" by domain/metricsAutoSuggest,
-    // so only flag metrics with actual dangerous / low-signal content.
     const trimmed = String(raw).trim();
     if (!trimmed) continue;
 
@@ -187,4 +187,36 @@ export function evaluateMetricsDangerous(
   }
 
   return { dangerousMetrics };
+}
+
+export function isDangerousCompanyText(
+  value: unknown,
+  errorCodes: ErrorCode[] = []
+): boolean {
+  const trimmed = toSafeTrimmedString(value);
+  if (!trimmed) return false;
+
+  const { isDangerous, isLowSemantic } = checkDangerousText(
+    trimmed,
+    'Company',
+    errorCodes
+  );
+
+  return isDangerous || isLowSemantic;
+}
+
+export function isDangerousBenefitText(
+  value: unknown,
+  errorCodes: ErrorCode[] = []
+): boolean {
+  const trimmed = toSafeTrimmedString(value);
+  if (!trimmed) return false;
+
+  const { isDangerous, isLowSemantic } = checkDangerousText(
+    trimmed,
+    'Strategic Benefit',
+    errorCodes
+  );
+
+  return isDangerous || isLowSemantic;
 }

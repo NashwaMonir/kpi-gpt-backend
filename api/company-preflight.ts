@@ -1,10 +1,12 @@
 // api/company-preflight.ts
-import type { VercelRequest, VercelResponse } from '@vercel/node'
-import { checkDangerousText } from '../engine/validateDangerous';
-import type { ErrorCode } from '../engine/errorCodes';
+import type { VercelRequest, VercelResponse } from '@vercel/node';
 type PreflightErrorResponse = {
   error: string;
 };
+import {
+  isDangerousCompanyText,
+  isDangerousBenefitText
+} from '../engine/validateDangerous';
 /* -----------------------------------------------------------
    Types
 ----------------------------------------------------------- */
@@ -35,14 +37,15 @@ interface RewriteRequest {
   mode: 'rewrite'
   selected_company: string
   generic_mode: boolean
-  apply_to_missing: boolean | null
-  mismatched_strategy: 'overwrite' | 'keep' | null
+  apply_to_missing?: boolean
+  mismatched_strategy?: 'overwrite' | 'keep'
   rows: RowIn[]
 }
 
 interface AnalyzeResponse {
   missing_company_rows: number[]
   mismatched_company_rows: number[]
+  malformed_company_rows: number[]
   external_company_names: string[]
   per_row_status: {
     row_id: number
@@ -102,29 +105,33 @@ function detectCompanyInBenefit(text: string): string[] {
   return found
 }
 
-function splitCompanyField(raw: string | null | undefined): string[] {
-  if (!raw) return []
-  // Split on common multi-company separators: ',', '/', '&', ' and '
-  return raw
+function splitCompanyField(raw: string | null | undefined): { parts: string[]; malformed: boolean } {
+  if (!raw) {
+    return { parts: [], malformed: false }
+  }
+
+  const value = raw.trim()
+
+  // Detect malformed patterns:
+  //  - double separators (,, // && "and and")
+  //  - leading separator
+  //  - trailing separator
+  const malformed =
+    /,,/.test(value) ||
+    /\/\//.test(value) ||
+    /&&/.test(value) ||
+    /\band and\b/i.test(value) ||
+    /^[,\/&]/.test(value) ||
+    /[,\/&]$/.test(value)
+
+  const parts = value
     .split(/,|\/|&|\band\b/gi)
     .map(part => part.trim())
     .filter(part => part.length > 0)
+
+  return { parts, malformed }
 }
 
-// Reuse engine-level dangerous-text heuristics for company values
-function isDangerousCompanyText(value: string | null | undefined): boolean {
-  const trimmed = (value || '').trim();
-  if (!trimmed) return false;
-
-  const dummyErrors: ErrorCode[] = [];
-  const { isDangerous, isLowSemantic } = checkDangerousText(
-    trimmed,
-    'Company',
-    dummyErrors
-  );
-
-  return isDangerous || isLowSemantic;
-}
 
 /* -----------------------------------------------------------
    ANALYZE LOGIC
@@ -149,13 +156,40 @@ function runAnalyze(payload: AnalyzeRequest): AnalyzeResponse {
 
   const missing: number[] = []
   const mismatched: number[] = []
+  const malformed: number[] = []
   const externalNames = new Set<string>()
   const perRow: AnalyzeResponse['per_row_status'] = []
 
   for (const row of rows) {
-    const colCompanies = splitCompanyField(row.company).filter(
-      c => !isDangerousCompanyText(c)
-    )
+    // Type checks for company / strategic_benefit
+    if (row.company != null && typeof row.company !== 'string') {
+      throw { status: 400, error: 'Company field must be string.' }
+    }
+
+    if (row.strategic_benefit != null && typeof row.strategic_benefit !== 'string') {
+      throw { status: 400, error: 'Strategic_benefit field must be string.' }
+    }
+
+    // Dangerous / low-signal checks (reuse engine rules)
+    if (isDangerousCompanyText(row.company)) {
+      throw {
+        status: 400,
+        error: 'Invalid text format for company.'
+      }
+    }
+
+    if (isDangerousBenefitText(row.strategic_benefit)) {
+      throw {
+        status: 400,
+        error: 'Invalid text format for strategic_benefit.'
+      }
+    }
+
+    const { parts: colCompanies, malformed: malformedCompany } = splitCompanyField(row.company)
+    if (malformedCompany) {
+      malformed.push(row.row_id)
+    }
+
     const benefitCompanies = detectCompanyInBenefit(row.strategic_benefit)
     const selectedFromBenefit = selectedFromBenefitExtractor(row.strategic_benefit, selectedNorm)
 
@@ -226,6 +260,7 @@ function runAnalyze(payload: AnalyzeRequest): AnalyzeResponse {
   return {
     missing_company_rows: missing,
     mismatched_company_rows: mismatched,
+    malformed_company_rows: malformed,
     external_company_names: Array.from(externalNames),
     per_row_status: perRow
   }
@@ -246,9 +281,31 @@ function runRewrite(payload: RewriteRequest): RewriteResponse {
   const updated = rows.map(row => {
     let { company, strategic_benefit } = row
 
-    const colCompanies = splitCompanyField(company).filter(
-      c => !isDangerousCompanyText(c)
-    )
+    // Type checks for company / strategic_benefit
+    if (company != null && typeof company !== 'string') {
+      throw { status: 400, error: 'Company field must be string.' }
+    }
+
+    if (strategic_benefit != null && typeof strategic_benefit !== 'string') {
+      throw { status: 400, error: 'Strategic_benefit field must be string.' }
+    }
+
+    // Dangerous / low-signal checks (reuse engine rules)
+    if (isDangerousCompanyText(company)) {
+      throw {
+        status: 400,
+        error: 'Invalid text format for company.'
+      }
+    }
+
+    if (isDangerousBenefitText(strategic_benefit)) {
+      throw {
+        status: 400,
+        error: 'Invalid text format for strategic_benefit.'
+      }
+    }
+
+    const { parts: colCompanies } = splitCompanyField(company)
     const benefitCompanies = detectCompanyInBenefit(strategic_benefit)
     const selectedFromBenefit = selectedFromBenefitExtractor(strategic_benefit, selectedNorm)
 
@@ -342,14 +399,50 @@ export default function handler(req: VercelRequest, res: VercelResponse) {
     return res.status(400).json(errorBody)
   }
 
+  // Validate generic_mode
+  if (typeof (body as any).generic_mode !== 'boolean') {
+    const errorBody: PreflightErrorResponse = { error: 'generic_mode must be boolean.' }
+    return res.status(400).json(errorBody)
+  }
+
+  // Validate selected_company for non-generic mode
+  if ((body as any).mode === 'analyze' || (body as any).mode === 'rewrite') {
+    const genericMode = (body as any).generic_mode as boolean
+    const selectedCompany = ((body as any).selected_company || '').toString().trim()
+
+    if (!genericMode && !selectedCompany) {
+      const errorBody: PreflightErrorResponse = { error: 'Missing selected_company for non-generic mode.' }
+      return res.status(400).json(errorBody)
+    }
+  }
+
+  // Rewrite-specific validation
+  if ((body as any).mode === 'rewrite') {
+    const rewrite = body as RewriteRequest
+
+    if (typeof rewrite.apply_to_missing !== 'undefined' && typeof rewrite.apply_to_missing !== 'boolean') {
+      const errorBody: PreflightErrorResponse = { error: 'apply_to_missing must be boolean.' }
+      return res.status(400).json(errorBody)
+    }
+
+    if (
+      typeof rewrite.mismatched_strategy !== 'undefined' &&
+      rewrite.mismatched_strategy !== 'overwrite' &&
+      rewrite.mismatched_strategy !== 'keep'
+    ) {
+      const errorBody: PreflightErrorResponse = { error: 'Invalid mismatched_strategy.' }
+      return res.status(400).json(errorBody)
+    }
+  }
+
   try {
     if (body.mode === 'analyze') {
-      const out = runAnalyze(body);
+      const out = runAnalyze(body as AnalyzeRequest);
       return res.status(200).json(out);
     }
 
     if (body.mode === 'rewrite') {
-      const out = runRewrite(body);
+      const out = runRewrite(body as RewriteRequest);
       return res.status(200).json(out);
     }
 
