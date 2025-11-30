@@ -448,11 +448,21 @@ export default function handler(req: VercelRequest, res: VercelResponse) {
 
     const errorBody: PreflightErrorResponse = { error: 'Invalid mode.' }
     return res.status(400).json(errorBody)
-  } catch (err) {
-    console.error('company-preflight error:', err)
-    const errorBody: PreflightErrorResponse = {
-      error: 'Internal company-preflight error.'
-    }
-    return res.status(500).json(errorBody)
+  } catch (err: any) {
+  console.error('company-preflight error:', err);
+
+  // Propagate structured errors thrown from runAnalyze / runRewrite
+  if (err && typeof err === 'object' && 'status' in err && 'error' in err) {
+    const status = typeof (err as any).status === 'number' ? (err as any).status : 400;
+    const message = String((err as any).error || 'Unknown company-preflight error.');
+    const errorBody: PreflightErrorResponse = { error: message };
+    return res.status(status).json(errorBody);
+  }
+
+  // Fallback for unexpected errors
+  const errorBody: PreflightErrorResponse = {
+    error: 'Internal company-preflight error.'
+  };
+  return res.status(500).json(errorBody);
   }
 }
