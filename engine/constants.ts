@@ -27,6 +27,19 @@ export const ALLOWED_TEAM_ROLE_PREFIXES = [
   'development'
 ] as const;
 
+
+export const COMPANY_SUFFIX_TOKENS = [
+  'bank',
+  'group',
+  'telecom',
+  'corp',
+  'corporation',
+  'ltd',
+  'llc',
+  'ab',
+  'inc'
+];
+
 export type TeamRoleFamily = (typeof ALLOWED_TEAM_ROLE_PREFIXES)[number];
 
 // Lowercase lookups for case-insensitive matching

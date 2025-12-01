@@ -42,7 +42,9 @@ export const DEFAULT_TENANT_CONFIG: TenantConfig = {
       'Development',
       'Development Lead'
     ],
-    genericCompanyTokens: ['the company', 'the organization']
+    genericCompanyTokens: [
+      'the company', 'the organization'
+    ]
   },
   dangerous: {
     extraDangerousSubstrings: [],

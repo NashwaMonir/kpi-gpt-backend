@@ -7,7 +7,8 @@ import {
 import {
   DEFAULT_COMPANY_TOKEN_PATTERNS,
   MAX_COMPANY_TOKENS,
-  MAX_PREFLIGHT_ROWS
+  MAX_PREFLIGHT_ROWS,
+  COMPANY_SUFFIX_TOKENS
 } from '../engine/constants';
 import { DEFAULT_TENANT_CONFIG } from '../engine/config';
 import { toSafeTrimmedString } from '../engine/normalizeFields';
@@ -180,6 +181,38 @@ function detectCompanyInBenefit(text: string): string[] {
   return found;
 }
 
+function enrichWithSuffixCompanies(
+  text: string | null | undefined,
+  existing: string[]
+): string[] {
+  const value = toSafeTrimmedString(text);
+  if (!value) return existing;
+
+  const out = [...existing];
+  const seen = new Set(out.map(t => t.toLowerCase()));
+
+  const suffixAlt = COMPANY_SUFFIX_TOKENS.join('|'); // bank|group|telecom|corp|ab
+  const regex = new RegExp(
+    `\\b([A-Z][A-Za-z0-9]*(?:[-\\s][A-Z][A-Za-z0-9]*)*)\\s+(${suffixAlt})\\b`,
+    'g'
+  );
+
+  let match: RegExpExecArray | null;
+  while ((match = regex.exec(value)) !== null) {
+    const rawName = match[1].trim();     // e.g. "ACME", "GAMMA"
+    const rawSuffix = match[2].trim();   // e.g. "Bank"
+    const full = `${rawName} ${rawSuffix}`; // "ACME Bank", "GAMMA group"
+    const norm = full.toLowerCase();
+
+    if (!seen.has(norm)) {
+      seen.add(norm);
+      out.push(full);
+    }
+  }
+
+  return out;
+}
+
 function splitCompanyField(
   raw: string | null | undefined
 ): { parts: string[]; malformed: boolean } {
@@ -279,9 +312,12 @@ if (isDangerousBenefitText(row.strategic_benefit)) {
       malformed.push(row.row_id)
     }
 
-    const benefitCompanies = detectCompanyInBenefit(row.strategic_benefit)
+    let benefitCompanies = detectCompanyInBenefit(row.strategic_benefit)
+    benefitCompanies = enrichWithSuffixCompanies(row.strategic_benefit, benefitCompanies)
     const selectedFromBenefit = selectedFromBenefitExtractor(row.strategic_benefit, selectedNorm)
 
+
+    
     // All detected companies in display form
     const allCompanies: string[] = []
     allCompanies.push(...colCompanies)
@@ -399,7 +435,8 @@ if (isDangerousBenefitText(strategic_benefit)) {
 }
 
     const { parts: colCompanies } = splitCompanyField(company)
-    const benefitCompanies = detectCompanyInBenefit(strategic_benefit)
+    let benefitCompanies = detectCompanyInBenefit(strategic_benefit)
+    benefitCompanies = enrichWithSuffixCompanies(strategic_benefit, benefitCompanies)
     const selectedFromBenefit = selectedFromBenefitExtractor(strategic_benefit, selectedNorm)
 
     const allCompanies: string[] = []
