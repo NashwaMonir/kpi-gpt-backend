@@ -158,6 +158,14 @@ export function validateDomain(
     // treat empty/undefined as null in normalized row
     normalizedRow.company = null;
   }
+  /*
+  // If you want to reuse the helpers, you can later switch to:
+  if (safeCompany) {
+  if (isDangerousCompanyText(safeCompany, errorCodes)) {
+    invalidTextFields.push('Company');
+  }
+  normalizedRow.company = safeCompany;
+}*/
 
   // -----------------------------
   // 3) Metrics normalization

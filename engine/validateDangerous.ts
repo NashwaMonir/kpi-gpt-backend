@@ -13,7 +13,9 @@ import {
 import { ErrorCodes, addErrorCode } from './errorCodes';
 import type { ErrorCode } from './errorCodes';
 import { toSafeTrimmedString } from './normalizeFields';
-
+import { stripZeroWidthAndControl } from './regex';
+import { MAX_TEXT_LENGTH } from './constants';
+import { DEFAULT_TENANT_CONFIG } from './config';
 /**
  * Checks for dangerous or low-signal content (HTML/JS/SQL/code injection, formulas,
  * control characters, and non-semantic noise).
@@ -28,17 +30,33 @@ import { toSafeTrimmedString } from './normalizeFields';
  */
 
 
+
+export interface DangerousCheckResult {
+  isDangerous: boolean;
+  isLowSemantic: boolean;
+}
+
 export function checkDangerousText(
   rawValue: string | undefined | null,
   _fieldName: string,     // kept for logging / diagnostics; not used in code selection
   errorCodes: ErrorCode[] // STRICT typed error code bucket
 ): { isDangerous: boolean; isLowSemantic: boolean } {
-  const value = (rawValue ?? '').toString();
+  // Normalize + strip zero-width / control chars
+  const raw = (rawValue ?? '').toString();
+  const cleaned = stripZeroWidthAndControl(raw);
 
   // Empty → not dangerous but low semantic. Missing-ness is handled by domain validator.
-  const trimmed = value.trim();
+  const trimmed = cleaned.trim();
   if (!trimmed) {
     return { isDangerous: false, isLowSemantic: true };
+  }
+ const cfg = DEFAULT_TENANT_CONFIG;
+  // ----------------------------------------------------
+  // 0. Length guard (very long payloads)
+  // ----------------------------------------------------
+  if (trimmed.length > MAX_TEXT_LENGTH) {
+    addErrorCode(errorCodes, ErrorCodes.DANGEROUS_TEXT);
+    return { isDangerous: true, isLowSemantic: false };
   }
 
   // ----------------------------------------------------
@@ -46,11 +64,12 @@ export function checkDangerousText(
   // ----------------------------------------------------
 
   // 1.1 HTML tags (generic) → E401
-  if (HTML_TAG_REGEX.test(trimmed)) {
+if (HTML_TAG_REGEX.test(trimmed)) {
+  if (!cfg.policy.allowHtmlLikeCompany) {
     addErrorCode(errorCodes, ErrorCodes.DANGEROUS_TEXT);
     return { isDangerous: true, isLowSemantic: false };
   }
-
+}
   // 1.2 Script / XSS patterns → E401
   if (SCRIPT_XSS_REGEX.test(trimmed)) {
     addErrorCode(errorCodes, ErrorCodes.DANGEROUS_TEXT);
@@ -82,7 +101,7 @@ export function checkDangerousText(
   }
 
   // 1.7 Extra HTML/JS injection helpers (backticks, template, HTML attack surface) → E401
-  const lower = trimmed.toLowerCase();
+    const lower = trimmed.toLowerCase();
   if (
     trimmed.includes('`') ||          // backticks (JS template literals)
     trimmed.includes('${') ||         // template injection markers
@@ -95,22 +114,34 @@ export function checkDangerousText(
   }
 
   // ----------------------------------------------------
-  // 2. Low-signal / non-semantic content (E402)
+  // 2. Tenant-specific extra dangerous substrings
   // ----------------------------------------------------
 
-  // 2.1 Rule: if the string contains NO alphanumeric characters at all, it is low-signal noise.
-  // This covers emoji-only and pure punctuation content (e.g. "😀", ".", "-").
+ if (cfg.dangerous.extraDangerousSubstrings.length > 0) {
+  const lower = trimmed.toLowerCase();
+  if (cfg.dangerous.extraDangerousSubstrings.some(snippet =>
+    lower.includes(snippet.toLowerCase())
+  )) {
+    addErrorCode(errorCodes, ErrorCodes.DANGEROUS_TEXT);
+    return { isDangerous: true, isLowSemantic: false };
+  }
+}
+
+  // ----------------------------------------------------
+  // 3. Low-signal / non-semantic content (E402)
+  // ----------------------------------------------------
+
+  // 3.1 No alphanumeric chars → emoji/punctuation-only noise
   if (!/[A-Za-z0-9]/.test(trimmed)) {
+  if (!cfg.policy.allowEmojiInBenefit) {
     addErrorCode(errorCodes, ErrorCodes.LOW_SIGNAL_TEXT);
     return { isDangerous: false, isLowSemantic: true };
   }
+  // if allowed → treat as non-dangerous, non-low-signal
+  return { isDangerous: false, isLowSemantic: false };
+}
 
   // 2.2 Repeated low-signal tokens such as "and and and"
-  // Heuristic:
-  //  - At least 3 tokens.
-  //  - All tokens are the same short word (length <= 4).
-  // This safely classifies patterns like "and and and" (NEG_stopwords_benefit_invalid)
-  // as low-signal while leaving normal sentences untouched.
   const simpleTokens = trimmed.toLowerCase().split(/\s+/).filter(Boolean);
   if (simpleTokens.length >= 3) {
     const uniqueTokens = Array.from(new Set(simpleTokens));
@@ -124,14 +155,27 @@ export function checkDangerousText(
   }
 
   // ----------------------------------------------------
-  // 3. Otherwise, safe and semantically meaningful
+  // 4. Tenant-specific low-signal patterns
   // ----------------------------------------------------
-  return {
-    isDangerous: false,
-    isLowSemantic: false
-  };
-  
+if (cfg.dangerous.extraLowSignalPatterns.length > 0) {
+    const lower = trimmed.toLowerCase();
+    if (
+      cfg.dangerous.extraLowSignalPatterns.some(pat =>
+        lower.includes(pat.toLowerCase())
+      )
+    ) {
+      addErrorCode(errorCodes, ErrorCodes.LOW_SIGNAL_TEXT);
+      return { isDangerous: false, isLowSemantic: true };
+    }
+  }
+
+  return { isDangerous: false, isLowSemantic: false };
+
 }
+  // ----------------------------------------------------
+  // 5. Otherwise, safe and semantically meaningful
+  // ----------------------------------------------------
+
 
 // Metric labels used in error messages
 const METRIC_LABELS = {

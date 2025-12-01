@@ -11,21 +11,32 @@ import {
   ALLOWED_TASK_TYPES_LOWER,
   ALLOWED_TEAM_ROLES,
   ALLOWED_TEAM_ROLES_LOWER,
-  ALLOWED_TEAM_ROLE_PREFIXES
+  ALLOWED_TEAM_ROLE_PREFIXES,
+  type TeamRoleFamily
 } from './constants';
 
 // ---- Runtime imports ----
 import { ErrorCodes, addErrorCode } from './errorCodes';
 
+// ------------------------------------------------------------
+// Core string helper
+// ------------------------------------------------------------
+
 /**
- * Safely coerce any possibly-null value to a trimmed string.
+ * Safely convert any unknown value to a trimmed string.
+ * Never returns null/undefined; always returns a string (possibly empty).
  */
 export function toSafeTrimmedString(value: unknown): string {
-  try {
-    return (value ?? '').toString().trim();
-  } catch {
-    return String(value ?? '').trim();
-  }
+  return (value ?? '').toString().trim();
+}
+
+// ------------------------------------------------------------
+// Task Type normalization
+// ------------------------------------------------------------
+
+export interface NormalizedTaskTypeResult {
+  normalized: string;   // canonical label or original if invalid
+  isAllowed: boolean;   // true if in ALLOWED_TASK_TYPES
 }
 
 /**
@@ -36,12 +47,14 @@ export function toSafeTrimmedString(value: unknown): string {
  *  - normalized: canonical task type if allowed, or original trimmed input
  *  - isAllowed: true if the normalized value is one of the allowed types
  */
-export function normalizeTaskType(raw: unknown): { normalized: string; isAllowed: boolean } {
+export function normalizeTaskType(raw: unknown): NormalizedTaskTypeResult {
   const safe = toSafeTrimmedString(raw);
   if (!safe) {
     return { normalized: '', isAllowed: false };
   }
-
+  // canonical lower string for comparison:
+  //  - collapse multiple spaces
+  //  - treat -, _ like spaces
    const canonical = safe
     .trim()
     .replace(/[_-]+/g, ' ')
@@ -51,6 +64,7 @@ export function normalizeTaskType(raw: unknown): { normalized: string; isAllowed
   const idx = ALLOWED_TASK_TYPES_LOWER.indexOf(canonical);
 
   if (idx === -1) {
+    // Not one of the allowed values; keep original text
     return { normalized: safe, isAllowed: false };
   }
 
@@ -58,6 +72,17 @@ export function normalizeTaskType(raw: unknown): { normalized: string; isAllowed
     normalized: ALLOWED_TASK_TYPES[idx],
     isAllowed: true
   };
+}
+
+// ------------------------------------------------------------
+// Team Role normalization
+// ------------------------------------------------------------
+
+export interface NormalizedTeamRoleResult {
+  normalized: string;         // canonical label or original if invalid
+  isAllowed: boolean;         // true if in ALLOWED_TEAM_ROLES
+  family: TeamRoleFamily | null; // 'content' | 'design' | 'development' | null
+  isLead: boolean;            // true if "... Lead" role
 }
 
 /**
@@ -69,69 +94,74 @@ export function normalizeTaskType(raw: unknown): { normalized: string; isAllowed
  *    and a "lead" flag from the presence of the word "lead".
  *  - Map families into canonical roles: Content / Content Lead / Design / Design Lead / Development / Development Lead.
  */
-export function normalizeTeamRole(raw: unknown): { normalized: string; isAllowed: boolean } {
+export function normalizeTeamRole(raw: unknown): NormalizedTeamRoleResult {
   const safe = toSafeTrimmedString(raw);
   if (!safe) {
-    return { normalized: '', isAllowed: false };
-  }
-
-  const lower = safe.toLowerCase();
-
-  // 1) Direct match against allowed roles (case-insensitive)
-  const directIdx = ALLOWED_TEAM_ROLES_LOWER.indexOf(lower);
-  if (directIdx >= 0) {
-    return {
-      normalized: ALLOWED_TEAM_ROLES[directIdx],
-      isAllowed: true
+     return {
+      normalized: '',
+      isAllowed: false,
+      family: null,
+      isLead: false
     };
   }
+ // Canonicalized lowercase used for all matching
+  const canonical = safe
+    .replace(/\s+/g, ' ')
+    .trim()
+    .toLowerCase();
 
-  // 2) Heuristic: derive family from the part before dash ("Content – Project" → "content")
-  const baseLower = safe.split(/[–-]/)[0].trim().toLowerCase();
+  // ---------------------------------------------
+  // 1) Exact allowed-role match
+  // ---------------------------------------------
+  const idx = ALLOWED_TEAM_ROLES_LOWER.indexOf(canonical);
 
-  let family: 'content' | 'design' | 'development' | null = null;
+  let normalized: string;
+  let isAllowed = false;
+
+  if (idx === -1) {
+    normalized = safe;
+  } else {
+    normalized = ALLOWED_TEAM_ROLES[idx];
+    isAllowed = true;
+  }
+
+// ---------------------------------------------
+  // 2) Derive family using prefix (before dash)
+  //    Works for inputs like:
+  //    "Content – Project", "Design - UX", "Development–API"
+  // ---------------------------------------------
+  const baseLower = canonical.split(/[–-]/)[0].trim();
+
+
+  let family: TeamRoleFamily | null = null;
   for (const prefix of ALLOWED_TEAM_ROLE_PREFIXES) {
     if (baseLower.startsWith(prefix)) {
-      family = prefix as 'content' | 'design' | 'development';
+      family = prefix;
       break;
     }
   }
-
-  if (!family) {
-    // Unrecognized family → treat as invalid, return original
-    return { normalized: safe, isAllowed: false };
-  }
-
-  const isLead = lower.includes('lead');
-
-  const candidate =
-    family === 'content'
-      ? (isLead ? 'Content Lead' : 'Content')
-      : family === 'design'
-      ? (isLead ? 'Design Lead' : 'Design')
-      : (isLead ? 'Development Lead' : 'Development');
-
-  const candidateLower = candidate.toLowerCase();
-  const allowedIdx = ALLOWED_TEAM_ROLES_LOWER.indexOf(candidateLower);
-
-  if (allowedIdx === -1) {
-    // Family understood but not part of ALLOWED_TEAM_ROLES → treat as invalid
-    return { normalized: candidate, isAllowed: false };
-  }
+// ---------------------------------------------
+  // 3) Detect "lead" inside role
+  // ---------------------------------------------
+  const isLead = canonical.includes('lead');
 
   return {
-    normalized: ALLOWED_TEAM_ROLES[allowedIdx],
-    isAllowed: true
+    normalized,
+    isAllowed,
+    family,
+    isLead
   };
 }
 
+// ------------------------------------------------------------
+// Mode normalization
+// ------------------------------------------------------------
+
 /**
- * Normalize mode to 'simple' | 'complex' | 'both', with fallback and error code when invalid.
- *
- * Behavior:
- *  - Empty / undefined → 'both' (default)
- *  - 'simple' | 'complex' | 'both' (case-insensitive) → same canonical value
- *  - Any other value → treated as invalid, fallback to 'both', and error code E306 added.
+ * Normalize mode to one of: 'simple' | 'complex' | 'both'
+ * - Empty → 'both' (no error)
+ * - Valid value → itself
+ * - Invalid → fallback to 'both' and record INVALID_MODE_VALUE (E306)
  */
 export function normalizeMode(
   rawMode: unknown,

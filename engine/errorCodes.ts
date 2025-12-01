@@ -46,6 +46,7 @@ export const ErrorCodes = {
   EMPTY_ROWS_ARRAY: 'E604',               // rows is [], not allowed
   INVALID_TRANSPORT_PAYLOAD: 'E605',      // a row is not a plain object
   INVALID_TRANSPORT_SANITIZATION: 'E606', // script/template injection in body
+  INTERNAL_ENGINE_ERROR: 'E607',
 
 } as const;
 
@@ -81,7 +82,8 @@ export const ErrorCodeDescriptions: Record<ErrorCode, string> = {
   [ErrorCodes.INVALID_ROWS_ARRAY]: 'The "rows" property is missing or is not a valid array.',
   [ErrorCodes.EMPTY_ROWS_ARRAY]: 'The "rows" array is present but empty.',
   [ErrorCodes.INVALID_TRANSPORT_PAYLOAD]: 'One or more rows are not valid objects.',
-  [ErrorCodes.INVALID_TRANSPORT_SANITIZATION]: 'Request contains unsafe or non-JSON-safe characters.'
+  [ErrorCodes.INVALID_TRANSPORT_SANITIZATION]: 'Request contains unsafe or non-JSON-safe characters.',
+  [ErrorCodes.INTERNAL_ENGINE_ERROR]: 'Internal backend processing failure.',
 };
 
 export const ERROR_COMMENTS: Record<ErrorCode, string> = {
@@ -112,7 +114,8 @@ export const ERROR_COMMENTS: Record<ErrorCode, string> = {
   [ErrorCodes.INVALID_ROWS_ARRAY]: 'Missing or invalid rows array.',
   [ErrorCodes.EMPTY_ROWS_ARRAY]: 'Rows array must not be empty.',
   [ErrorCodes.INVALID_TRANSPORT_PAYLOAD]: 'Row entries must be objects.',
-  [ErrorCodes.INVALID_TRANSPORT_SANITIZATION]: 'Request contains unsafe or non-JSON-safe characters.'
+  [ErrorCodes.INVALID_TRANSPORT_SANITIZATION]: 'Request contains unsafe or non-JSON-safe characters.',
+  [ErrorCodes.INTERNAL_ENGINE_ERROR]: 'Internal KPI engine error.',
 };
 
 // Helper: add an error code only once, preserving insertion order

@@ -83,3 +83,22 @@ export const REGEX_NO_LETTERS_DIGITS = /^[^A-Za-z0-9]+$/;
 
 // Split tokens for repeated-word detection
 export const REGEX_TOKEN_SPLIT = /\s+/;
+
+
+// ------------------------------------------------------------
+// Unicode clean helper
+// ------------------------------------------------------------
+
+
+// Strip Unicode zero-width + most control characters (except \n, \r, \t)
+export function stripZeroWidthAndControl(input: string): string {
+  if (!input) return '';
+
+  // Zero-width and bidi controls
+  const zeroWidthAndBidi = /[\u200B-\u200F\u202A-\u202E\u2060-\u206F]/g;
+
+  // Control chars: 0x00–0x08, 0x0B, 0x0C, 0x0E–0x1F, 0x7F
+  const controlChars = /[\u0000-\u0008\u000B\u000C\u000E-\u001F\u007F]/g;
+
+  return input.replace(zeroWidthAndBidi, '').replace(controlChars, '');
+}

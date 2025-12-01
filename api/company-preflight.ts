@@ -1,12 +1,40 @@
 // api/company-preflight.ts
 import type { VercelRequest, VercelResponse } from '@vercel/node';
-type PreflightErrorResponse = {
-  error: string;
-};
 import {
   isDangerousCompanyText,
   isDangerousBenefitText
 } from '../engine/validateDangerous';
+import {
+  DEFAULT_COMPANY_TOKEN_PATTERNS,
+  MAX_COMPANY_TOKENS,
+  MAX_PREFLIGHT_ROWS
+} from '../engine/constants';
+import { DEFAULT_TENANT_CONFIG } from '../engine/config';
+import { toSafeTrimmedString } from '../engine/normalizeFields';
+
+type PreflightErrorCode =
+  | 'METHOD_NOT_ALLOWED'
+  | 'INVALID_MODE'
+  | 'INVALID_JSON_BODY'
+  | 'INVALID_REQUEST_STRUCTURE'
+  | 'MISSING_ROWS_ARRAY'
+  | 'GENERIC_MODE_NOT_BOOLEAN'
+  | 'MISSING_SELECTED_COMPANY'
+  | 'APPLY_TO_MISSING_NOT_BOOLEAN'
+  | 'INVALID_MISMATCHED_STRATEGY'
+  | 'COMPANY_NOT_STRING'
+  | 'BENEFIT_NOT_STRING'
+  | 'INVALID_TEXT_COMPANY'
+  | 'INVALID_TEXT_BENEFIT'
+  | 'REQUEST_BODY_TOO_LARGE'
+  | 'TOO_MANY_ROWS'
+  | 'INTERNAL_PREFLIGHT_ERROR';
+
+type PreflightErrorResponse = {
+  error: string;            // human-readable text
+  code: PreflightErrorCode; // machine-readable for GPT
+  hint?: string;            // optional UX hint (e.g. "ask_for_selected_company")
+};
 /* -----------------------------------------------------------
    Types
 ----------------------------------------------------------- */
@@ -60,6 +88,63 @@ interface RewriteResponse {
 
 type PreflightRequest = AnalyzeRequest | RewriteRequest
 
+
+// -----------------------------------------------------------
+// // ========== Observability: Logging + Metrics ==========
+// -----------------------------------------------------------
+
+// Simple structured logging helpers
+function logPreflightInfo(event: string, ctx: Record<string, unknown>) {
+  console.info(
+    JSON.stringify({
+      level: 'info',
+      service: 'company-preflight',
+      event,
+      ...ctx
+    })
+  );
+}
+
+function logPreflightWarn(event: string, ctx: Record<string, unknown>) {
+  console.warn(
+    JSON.stringify({
+      level: 'warn',
+      service: 'company-preflight',
+      event,
+      ...ctx
+    })
+  );
+}
+
+function logPreflightError(event: string, ctx: Record<string, unknown>) {
+  console.error(
+    JSON.stringify({
+      level: 'error',
+      service: 'company-preflight',
+      event,
+      ...ctx
+    })
+  );
+}
+
+// Helper: never log full benefit text
+function summarizeBenefit(benefit: unknown): string | null {
+  if (typeof benefit !== 'string') return null;
+  const trimmed = benefit.trim();
+  if (!trimmed) return null;
+  if (trimmed.length <= 80) return trimmed;
+  return trimmed.slice(0, 77) + '...';
+}
+
+
+// -----------------------------------------------------------
+// Simple in-memory metrics (per runtime instance)
+// -----------------------------------------------------------
+let preflightRequestsTotal = 0;
+let preflightRequests400 = 0;
+let preflightRequests500 = 0;
+let preflightMalformedRowsTotal = 0;
+
 /* -----------------------------------------------------------
    Helpers
 ----------------------------------------------------------- */
@@ -80,58 +165,57 @@ function normalize(str: string | null | undefined): string {
 
 // Very simple company-token detector inside strategic_benefit
 function detectCompanyInBenefit(text: string): string[] {
-  if (!text) return []
-  const tokens = text.split(/[\s,.;:]+/)
-  const patterns = [
-  'inc',
-  'ltd',
-  'corp',
-  'ab',
-  'llc',
-  'bank',
-  'telecom',
-  'group',
-  'company',
-  'corporation',
-  'organization' // NEW: detect “organization’s” etc. as a generic org token
-  ]
-  const found: string[] = []
-  for (const t of tokens) {
-    const lower = t.toLowerCase()
-    if (patterns.some(p => lower.includes(p))) {
-      found.push(t)
+  if (!text) return [];
+
+  const tokens = text.split(/[\s,.;:]+/);
+  const found: string[] = [];
+
+  for (const token of tokens) {
+    const lower = token.toLowerCase();
+    if (DEFAULT_COMPANY_TOKEN_PATTERNS.some(p => lower.includes(p))) {
+      found.push(token);
     }
   }
-  return found
+
+  return found;
 }
 
-function splitCompanyField(raw: string | null | undefined): { parts: string[]; malformed: boolean } {
-  if (!raw) {
-    return { parts: [], malformed: false }
+function splitCompanyField(
+  raw: string | null | undefined
+): { parts: string[]; malformed: boolean } {
+  // Normalize input to a safe, trimmed string
+  const value = toSafeTrimmedString(raw);
+
+  if (!value) {
+    return { parts: [], malformed: false };
   }
+// 1) Pattern-based malformed detection
+  let malformed =
+    /,,/.test(value) ||          // double commas
+    /\/\//.test(value) ||        // double slashes
+    /&&/.test(value) ||          // double ampersands
+    /\band and\b/i.test(value) ||// "and and"
+    /^[,\/&]/.test(value) ||     // leading separator
+    /[,\/&]$/.test(value);       // trailing separator
 
-  const value = raw.trim()
-
-  // Detect malformed patterns:
-  //  - double separators (,, // && "and and")
-  //  - leading separator
-  //  - trailing separator
-  const malformed =
-    /,,/.test(value) ||
-    /\/\//.test(value) ||
-    /&&/.test(value) ||
-    /\band and\b/i.test(value) ||
-    /^[,\/&]/.test(value) ||
-    /[,\/&]$/.test(value)
-
+  // 2) Tokenization
   const parts = value
     .split(/,|\/|&|\band\b/gi)
     .map(part => part.trim())
-    .filter(part => part.length > 0)
+    .filter(part => part.length > 0);
 
-  return { parts, malformed }
+  // 3) Too many tokens → malformed
+  if (parts.length > MAX_COMPANY_TOKENS) {
+    malformed = true;
+  }
+
+  // Respect tenant policy for multi-company per row
+  if (!DEFAULT_TENANT_CONFIG.policy.allowMultiCompanyPerRow && parts.length > 1) {
+    malformed = true;
+  }
+
+  return { parts, malformed };
 }
-
 
 /* -----------------------------------------------------------
    ANALYZE LOGIC
@@ -162,28 +246,33 @@ function runAnalyze(payload: AnalyzeRequest): AnalyzeResponse {
 
   for (const row of rows) {
     // Type checks for company / strategic_benefit
-    if (row.company != null && typeof row.company !== 'string') {
-      throw { status: 400, error: 'Company field must be string.' }
-    }
+   if (row.company != null && typeof row.company !== 'string') {
+  throw { status: 400, error: 'Company field must be string.', code: 'COMPANY_NOT_STRING' };
+}
 
-    if (row.strategic_benefit != null && typeof row.strategic_benefit !== 'string') {
-      throw { status: 400, error: 'Strategic_benefit field must be string.' }
-    }
+if (row.strategic_benefit != null && typeof row.strategic_benefit !== 'string') {
+  throw {
+    status: 400,
+    error: 'Strategic_benefit field must be string.',
+    code: 'BENEFIT_NOT_STRING'
+  };
+}
 
-    // Dangerous / low-signal checks (reuse engine rules)
-    if (isDangerousCompanyText(row.company)) {
-      throw {
-        status: 400,
-        error: 'Invalid text format for company.'
-      }
-    }
+if (isDangerousCompanyText(row.company)) {
+  throw {
+    status: 400,
+    error: 'Invalid text format for company.',
+    code: 'INVALID_TEXT_COMPANY'
+  };
+}
 
-    if (isDangerousBenefitText(row.strategic_benefit)) {
-      throw {
-        status: 400,
-        error: 'Invalid text format for strategic_benefit.'
-      }
-    }
+if (isDangerousBenefitText(row.strategic_benefit)) {
+  throw {
+    status: 400,
+    error: 'Invalid text format for strategic_benefit.',
+    code: 'INVALID_TEXT_BENEFIT'
+  };
+}
 
     const { parts: colCompanies, malformed: malformedCompany } = splitCompanyField(row.company)
     if (malformedCompany) {
@@ -256,7 +345,6 @@ function runAnalyze(payload: AnalyzeRequest): AnalyzeResponse {
       detected_company
     })
   }
-
   return {
     missing_company_rows: missing,
     mismatched_company_rows: mismatched,
@@ -282,28 +370,33 @@ function runRewrite(payload: RewriteRequest): RewriteResponse {
     let { company, strategic_benefit } = row
 
     // Type checks for company / strategic_benefit
-    if (company != null && typeof company !== 'string') {
-      throw { status: 400, error: 'Company field must be string.' }
-    }
+   if (company != null && typeof company !== 'string') {
+  throw { status: 400, error: 'Company field must be string.', code: 'COMPANY_NOT_STRING' };
+}
 
-    if (strategic_benefit != null && typeof strategic_benefit !== 'string') {
-      throw { status: 400, error: 'Strategic_benefit field must be string.' }
-    }
+if (strategic_benefit != null && typeof strategic_benefit !== 'string') {
+  throw {
+    status: 400,
+    error: 'Strategic_benefit field must be string.',
+    code: 'BENEFIT_NOT_STRING'
+  };
+}
 
-    // Dangerous / low-signal checks (reuse engine rules)
-    if (isDangerousCompanyText(company)) {
-      throw {
-        status: 400,
-        error: 'Invalid text format for company.'
-      }
-    }
+if (isDangerousCompanyText(company)) {
+  throw {
+    status: 400,
+    error: 'Invalid text format for company.',
+    code: 'INVALID_TEXT_COMPANY'
+  };
+}
 
-    if (isDangerousBenefitText(strategic_benefit)) {
-      throw {
-        status: 400,
-        error: 'Invalid text format for strategic_benefit.'
-      }
-    }
+if (isDangerousBenefitText(strategic_benefit)) {
+  throw {
+    status: 400,
+    error: 'Invalid text format for strategic_benefit.',
+    code: 'INVALID_TEXT_BENEFIT'
+  };
+}
 
     const { parts: colCompanies } = splitCompanyField(company)
     const benefitCompanies = detectCompanyInBenefit(strategic_benefit)
@@ -321,19 +414,33 @@ function runRewrite(payload: RewriteRequest): RewriteResponse {
     const hasAny = allCompanies.length > 0
 
 
-    /* -------------------------
-       Missing company?
-    -------------------------- */
-    if (apply_to_missing && !hasAny) {
-      if (generic_mode) {
-        company = ''
-        if (!strategic_benefit.trim()) {
-          strategic_benefit = 'Support the organization’s strategic objectives'
+        // -------------------------
+    // Missing company / missing benefit handling
+    // -------------------------
+    const benefitTrimmed = (strategic_benefit || '').trim();
+    const benefitEmpty = benefitTrimmed.length === 0;
+
+    if (apply_to_missing) {
+      // 1) If we have NO detectable company tokens at all, fill company.
+      if (!hasAny) {
+        if (generic_mode) {
+          // Generic: keep company empty, rely on benefit wording
+          company = '';
+        } else {
+          // Named: attach the selected company
+          company = selected_company;
         }
-      } else {
-        company = selected_company
-        if (!strategic_benefit.trim()) {
-          strategic_benefit = `Support ${selected_company}’s strategic objectives`
+      }
+
+      // 2) If benefit text is empty, seed a strategic benefit sentence.
+      if (benefitEmpty) {
+        if (generic_mode) {
+          strategic_benefit = 'Support the organization’s strategic objectives';
+        } else if (selected_company.trim()) {
+          strategic_benefit = `Support ${selected_company}’s strategic objectives`;
+        } else {
+          // Safety fallback if selected_company somehow blank
+          strategic_benefit = 'Support the organization’s strategic objectives';
         }
       }
     }
@@ -372,10 +479,14 @@ function runRewrite(payload: RewriteRequest): RewriteResponse {
 export default function handler(req: VercelRequest, res: VercelResponse) {
   if (req.method !== 'POST') {
     res.setHeader('Allow', 'POST')
-    const errorBody: PreflightErrorResponse = { error: 'Method Not Allowed' }
-    return res.status(405).json(errorBody)
-  }
-  
+    const errorBody: PreflightErrorResponse = {
+    error: 'Method Not Allowed',
+    code: 'METHOD_NOT_ALLOWED'
+  };
+  return res.status(405).json(errorBody);
+}
+  // Count every POST preflight request
+  preflightRequestsTotal++;
 
   let body: PreflightRequest;
 
@@ -385,44 +496,171 @@ export default function handler(req: VercelRequest, res: VercelResponse) {
       ? JSON.parse(req.body)
       : (req.body as PreflightRequest);
   } catch {
-    const errorBody: PreflightErrorResponse = { error: 'Invalid JSON body.' }
-    return res.status(400).json(errorBody)
+  const errorBody: PreflightErrorResponse = {
+    error: 'Invalid JSON body.',
+    code: 'INVALID_JSON_BODY'
+  };
+  preflightRequests400++;
+  logPreflightWarn('request_rejected_400', {
+    reason: errorBody.error,
+    mode: null,
+    generic_mode: null,
+    rows_count: null
+  });
+  return res.status(400).json(errorBody);
+}
+
+    // Enforce body-size limit (payload safety) using string length
+  // Enforce body-size limit (payload safety)
+const MAX_BODY_CHARS = 1 * 1024 * 1024; // 1 MB (approx; JSON string length)
+
+try {
+  const serialized = JSON.stringify(body);
+  const approxSize = serialized.length;
+
+  if (approxSize > MAX_BODY_CHARS) {
+    const errorBody: PreflightErrorResponse = {
+      error: 'Request body too large.',
+      code: 'REQUEST_BODY_TOO_LARGE'
+    };
+    preflightRequests400++;
+    logPreflightWarn('request_rejected_400', {
+      reason: errorBody.error,
+      approx_size: approxSize,
+      max_size: MAX_BODY_CHARS,
+      mode: (body as any).mode ?? null,
+      generic_mode: (body as any).generic_mode ?? null,
+      rows_count: Array.isArray((body as any).rows)
+        ? (body as any).rows.length
+        : null
+    });
+    return res.status(400).json(errorBody);
   }
+} catch {
+  const errorBody: PreflightErrorResponse = {
+    error: 'Invalid request structure.',
+    code: 'INVALID_REQUEST_STRUCTURE'
+  };
+  preflightRequests400++;
+  logPreflightWarn('request_rejected_400', {
+    reason: 'Invalid request structure on size check.',
+    mode: null,
+    generic_mode: null,
+    rows_count: null
+  });
+  return res.status(400).json(errorBody);
+}
   // Basic structure validation
-  if (!body || typeof body !== 'object') {
-    const errorBody: PreflightErrorResponse = { error: 'Invalid request structure.' }
-    return res.status(400).json(errorBody)
-  }
+if (!body || typeof body !== 'object') {
+  const errorBody: PreflightErrorResponse = {
+    error: 'Invalid request structure.',
+    code: 'INVALID_REQUEST_STRUCTURE'
+  };
+  preflightRequests400++;
+  logPreflightWarn('request_rejected_400', {
+    reason: errorBody.error,
+    mode: null,
+    generic_mode: null,
+    rows_count: null
+  });
+  return res.status(400).json(errorBody);
+}
 
-  if (!('rows' in body) || !Array.isArray((body as any).rows)) {
-    const errorBody: PreflightErrorResponse = { error: 'Missing or invalid rows array.' }
-    return res.status(400).json(errorBody)
-  }
+if (!('rows' in body) || !Array.isArray((body as any).rows)) {
+  const errorBody: PreflightErrorResponse = {
+    error: 'Missing or invalid rows array.',
+    code: 'MISSING_ROWS_ARRAY'
+  };
+  preflightRequests400++;
+  logPreflightWarn('request_rejected_400', {
+    reason: errorBody.error,
+    mode: (body as any).mode ?? null,
+    generic_mode: (body as any).generic_mode ?? null,
+    rows_count: null
+  });
+  return res.status(400).json(errorBody);
+}
 
+  const rowsCount = (body as any).rows.length;
+
+  logPreflightInfo('request_received', {
+    mode: (body as any).mode ?? null,
+    generic_mode: (body as any).generic_mode ?? null,
+    selected_company: (body as any).selected_company ?? '',
+    rows_count: rowsCount
+  });
+
+  if (rowsCount > MAX_PREFLIGHT_ROWS) {
+  const errorBody: PreflightErrorResponse = {
+    error: 'Too many rows in preflight request.',
+    code: 'TOO_MANY_ROWS'
+  };
+  preflightRequests400++;
+  logPreflightWarn('request_rejected_400', {
+    reason: errorBody.error,
+    mode: (body as any).mode ?? null,
+    generic_mode: (body as any).generic_mode ?? null,
+    rows_count: rowsCount,
+    max_rows: MAX_PREFLIGHT_ROWS
+  });
+  return res.status(400).json(errorBody);
+}
   // Validate generic_mode
   if (typeof (body as any).generic_mode !== 'boolean') {
-    const errorBody: PreflightErrorResponse = { error: 'generic_mode must be boolean.' }
-    return res.status(400).json(errorBody)
-  }
+  const errorBody: PreflightErrorResponse = {
+    error: 'generic_mode must be boolean.',
+    code: 'GENERIC_MODE_NOT_BOOLEAN'
+  };
+  preflightRequests400++;
+  logPreflightWarn('request_rejected_400', {
+    reason: errorBody.error,
+    mode: (body as any).mode ?? null,
+    generic_mode: (body as any).generic_mode ?? null,
+    rows_count: (body as any).rows ? (body as any).rows.length : null
+  });
+  return res.status(400).json(errorBody);
+}
 
   // Validate selected_company for non-generic mode
   if ((body as any).mode === 'analyze' || (body as any).mode === 'rewrite') {
-    const genericMode = (body as any).generic_mode as boolean
-    const selectedCompany = ((body as any).selected_company || '').toString().trim()
+  const genericMode = (body as any).generic_mode as boolean;
+  const selectedCompany = ((body as any).selected_company || '').toString().trim();
 
-    if (!genericMode && !selectedCompany) {
-      const errorBody: PreflightErrorResponse = { error: 'Missing selected_company for non-generic mode.' }
-      return res.status(400).json(errorBody)
-    }
+  if (!genericMode && !selectedCompany) {
+    const errorBody: PreflightErrorResponse = {
+      error: 'Missing selected_company for non-generic mode.',
+      code: 'MISSING_SELECTED_COMPANY',
+      hint: 'ask_for_selected_company'
+    };
+    preflightRequests400++;
+    logPreflightWarn('request_rejected_400', {
+      reason: errorBody.error,
+      mode: (body as any).mode ?? null,
+      generic_mode: genericMode,
+      rows_count: (body as any).rows ? (body as any).rows.length : null
+    });
+    return res.status(400).json(errorBody);
   }
+}
 
   // Rewrite-specific validation
   if ((body as any).mode === 'rewrite') {
-    const rewrite = body as RewriteRequest
+    const rewrite = body as RewriteRequest;
 
-    if (typeof rewrite.apply_to_missing !== 'undefined' && typeof rewrite.apply_to_missing !== 'boolean') {
-      const errorBody: PreflightErrorResponse = { error: 'apply_to_missing must be boolean.' }
-      return res.status(400).json(errorBody)
+    if (typeof rewrite.apply_to_missing !== 'undefined' &&
+    typeof rewrite.apply_to_missing !== 'boolean') {
+      const errorBody: PreflightErrorResponse = {
+        error: 'apply_to_missing must be boolean.',
+        code: 'APPLY_TO_MISSING_NOT_BOOLEAN'
+      };
+      preflightRequests400++;
+      logPreflightWarn('request_rejected_400', {
+        reason: errorBody.error,
+        mode: rewrite.mode,
+        generic_mode: rewrite.generic_mode,
+        rows_count: rewrite.rows.length
+      });
+      return res.status(400).json(errorBody);
     }
 
     if (
@@ -430,39 +668,106 @@ export default function handler(req: VercelRequest, res: VercelResponse) {
       rewrite.mismatched_strategy !== 'overwrite' &&
       rewrite.mismatched_strategy !== 'keep'
     ) {
-      const errorBody: PreflightErrorResponse = { error: 'Invalid mismatched_strategy.' }
-      return res.status(400).json(errorBody)
+      const errorBody: PreflightErrorResponse = {
+        error: 'Invalid mismatched_strategy.',
+        code: 'INVALID_MISMATCHED_STRATEGY'
+      };
+      preflightRequests400++;
+      logPreflightWarn('request_rejected_400', {
+        reason: errorBody.error,
+        mode: rewrite.mode,
+        generic_mode: rewrite.generic_mode,
+        rows_count: rewrite.rows.length
+      });
+      return res.status(400).json(errorBody);
     }
   }
 
   try {
     if (body.mode === 'analyze') {
       const out = runAnalyze(body as AnalyzeRequest);
+      // NEW: accumulate malformed rows count
+      preflightMalformedRowsTotal += out.malformed_company_rows.length;
+
+      logPreflightInfo('request_completed_200', {
+        mode: 'analyze',
+        generic_mode: (body as any).generic_mode,
+        selected_company: (body as any).selected_company ?? '',
+        rows_count: (body as any).rows.length,
+        missing_count: out.missing_company_rows.length,
+        mismatched_count: out.mismatched_company_rows.length,
+        malformed_count: out.malformed_company_rows.length
+      });
       return res.status(200).json(out);
     }
 
     if (body.mode === 'rewrite') {
       const out = runRewrite(body as RewriteRequest);
+      logPreflightInfo('request_completed_200', {
+        mode: 'rewrite',
+        generic_mode: (body as any).generic_mode,
+        selected_company: (body as any).selected_company ?? '',
+        rows_count: (body as any).rows.length
+      });
       return res.status(200).json(out);
     }
 
-    const errorBody: PreflightErrorResponse = { error: 'Invalid mode.' }
-    return res.status(400).json(errorBody)
-  } catch (err: any) {
-  console.error('company-preflight error:', err);
+const errorBody: PreflightErrorResponse = {
+  error: 'Invalid mode.',
+  code: 'INVALID_MODE'
+};
+preflightRequests400++;
+logPreflightWarn('request_rejected_400', {
+  reason: errorBody.error,
+  mode: (body as any).mode ?? null,
+  generic_mode: (body as any).generic_mode ?? null,
+  rows_count: (body as any).rows ? (body as any).rows.length : null
+});
+return res.status(400).json(errorBody);
 
+  } catch (err: any) {
   // Propagate structured errors thrown from runAnalyze / runRewrite
   if (err && typeof err === 'object' && 'status' in err && 'error' in err) {
     const status = typeof (err as any).status === 'number' ? (err as any).status : 400;
     const message = String((err as any).error || 'Unknown company-preflight error.');
-    const errorBody: PreflightErrorResponse = { error: message };
+
+    const errorBody: PreflightErrorResponse = {
+      error: message,
+      code: (err as any).code ?? 'INTERNAL_PREFLIGHT_ERROR',
+      hint: (err as any).hint
+    };
+
+    if (status >= 500) {
+      preflightRequests500++;
+      logPreflightError('request_failed_500', {
+        status,
+        message
+      });
+    } else {
+      preflightRequests400++;
+      logPreflightWarn('request_rejected_400', {
+        reason: message,
+        mode: (body as any)?.mode ?? null,
+        generic_mode: (body as any)?.generic_mode ?? null,
+        rows_count: (body as any)?.rows ? (body as any).rows.length : null
+      });
+    }
+
     return res.status(status).json(errorBody);
   }
 
   // Fallback for unexpected errors
+  preflightRequests500++;
+  logPreflightError('request_failed_500', {
+    status: 500,
+    message: 'Internal company-preflight error.',
+    rawError: String(err)
+  });
+
   const errorBody: PreflightErrorResponse = {
-    error: 'Internal company-preflight error.'
+    error: 'Internal company-preflight error.',
+    code: 'INTERNAL_PREFLIGHT_ERROR'
   };
   return res.status(500).json(errorBody);
   }
-}
+} 

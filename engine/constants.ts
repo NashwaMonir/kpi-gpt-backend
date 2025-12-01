@@ -2,24 +2,24 @@
 // Canonical constants for KPI Engine v10.7.5 (Option C-FULL)
 // Ensures predictable validation behavior and ordering across all modules.
 
+import { DEFAULT_TENANT_CONFIG } from './config';
 // ------------------------------------------------------------
 // Allowed enumerations
 // ------------------------------------------------------------
 
-export const ALLOWED_TASK_TYPES = [
-  'Project',
-  'Change Request',
-  'Consultation',
-] as const;
 
-export const ALLOWED_TEAM_ROLES = [
-  'Content',
-  'Design',
-  'Development',
-  'Content Lead',
-  'Design Lead',
-  'Development Lead'
-] as const;
+export const ALLOWED_TASK_TYPES = DEFAULT_TENANT_CONFIG.domain.allowedTaskTypes;
+export const ALLOWED_TASK_TYPES_LOWER = ALLOWED_TASK_TYPES.map(t =>
+  t.toLowerCase()
+);
+
+export const ALLOWED_TEAM_ROLES = DEFAULT_TENANT_CONFIG.domain.allowedTeamRoles;
+export const ALLOWED_TEAM_ROLES_LOWER = ALLOWED_TEAM_ROLES.map(r =>
+  r.toLowerCase()
+);
+
+export const GENERIC_COMPANY_TOKENS =
+  DEFAULT_TENANT_CONFIG.domain.genericCompanyTokens;
 
 export const ALLOWED_TEAM_ROLE_PREFIXES = [
   'content',
@@ -30,9 +30,11 @@ export const ALLOWED_TEAM_ROLE_PREFIXES = [
 export type TeamRoleFamily = (typeof ALLOWED_TEAM_ROLE_PREFIXES)[number];
 
 // Lowercase lookups for case-insensitive matching
-export const ALLOWED_TASK_TYPES_LOWER = ALLOWED_TASK_TYPES.map(t => t.toLowerCase());
-export const ALLOWED_TEAM_ROLES_LOWER = ALLOWED_TEAM_ROLES.map(r => r.toLowerCase());
+/*export const ALLOWED_TASK_TYPES_LOWER = ALLOWED_TASK_TYPES.map(t => t.toLowerCase());
 
+
+export const ALLOWED_TEAM_ROLES_LOWER = ALLOWED_TEAM_ROLES.map(r => r.toLowerCase());
+*/
 export type AllowedTaskType = (typeof ALLOWED_TASK_TYPES)[number];
 export type AllowedTeamRole = (typeof ALLOWED_TEAM_ROLES)[number];
 
@@ -64,6 +66,38 @@ export const STOPWORD_REPEAT_CANDIDATES = [
 
 // Max length for a low-signal repeated stopword
 export const LOW_SIGNAL_WORD_MAX_LENGTH = 4;
+
+// ------------------------------------------------------------
+// Length limit + shared patterns
+// ------------------------------------------------------------
+
+
+// 1) Maximum allowed length for any free-text field we validate
+export const MAX_TEXT_LENGTH = 1000; // safe default; adjust if needed
+
+// 2) Maximum number of distinct company tokens per cell
+export const MAX_COMPANY_TOKENS = 20;
+
+// 3) Maximum number of rows for preflight requests
+export const MAX_PREFLIGHT_ROWS = 500;
+
+// If you want to keep the older name:
+export const DEFAULT_COMPANY_TOKEN_PATTERNS = GENERIC_COMPANY_TOKENS;
+
+/*export const DEFAULT_COMPANY_TOKEN_PATTERNS: string[] = [
+  'inc',
+  'ltd',
+  'corp',
+  'ab',
+  'llc',
+  'bank',
+  'telecom',
+  'group',
+  'company',
+  'corporation',
+  'organization'
+];*/
+
 // ------------------------------------------------------------
 // Mandatory fields ordering (canonical for error messages)
 // ------------------------------------------------------------
