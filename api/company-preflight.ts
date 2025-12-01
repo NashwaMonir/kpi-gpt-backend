@@ -347,16 +347,31 @@ if (isDangerousBenefitText(row.strategic_benefit)) {
     const normalizedAll = allCompanies.map(c => normalize(c))
     const hasAny = allCompanies.length > 0
 
+    // NEW: detect generic organization/company wording when in generic_mode,
+    // even if no explicit company tokens were extracted.
+    const benefitText = (row.strategic_benefit || '').toLowerCase()
+    const genericFromText =
+      generic_mode &&
+      /\b(organisation|organization|company|företaget|företag)\b/.test(benefitText)
+
     let status: 'MATCH_SELECTED' | 'MATCH_GENERIC' | 'MISSING' | 'MISMATCH'
     let detected_company = ''
 
     if (!hasAny) {
-      status = 'MISSING'
-      missing.push(row.row_id)
-      detected_company = ''
+      if (genericFromText) {
+        // Generic mode + generic org wording → treat as MATCH_GENERIC
+        status = 'MATCH_GENERIC'
+        detected_company = 'the organization'
+        // NOTE: do NOT push into missing_company_rows
+      } else {
+        status = 'MISSING'
+        missing.push(row.row_id)
+        detected_company = ''
+      }
     } else {
       // Check generic tags
-      const allGeneric = normalizedAll.length > 0 &&
+      const allGeneric =
+        normalizedAll.length > 0 &&
         normalizedAll.every(n => n === 'the company' || n === 'the organization')
 
       if (generic_mode && allGeneric) {
