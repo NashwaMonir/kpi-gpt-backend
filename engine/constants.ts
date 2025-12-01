@@ -37,7 +37,7 @@ export const COMPANY_SUFFIX_TOKENS = [
   'ltd',
   'llc',
   'ab',
-  'inc'
+  'inc',
 ];
 
 export type TeamRoleFamily = (typeof ALLOWED_TEAM_ROLE_PREFIXES)[number];

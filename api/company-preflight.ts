@@ -193,9 +193,9 @@ function enrichWithSuffixCompanies(
 
   const suffixAlt = COMPANY_SUFFIX_TOKENS.join('|'); // bank|group|telecom|corp|ab
   const regex = new RegExp(
-    `\\b([A-Z][A-Za-z0-9]*(?:[-\\s][A-Z][A-Za-z0-9]*)*)\\s+(${suffixAlt})\\b`,
-    'g'
-  );
+  `\\b([A-Z][A-Za-z0-9]*(?:[-\\s][A-Z][A-Za-z0-9]*)*)\\s+(${suffixAlt})\\b`,
+  'gi'   // case-insensitive
+);
 
   let match: RegExpExecArray | null;
   while ((match = regex.exec(value)) !== null) {
