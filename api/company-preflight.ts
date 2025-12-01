@@ -171,10 +171,25 @@ function detectCompanyInBenefit(text: string): string[] {
   const tokens = text.split(/[\s,.;:]+/);
   const found: string[] = [];
 
+  // NEW: detect tokens that *end* with a known suffix (e.g. "BetaCorp", "GammaGroup")
+  const suffixEndRegex = new RegExp(
+    `(${COMPANY_SUFFIX_TOKENS.join('|')})$`,
+    'i'
+  );
+
   for (const token of tokens) {
     const lower = token.toLowerCase();
+
+    // 1) Existing pattern-based detection (unchanged)
     if (DEFAULT_COMPANY_TOKEN_PATTERNS.some(p => lower.includes(p))) {
       found.push(token);
+      continue;
+    }
+
+    // 2) NEW: detect things like "BetaCorp", "GammaGroup", "FooTelecom", "CoreAB"
+    if (suffixEndRegex.test(token)) {
+      found.push(token);
+      continue;
     }
   }
 
@@ -223,14 +238,15 @@ function splitCompanyField(
     return { parts: [], malformed: false };
   }
 // 1) Pattern-based malformed detection
-  let malformed =
-    /,,/.test(value) ||          // double commas
-    /\/\//.test(value) ||        // double slashes
-    /&&/.test(value) ||          // double ampersands
-    /\band and\b/i.test(value) ||// "and and"
-    /^[,\/&]/.test(value) ||     // leading separator
-    /[,\/&]$/.test(value);       // trailing separator
-
+    let malformed =
+    /,,/.test(value) ||              // double commas
+    /\/\//.test(value) ||            // double slashes
+    /&&/.test(value) ||              // double ampersands
+    /\band and\b/i.test(value) ||    // "and and"
+    /\/\s+\/\s*/.test(value) ||      // NEW: "/ /" or "/   /" => empty company between slashes
+    /^[,\/&]/.test(value) ||         // leading separator
+    /[,\/&]$/.test(value);           // trailing separator
+    
   // 2) Tokenization
   const parts = value
     .split(/,|\/|&|\band\b/gi)
