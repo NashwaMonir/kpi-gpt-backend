@@ -4,27 +4,31 @@
 // Rules:
 //  - If ALL 3 metrics missing  → auto-suggest defaults + E501 (NEEDS_REVIEW)
 //  - If SOME metrics missing   → auto-suggest defaults + E502 (NEEDS_REVIEW)
-//  - If NONE missing           → VALID (no error codes added)
+//  - If NONE missing           → no auto-suggest, no E501/E502
 //
 // v10.8: this module will be replaced by the role_metric_matrix engine.
 
 import type { KpiRowIn } from './types';
 import { ROLE_DEFAULT_METRICS } from './constants';
 import { ErrorCodes, addErrorCode, type ErrorCode } from './errorCodes';
+import {
+  resolveMatrixKey,
+  resolveMatrixMetrics,
+  type MatrixKey
+} from './metricMatrixResolver';
 
 export interface MetricResolutionResult {
-  output: string;
-  quality: string;
-  improvement: string;
-  missingMetrics: string[];   // "Output", "Quality", "Improvement"
-  needsReview: boolean;
-  reviewText?: string;        // e.g. "Metrics auto-suggested (Output / Quality / Improvement)."
+  output_metric: string | null;
+  quality_metric: string | null;
+  improvement_metric: string | null;
+  used_default_metrics: boolean;
+  default_source?: MatrixKey;
 }
 
 /**
  * Resolve metrics for a normalized row:
- *  - If all present → no changes, VALID from metrics view.
- *  - If some/all missing → fill from ROLE_DEFAULT_METRICS and mark NEEDS_REVIEW.
+ *  - If all present → no changes, used_default_metrics = false.
+ *  - If some/all missing → fill from matrix / role defaults + E501/E502.
  */
 export function resolveMetrics(
   row: KpiRowIn,
@@ -41,32 +45,36 @@ export function resolveMetrics(
   let quality = currentQuality;
   let improvement = currentImprovement;
 
+  // 1) Detect missing
   const missing: string[] = [];
   if (!currentOutput) missing.push('Output');
   if (!currentQuality) missing.push('Quality');
   if (!currentImprovement) missing.push('Improvement');
 
-  // Nothing missing → no auto-suggest, no E501/E502
+  // 2) Nothing missing → no auto-suggest, no E501/E502
   if (missing.length === 0) {
     return {
-      output,
-      quality,
-      improvement,
-      missingMetrics: [],
-      needsReview: false,
-      reviewText: ''
+      output_metric: output,
+      quality_metric: quality,
+      improvement_metric: improvement,
+      used_default_metrics: false
     };
   }
 
-  // 1) Fill missing metrics from defaults
+  // 3) Some/all missing → fill from matrix (if available) or role defaults
+  const key = resolveMatrixKey(row.team_role, row.task_type);
+  const matrixDefaults = key ? resolveMatrixMetrics(key) : null;
+
   if (!output) {
-    output = defaults.output;
+    output = matrixDefaults ? matrixDefaults.output_metric : defaults.output;
   }
   if (!quality) {
-    quality = defaults.quality;
+    quality = matrixDefaults ? matrixDefaults.quality_metric : defaults.quality;
   }
   if (!improvement) {
-    improvement = defaults.improvement;
+    improvement = matrixDefaults
+      ? matrixDefaults.improvement_metric
+      : defaults.improvement;
   }
 
   // Normalize all resolved metrics
@@ -74,25 +82,21 @@ export function resolveMetrics(
   quality = quality.trim();
   improvement = improvement.trim();
 
-  // 2) Mark NEEDS_REVIEW and add error codes
-  let reviewText: string;
+  // 4) Metrics error codes (E501 / E502)
   if (missing.length === 3) {
     // All metrics missing → E501
     addErrorCode(errorCodes, ErrorCodes.METRICS_AUTOSUGGEST_ALL);
-    reviewText = 'Metrics auto-suggested (Output / Quality / Improvement).';
   } else {
     // 1 or 2 missing → E502
     addErrorCode(errorCodes, ErrorCodes.METRICS_AUTOSUGGEST_PARTIAL);
-    reviewText = `Metrics auto-suggested for: ${missing.join(', ')}.`;
   }
 
   return {
-    output,
-    quality,
-    improvement,
-    missingMetrics: missing,
-    needsReview: true,
-    reviewText
+    output_metric: output,
+    quality_metric: quality,
+    improvement_metric: improvement,
+    used_default_metrics: true,
+    default_source: key || undefined
   };
 }
 
@@ -103,15 +107,17 @@ export function resolveMetrics(
  *  - Detect base family: content | design | development (prefix match).
  *  - Detect "lead" anywhere in the role string.
  *  - Map to ROLE_DEFAULT_METRICS:
- *      content        → ROLE_DEFAULT_METRICS.content
- *      content lead   → ROLE_DEFAULT_METRICS.content_lead
- *      design         → ROLE_DEFAULT_METRICS.design
- *      design lead    → ROLE_DEFAULT_METRICS.design_lead
- *      development    → ROLE_DEFAULT_METRICS.development
- *      development lead → ROLE_DEFAULT_METRICS.development_lead
- *  - Anything else   → ROLE_DEFAULT_METRICS.generic
+ *      content           → ROLE_DEFAULT_METRICS.content
+ *      content lead      → ROLE_DEFAULT_METRICS.content_lead
+ *      design            → ROLE_DEFAULT_METRICS.design
+ *      design lead       → ROLE_DEFAULT_METRICS.design_lead
+ *      development       → ROLE_DEFAULT_METRICS.development
+ *      development lead  → ROLE_DEFAULT_METRICS.development_lead
+ *  - Anything else       → ROLE_DEFAULT_METRICS.generic
  */
-export function pickRoleDefaults(roleLowerRaw: string): typeof ROLE_DEFAULT_METRICS[keyof typeof ROLE_DEFAULT_METRICS] {
+export function pickRoleDefaults(
+  roleLowerRaw: string
+): (typeof ROLE_DEFAULT_METRICS)[keyof typeof ROLE_DEFAULT_METRICS] {
   const base = (roleLowerRaw ?? '').trim().toLowerCase();
   if (!base) {
     return ROLE_DEFAULT_METRICS.generic;
@@ -128,7 +134,9 @@ export function pickRoleDefaults(roleLowerRaw: string): typeof ROLE_DEFAULT_METR
   }
 
   if (base.startsWith('development')) {
-    return isLead ? ROLE_DEFAULT_METRICS.development_lead : ROLE_DEFAULT_METRICS.development;
+    return isLead
+      ? ROLE_DEFAULT_METRICS.development_lead
+      : ROLE_DEFAULT_METRICS.development;
   }
 
   // Fallback to generic metrics when role family is unknown

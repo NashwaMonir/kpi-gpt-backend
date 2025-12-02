@@ -1,6 +1,8 @@
 // engine/types.ts
 // Shared TypeScript interfaces for the KPI Engine (v10.7.5 with Option C-FULL)
 
+import type { MatrixKey } from './metricMatrixResolver';
+import type { MetricResolutionResult } from './metricsAutoSuggest';
 
 export type Mode = 'simple' | 'complex' | 'both';
 
@@ -39,7 +41,13 @@ export interface KpiRowOut {
   status: 'VALID' | 'NEEDS_REVIEW' | 'INVALID';
   comments: string;
   summary_reason: string;
-  error_codes: string[];    // New for Option C-FULL
+  error_codes: string[]; // New for Option C-FULL
+
+  /**
+   * Optional resolved metrics snapshot exposed to GPT / clients.
+   * Mirrors MetricResolutionResult from metricsAutoSuggest.ts.
+   */
+  resolved_metrics?: MetricResolutionResult;
 }
 
 export interface KpiResponse {
@@ -55,9 +63,8 @@ export interface DeadlineParseResult {
 export interface FieldCheckResult {
   missing: string[];
   invalid: string[];
-  invalidText?: string[];   // ← must exist
+  invalidText?: string[]; // domain-level invalid text fields (Company, Strategic Benefit, etc.)
 }
-// engine/types.ts
 
 export interface DomainValidationResult {
   // Normalized input row (trimmed/normalized fields).
@@ -94,5 +101,4 @@ export interface DomainValidationResult {
   // invalid text, dangerous metrics, or deadline issues). Used to derive
   // final status together with metrics auto-suggest and modeWasInvalid.
   hasBlockingErrors: boolean;
-  
 }

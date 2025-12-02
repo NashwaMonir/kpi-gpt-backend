@@ -28,7 +28,7 @@ export interface FinalAssemblyResult {
   /**
    * Canonical row snapshots (for safe echoes / future v10.8 use)
    */
-  input_row: KpiRowIn;      // sanitized input row used by the engine
+  input_row: KpiRowIn; // sanitized input row used by the engine
   normalized_row: KpiRowIn; // same as input_row under v10.7.5, reserved for future transforms
 
   /**
@@ -39,7 +39,8 @@ export interface FinalAssemblyResult {
   task_type_lower: string;
 
   /**
-   * Final metrics snapshot (already sanitized + resolved)
+   * Final metrics snapshot actually used by the engine
+   * (for status/comments logic and for the API row)
    */
   metrics: {
     output_metric: string;
@@ -47,6 +48,12 @@ export interface FinalAssemblyResult {
     improvement_metric: string;
     needsReview: boolean;
   };
+
+  /**
+   * Resolved metrics from the role/task matrix
+   * (this is what /api/kpi will expose as resolved_metrics to GPT)
+   */
+  resolved_metrics: MetricResolutionResult;
 }
 
 /**
@@ -80,19 +87,19 @@ export function buildFinalMessage(
     dangerousMetrics
   } = domainResult;
 
-  const reviewText = (metricsResult.reviewText ?? '').trim();
-
   const teamRoleRaw = (normalizedRow.team_role ?? '').toString();
   const taskTypeRaw = (normalizedRow.task_type ?? '').toString();
 
   const teamRoleLower = teamRoleRaw.toLowerCase();
   const taskTypeLower = taskTypeRaw.toLowerCase();
 
+  const metricsNeedsReview = !!metricsResult.used_default_metrics;
+
   const metricsSnapshot = {
-    output_metric: (metricsResult.output ?? safeOutput ?? '').toString(),
-    quality_metric: (metricsResult.quality ?? safeQuality ?? '').toString(),
-    improvement_metric: (metricsResult.improvement ?? safeImprovement ?? '').toString(),
-    needsReview: !!metricsResult.needsReview
+    output_metric: (metricsResult.output_metric ?? safeOutput ?? '').toString(),
+    quality_metric: (metricsResult.quality_metric ?? safeQuality ?? '').toString(),
+    improvement_metric: (metricsResult.improvement_metric ?? safeImprovement ?? '').toString(),
+    needsReview: metricsNeedsReview
   };
 
   // ---------------------------------------------------------------------------
@@ -104,7 +111,7 @@ export function buildFinalMessage(
 
   if (statusHint === 'INVALID' || hasBlockingErrors) {
     status = 'INVALID';
-  } else if (metricsResult.needsReview || modeWasInvalid) {
+  } else if (metricsNeedsReview || modeWasInvalid) {
     status = 'NEEDS_REVIEW';
   }
 
@@ -133,14 +140,14 @@ export function buildFinalMessage(
     }
   };
 
-  // 2.1 Missing mandatory fields (E2xx) — we prefer fieldChecks to build precise message
+  // 2.1 Missing mandatory fields (E2xx) — prefer fieldChecks to build precise message
   if (fieldChecks.missing.length > 0) {
     commentsParts.push(
       `Missing mandatory field(s): ${fieldChecks.missing.join(', ')}.`
     );
   } else {
     // Fallback to error-code-based messages if domain did not specify fields
-    pushFromCodes(code => code.startsWith('E2'));
+    pushFromCodes((code) => code.startsWith('E2'));
   }
 
   // 2.2 Invalid enum / value fields (E301, E302)
@@ -150,16 +157,14 @@ export function buildFinalMessage(
     );
   } else {
     pushFromCodes(
-      code =>
+      (code) =>
         code === ErrorCodes.INVALID_TASK_TYPE ||
         code === ErrorCodes.INVALID_TEAM_ROLE
     );
   }
 
   // 2.3 Dangerous / low-signal text (E4xx)
-  // Combine domain-level invalidText fields (e.g. Company, Strategic Benefit)
-  // with metric-level dangerousMetrics (Output, Quality, Improvement),
-  // and emit a single canonical message.
+  // Combine domain-level invalidText fields with metric-level dangerousMetrics.
   const invalidTextFields = fieldChecks.invalidText ?? [];
   const allDangerousFields = [
     ...invalidTextFields,
@@ -172,8 +177,6 @@ export function buildFinalMessage(
       `Invalid text format for: ${uniqueDangerousFields.join(', ')}.`
     );
   }
-  // We deliberately do not fall back to ERROR_COMMENTS for E4xx,
-  // to keep wording and field lists deterministic.
 
   // 2.4 Deadline issues (E303–E305)
   if (!deadline.valid) {
@@ -197,17 +200,36 @@ export function buildFinalMessage(
   }
 
   // 2.6 Metrics-related messages (only if status is not INVALID)
-  if (status !== 'INVALID') {
-    if (metricsResult.needsReview && reviewText) {
-      commentsParts.push(reviewText);
-    }
-    // Optional: generic fallback note if generic role metrics were used
-    if ((metricsResult as any).usedGenericFallback) {
-      commentsParts.push('Metrics used generic role fallback.');
+  if (status !== 'INVALID' && metricsNeedsReview) {
+    const autoSuggested: string[] = [];
+
+    const userOutput = (safeOutput ?? '').toString().trim();
+    const userQuality = (safeQuality ?? '').toString().trim();
+    const userImprovement = (safeImprovement ?? '').toString().trim();
+
+    const finalOutput = (metricsResult.output_metric ?? '').toString().trim();
+    const finalQuality = (metricsResult.quality_metric ?? '').toString().trim();
+    const finalImprovement = (metricsResult.improvement_metric ?? '').toString().trim();
+
+    if (!userOutput && finalOutput) autoSuggested.push('Output');
+    if (!userQuality && finalQuality) autoSuggested.push('Quality');
+    if (!userImprovement && finalImprovement) autoSuggested.push('Improvement');
+
+    if (autoSuggested.length === 3) {
+      commentsParts.push(
+        'Metrics auto-suggested (Output / Quality / Improvement).'
+      );
+    } else if (autoSuggested.length > 0) {
+      commentsParts.push(
+        `Metrics auto-suggested for: ${autoSuggested.join(', ')}.`
+      );
+    } else {
+      // Fallback generic note if we cannot infer exact fields
+      commentsParts.push(
+        'Metrics auto-suggested based on the role matrix.'
+      );
     }
   }
-
-  // 2.7 Domain-level closing line for INVALID
 
   // Normalize spaces and join into single-line comments
   const comments = commentsParts
@@ -218,30 +240,23 @@ export function buildFinalMessage(
   // ---------------------------------------------------------------------------
   // 3. summary_reason hierarchy
   //
-  //  - INVALID       → first domain-level message (first commentsParts entry)
-  //  - NEEDS_REVIEW  → metrics review text if present, else mode fallback, else generic
-  //  - VALID         → empty string (per v10.7.5 spec)
+  //  - INVALID       → fixed invalid summary
+  //  - NEEDS_REVIEW  → fixed metrics summary
+  //  - VALID         → empty string
   // ---------------------------------------------------------------------------
- 
   let summary_reason = '';
 
   if (status === 'INVALID') {
-    // v10.7.5 UX: one clear, stable summary for all invalid rows.
     summary_reason = 'Objectives not generated due to validation errors.';
-
   } else if (status === 'NEEDS_REVIEW') {
-
-    // v10.7.5 UX: one clear, consistent summary for NEEDS_REVIEW
-    summary_reason = 'Objective metrics were auto-suggested based on the role matrix. Please review before approval.';
-
+    summary_reason =
+      'Objective metrics were auto-suggested based on the role matrix. Please review before approval.';
   } else {
-    // VALID → no summary in v10.7.5
     summary_reason = '';
   }
 
   // ---------------------------------------------------------------------------
   // 4. VALID comments override (no domain or metrics issues)
-  //    Spec: VALID rows must always return the fixed comment text.
   // ---------------------------------------------------------------------------
   if (status === 'VALID') {
     return {
@@ -254,7 +269,8 @@ export function buildFinalMessage(
       mode,
       team_role_lower: teamRoleLower,
       task_type_lower: taskTypeLower,
-      metrics: metricsSnapshot
+      metrics: metricsSnapshot,
+      resolved_metrics: metricsResult
     };
   }
 
@@ -271,6 +287,7 @@ export function buildFinalMessage(
     mode,
     team_role_lower: teamRoleLower,
     task_type_lower: taskTypeLower,
-    metrics: metricsSnapshot
+    metrics: metricsSnapshot,
+    resolved_metrics: metricsResult
   };
 }

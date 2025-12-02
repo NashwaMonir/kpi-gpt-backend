@@ -6,13 +6,12 @@
 //  - Apply transport-level validation
 //  - For each row:
 //      * Run domain validation
-//      * Run metrics auto-suggest
+//      * Run metrics auto-suggest (role/task matrix + defaults)
 //      * Build final status + comments + summary_reason
 //      * (v10.7.5) Leave objectives empty (GPT owns sentence generation)
 //  - Return KpiResponse with error_codes per row
 //
 // This file contains NO business rules itself; it only orchestrates engine modules.
-
 
 import type { VercelRequest, VercelResponse } from '@vercel/node';
 
@@ -23,7 +22,7 @@ import { validateDomain } from '../engine/validateDomain';
 import { resolveMetrics } from '../engine/metricsAutoSuggest';
 import { buildFinalMessage } from '../engine/buildErrorMessage';
 
-// Simple in‑memory metrics for KPI Engine endpoint
+// Simple in-memory metrics for KPI Engine endpoint
 let kpiRequestsTotal = 0;
 let kpiRequests400 = 0;
 let kpiRequests500 = 0;
@@ -111,9 +110,10 @@ export default function handler(req: VercelRequest, res: VercelResponse) {
     // 1. Parse JSON safely
     // --------------------------------------
     try {
-      body = typeof req.body === 'string'
-        ? JSON.parse(req.body)
-        : (req.body as KpiRequest);
+      body =
+        typeof req.body === 'string'
+          ? JSON.parse(req.body)
+          : (req.body as KpiRequest);
     } catch {
       // JSON parsing error is transport-level
       kpiRequests400++;
@@ -176,7 +176,10 @@ export default function handler(req: VercelRequest, res: VercelResponse) {
     if (!body.engine_version) {
       logKpiWarn('engine_version_missing', {});
     }
-    if (body.default_company !== undefined && typeof body.default_company !== 'string') {
+    if (
+      body.default_company !== undefined &&
+      typeof body.default_company !== 'string'
+    ) {
       logKpiWarn('default_company_non_string', {
         type: typeof body.default_company
       });
@@ -208,7 +211,9 @@ export default function handler(req: VercelRequest, res: VercelResponse) {
         status: final.status,
         comments: final.comments,
         summary_reason: final.summary_reason,
-        error_codes: final.errorCodes
+        error_codes: final.errorCodes,
+        // Expose resolved metrics snapshot to GPT; omit if null
+        resolved_metrics: final.resolved_metrics ?? undefined
       };
 
       return rowOut;
@@ -241,7 +246,9 @@ export default function handler(req: VercelRequest, res: VercelResponse) {
 
     return res.status(500).json({
       error: 'Internal KPI engine error.',
-      error_codes: [ErrorCodes.INTERNAL_ENGINE_ERROR as ErrorCode].filter(Boolean)
+      error_codes: [ErrorCodes.INTERNAL_ENGINE_ERROR as ErrorCode].filter(
+        Boolean
+      )
     });
   }
 }
