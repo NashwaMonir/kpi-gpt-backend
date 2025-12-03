@@ -3,9 +3,9 @@ import type { VercelRequest, VercelResponse } from '@vercel/node';
 import { createKpiTemplateWorkbook } from '../engine/excelExport';
 
 export default async function handler(req: VercelRequest, res: VercelResponse) {
-  if (req.method !== 'GET') {
-    res.setHeader('Allow', 'GET');
-    return res.status(405).json({ error: 'Method Not Allowed' });
+ if (req.method !== 'GET' && req.method !== 'HEAD') {
+  res.setHeader('Allow', 'GET, HEAD');
+  return res.status(405).json({ error: 'Method Not Allowed' });
   }
 
   try {
@@ -20,6 +20,11 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       'Content-Disposition',
       'attachment; filename="KPI_Input_Template.xlsx"'
     );
+
+    // For HEAD, just send headers and 200, no body
+    if (req.method === 'HEAD') {
+      return res.status(200).end();
+    }
 
     return res.status(200).send(Buffer.from(buffer));
   } catch (err) {
