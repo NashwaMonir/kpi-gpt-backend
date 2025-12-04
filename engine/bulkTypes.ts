@@ -1,58 +1,114 @@
 // engine/bulkTypes.ts
-// Shared types for Bulk KPI Orchestration (v10.7.5-compatible)
-
-import type { Mode } from './types';
-
-export type BulkCompanyCase = 'NO_COLUMN' | 'SINGLE_COMPANY' | 'MULTI_COMPANY';
-
-export type BulkFlowState =
-  | 'NEED_COMPANY_DECISION'
-  | 'NEED_MULTI_COMPANY_STRATEGY'
-  | 'CONFIRM_SINGLE_COMPANY'
-  | 'INVALID_ROWS_ACTION'
-  | 'READY_FOR_OBJECTIVES'
-  | 'ABORT_EMPTY_FILE'
-  | 'ABORT_REUPLOAD';
-
-export interface BulkUiOption {
-  code: string;   // backend decision code, e.g. "ONE_COMPANY_ALL"
-  label: string;  // text shown to the user
-}
+export type BulkSessionState = 'INSPECTED' | 'PREPARED' | 'FINALIZED';
 
 export interface ParsedRow {
   row_id: number;
-  company?: string | null;
+  company: string | null;
   team_role: string | null;
   task_type: string | null;
   task_name: string | null;
   dead_line: string | null;
   strategic_benefit: string | null;
-  output_metric?: string | null;
-  quality_metric?: string | null;
-  improvement_metric?: string | null;
-  mode?: Mode | string | null;
-  // Optional validity flag (can be added by validation layer later)
-  isValid?: boolean;
+  output_metric: string | null;
+  quality_metric: string | null;
+  improvement_metric: string | null;
+  mode: 'simple' | 'complex' | 'both';
+  isValid: boolean;
   invalidReason?: string;
 }
 
-export interface BulkInspectSummary {
-  bulk_session_id: string;
+export interface BulkInspectOption {
+  code: string;
+  label: string;
+}
+
+export interface ParsedExcelInspectionResult {
+  rows: ParsedRow[];
+
   row_count: number;
   invalid_row_count: number;
 
   has_company_column: boolean;
   unique_companies: string[];
   missing_company_count: number;
+
   benefit_company_signals: string[];
-  company_case: BulkCompanyCase;
+
+  company_case:
+    | 'no_company_data'
+    | 'single_company_column'
+    | 'multi_company_column'
+    | 'benefit_signal_only';
 
   needs_company_decision: boolean;
   has_invalid_rows: boolean;
 
-  state: BulkFlowState;
   ui_prompt: string;
-  options: BulkUiOption[];
+  options: BulkInspectOption[];
+}
+
+export interface BulkInspectSummary {
+  bulk_session_id: string;
+
+  row_count: number;
+  invalid_row_count: number;
+
+  has_company_column: boolean;
+  unique_companies: string[];
+  missing_company_count: number;
+
+  benefit_company_signals: string[];
+
+  company_case:
+    | 'no_company_data'
+    | 'single_company_column'
+    | 'multi_company_column'
+    | 'benefit_signal_only';
+
+  needs_company_decision: boolean;
+  has_invalid_rows: boolean;
+
+  state: BulkSessionState;
+  ui_prompt: string;
+  options: BulkInspectOption[];
+}
+
+export interface BulkSessionMeta {
+  row_count: number;
+  invalid_row_count: number;
+  has_company_column: boolean;
+  unique_companies: string[];
+  missing_company_count: number;
+  benefit_company_signals: string[];
+  company_case:
+    | 'no_company_data'
+    | 'single_company_column'
+    | 'multi_company_column'
+    | 'benefit_signal_only';
+  needs_company_decision: boolean;
+  has_invalid_rows: boolean;
+}
+
+export interface BulkPreparedRow extends ParsedRow {
+  status: 'VALID' | 'NEEDS_REVIEW' | 'INVALID';
+  comments: string;
+  summary_reason: string;
+  errorCodes: string[];
+  resolved_metrics?:
+    | {
+        output_metric?: string | null;
+        quality_metric?: string | null;
+        improvement_metric?: string | null;
+        used_default_metrics: boolean;
+      }
+    | null;
+}
+
+export interface BulkSessionSnapshot {
+  state: BulkSessionState;
+  rows: ParsedRow[];
+  meta: BulkSessionMeta;
+  preparedRows?: BulkPreparedRow[];
 }
 
 export interface BulkPrepareRowsRequest {
@@ -64,44 +120,22 @@ export interface BulkPrepareRowsRequest {
   invalid_handling: 'skip' | 'abort';
 }
 
-export interface BulkPreparedRow {
-  row_id: number;
-  company?: string | null;
-  team_role: string | null;
-  task_type: string | null;
-  task_name: string | null;
-  dead_line: string | null;
-  strategic_benefit: string | null;
-  output_metric?: string | null;
-  quality_metric?: string | null;
-  improvement_metric?: string | null;
-  mode?: Mode | string | null;
-  status: 'VALID' | 'NEEDS_REVIEW' | 'INVALID';
-  comments: string;
-  summary_reason: string;
-  errorCodes: string[];
-  resolved_metrics?: {
-    output_metric?: string;
-    quality_metric?: string;
-    improvement_metric?: string;
-    used_default_metrics: boolean;
-  };
-}
-
 export interface BulkPrepareRowsResponse {
   bulk_session_id: string;
-  state: BulkFlowState;
+  state: BulkSessionState;
   ui_summary: string;
   rows: BulkPreparedRow[];
 }
 
+export interface BulkFinalizeExportObjective {
+  row_id: number;
+  simple_objective: string;
+  complex_objective: string;
+}
+
 export interface BulkFinalizeExportRequest {
   bulk_session_id: string;
-  objectives: Array<{
-    row_id: number;
-    simple_objective: string;
-    complex_objective: string;
-  }>;
+  objectives: BulkFinalizeExportObjective[];
 }
 
 export interface BulkFinalizeExportResponse {

@@ -2,31 +2,29 @@
 // Simple in-memory store for bulk sessions.
 // For production, replace with Redis/DB but keep the interface.
 
-import type { ParsedRow, BulkPreparedRow, BulkInspectSummary } from './bulkTypes';
+import { randomUUID } from 'crypto';
+import type { BulkPreparedRow, BulkSessionSnapshot } from './bulkTypes';
 
-interface BulkSession {
-  summary: BulkInspectSummary;
-  parsedRows: ParsedRow[];
-  preparedRows?: BulkPreparedRow[];
+const BULK_SESSION_STORE = new Map<string, BulkSessionSnapshot>();
+
+export function saveBulkSession(snapshot: BulkSessionSnapshot): string {
+  const id = randomUUID();
+  BULK_SESSION_STORE.set(id, snapshot);
+  return id;
 }
 
-const sessions = new Map<string, BulkSession>();
-
-export function saveBulkSession(session: BulkSession): void {
-  sessions.set(session.summary.bulk_session_id, session);
-}
-
-export function getBulkSession(sessionId: string): BulkSession | undefined {
-  return sessions.get(sessionId);
+export function getBulkSession(id: string): BulkSessionSnapshot | undefined {
+  return BULK_SESSION_STORE.get(id);
 }
 
 export function updateBulkPreparedRows(
   sessionId: string,
   preparedRows: BulkPreparedRow[]
 ): void {
-  const existing = sessions.get(sessionId);
+  const existing = BULK_SESSION_STORE.get(sessionId);
   if (!existing) return;
-  sessions.set(sessionId, {
+
+  BULK_SESSION_STORE.set(sessionId, {
     ...existing,
     preparedRows
   });
