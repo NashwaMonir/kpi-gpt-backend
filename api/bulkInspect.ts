@@ -1,6 +1,6 @@
 // api/bulkInspect.ts
 import type { VercelRequest, VercelResponse } from '@vercel/node';
-import * as Busboy from 'busboy'; // use namespace import for safer typing
+import Busboy from 'busboy';
 
 import { parseKpiInputExcel } from '../engine/parseKpiInputExcel';
 import { saveBulkSession } from '../engine/bulkSessionStore';
@@ -11,8 +11,8 @@ function readExcelFileFromMultipart(
   fieldName: string
 ): Promise<Buffer> {
   return new Promise((resolve, reject) => {
-    // Busboy module exports a constructor function; cast to any for runtime + TS
-    const bb = new (Busboy as any)({ headers: req.headers as any });
+    // Busboy is a function in your runtime, not a constructor
+    const bb = Busboy({ headers: req.headers as any }) as any;
 
     const chunks: Buffer[] = [];
     let hasTargetFile = false;
@@ -25,8 +25,9 @@ function readExcelFileFromMultipart(
 
       hasTargetFile = true;
 
-      file.on('data', (chunk: Buffer) => {
-        chunks.push(Buffer.isBuffer(chunk) ? chunk : Buffer.from(chunk));
+      file.on('data', (chunk: any) => {
+        const buf = Buffer.isBuffer(chunk) ? chunk : Buffer.from(chunk);
+        chunks.push(buf);
       });
 
       file.on('end', () => {
@@ -96,7 +97,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     };
 
     return res.status(200).json(summary);
-    } catch (err: any) {
+  } catch (err: any) {
     if (err instanceof Error && err.message === 'Missing Excel file in request body.') {
       return res.status(400).json({ error: 'Missing Excel file in request body.' });
     }
