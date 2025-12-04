@@ -1,120 +1,145 @@
 // api/bulkInspect.ts
+// Step 1: parse Excel → return rows_token + summary (stateless)
+
 import type { VercelRequest, VercelResponse } from '@vercel/node';
 import Busboy from 'busboy';
-
 import { parseKpiInputExcel } from '../engine/parseKpiInputExcel';
-import { saveBulkSession } from '../engine/bulkSessionStore';
-import type { BulkInspectSummary } from '../engine/bulkTypes';
+import {
+  ParsedRow,
+  BulkInspectSummary,
+  BulkInspectOption,
+  BulkInspectTokenPayload,
+  encodeInspectToken,
+} from '../engine/bulkTypes';
 
-function readExcelFileFromMultipart(
-  req: VercelRequest,
-  fieldName: string
-): Promise<Buffer> {
-  return new Promise((resolve, reject) => {
-    // Busboy is a function in your runtime, not a constructor
-    const bb = Busboy({ headers: req.headers as any }) as any;
+interface ParseResult {
+  rows: ParsedRow[];
+  row_count: number;
+  invalid_row_count: number;
 
-    const chunks: Buffer[] = [];
-    let hasTargetFile = false;
+  has_company_column: boolean;
+  unique_companies: string[];
+  missing_company_count: number;
 
-    bb.on('file', (name: string, file: NodeJS.ReadableStream) => {
-      if (name !== fieldName) {
-        file.resume();
-        return;
-      }
+  benefit_company_signals: string[];
 
-      hasTargetFile = true;
+  company_case:
+    | 'no_company_data'
+    | 'single_company_column'
+    | 'multi_company_column'
+    | 'benefit_signal_only';
 
-      file.on('data', (chunk: any) => {
-        const buf = Buffer.isBuffer(chunk) ? chunk : Buffer.from(chunk);
-        chunks.push(buf);
-      });
-
-      file.on('end', () => {
-        // no-op; we concat on 'finish'
-      });
-    });
-
-    bb.on('finish', () => {
-      if (!hasTargetFile) {
-        return reject(new Error('Missing Excel file in request body.'));
-      }
-      const buf = Buffer.concat(chunks);
-      if (!buf.length) {
-        return reject(new Error('Missing Excel file in request body.'));
-      }
-      resolve(buf);
-    });
-
-    bb.on('error', (err: Error) => {
-      reject(err);
-    });
-
-    req.pipe(bb);
-  });
+  needs_company_decision: boolean;
+  has_invalid_rows: boolean;
 }
 
-export default async function handler(req: VercelRequest, res: VercelResponse) {
+export default function handler(req: VercelRequest, res: VercelResponse) {
   if (req.method !== 'POST') {
-    return res.status(405).json({ error: 'Method not allowed.' });
+    res
+      .status(405)
+      .json({ error: 'Method not allowed. Use POST with multipart/form-data.' });
+    return;
   }
 
-  try {
-    const fileBuffer = await readExcelFileFromMultipart(req, 'file');
+  const bb = Busboy({ headers: req.headers as any });
 
-    const parsed = parseKpiInputExcel(fileBuffer);
+  const chunks: Buffer[] = [];
+  let hasFile = false;
 
-    const bulk_session_id = saveBulkSession({
-      state: 'INSPECTED',
-      rows: parsed.rows,
-      meta: {
+  bb.on('file', (_name, file) => {
+    hasFile = true;
+    file.on('data', (chunk: Buffer) => {
+      chunks.push(chunk);
+    });
+  });
+
+  bb.on('error', (err: unknown) => {
+    res.status(500).json({
+      error: 'Internal bulkInspect error.',
+      detail: String(err),
+    });
+  });
+
+  bb.on('finish', async () => {
+    if (!hasFile || chunks.length === 0) {
+      res.status(400).json({
+        error: 'Missing Excel file in request body.',
+      });
+      return;
+    }
+
+    try {
+      const buffer = Buffer.concat(chunks);
+      const parsed = (await parseKpiInputExcel(buffer)) as ParseResult;
+
+      const options: BulkInspectOption[] = [];
+
+      if (parsed.has_company_column) {
+        options.push({
+          code: 'use_sheet_company',
+          label: 'Use the company from the sheet for all rows.',
+        });
+      }
+
+      options.push({
+        code: 'generic_mode',
+        label: 'Ignore company and generate generic objectives.',
+      });
+
+      let ui_prompt = `Detected ${parsed.row_count} row(s).`;
+      if (parsed.has_company_column && parsed.unique_companies.length === 1) {
+        ui_prompt += ` All rows use company "${parsed.unique_companies[0]}".`;
+      }
+      ui_prompt += ' Choose how to proceed.';
+
+      const summary: BulkInspectSummary = {
         row_count: parsed.row_count,
         invalid_row_count: parsed.invalid_row_count,
+
         has_company_column: parsed.has_company_column,
         unique_companies: parsed.unique_companies,
         missing_company_count: parsed.missing_company_count,
+
         benefit_company_signals: parsed.benefit_company_signals,
+
         company_case: parsed.company_case,
         needs_company_decision: parsed.needs_company_decision,
-        has_invalid_rows: parsed.has_invalid_rows
-      }
-    });
+        has_invalid_rows: parsed.has_invalid_rows,
 
-    const summary: BulkInspectSummary = {
-      bulk_session_id,
-      row_count: parsed.row_count,
-      invalid_row_count: parsed.invalid_row_count,
-      has_company_column: parsed.has_company_column,
-      unique_companies: parsed.unique_companies,
-      missing_company_count: parsed.missing_company_count,
-      benefit_company_signals: parsed.benefit_company_signals,
-      company_case: parsed.company_case,
-      needs_company_decision: parsed.needs_company_decision,
-      has_invalid_rows: parsed.has_invalid_rows,
-      state: 'INSPECTED',
-      ui_prompt: parsed.ui_prompt,
-      options: parsed.options
-    };
+        state: 'INSPECTED',
+        ui_prompt,
+        options,
+      };
 
-    return res.status(200).json(summary);
-  } catch (err: any) {
-    if (err instanceof Error && err.message === 'Missing Excel file in request body.') {
-      return res.status(400).json({ error: 'Missing Excel file in request body.' });
+      const tokenPayload: BulkInspectTokenPayload = {
+        parsedRows: parsed.rows,
+        summary,
+      };
+
+      const rows_token = encodeInspectToken(tokenPayload);
+
+      res.status(200).json({
+        rows_token,
+        row_count: summary.row_count,
+        invalid_row_count: summary.invalid_row_count,
+        has_company_column: summary.has_company_column,
+        unique_companies: summary.unique_companies,
+        missing_company_count: summary.missing_company_count,
+        benefit_company_signals: summary.benefit_company_signals,
+        company_case: summary.company_case,
+        needs_company_decision: summary.needs_company_decision,
+        has_invalid_rows: summary.has_invalid_rows,
+        state: summary.state,
+        ui_prompt: summary.ui_prompt,
+        options: summary.options,
+      });
+    } catch (err) {
+      res.status(500).json({
+        error: 'Internal bulkInspect error.',
+        detail: String(err),
+      });
     }
+  });
 
-    console.error(
-      JSON.stringify({
-        level: 'error',
-        service: 'bulkInspect',
-        event: 'unhandled_exception',
-        message: err instanceof Error ? err.message : String(err),
-        stack: err instanceof Error ? err.stack : undefined
-      })
-    );
-
-    return res.status(500).json({
-      error: 'Internal bulkInspect error.',
-      detail: err instanceof Error ? err.message : String(err)
-    });
-  }
+  (req as any).pipe(bb as any);
 }

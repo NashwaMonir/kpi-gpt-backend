@@ -1,168 +1,120 @@
 // api/bulkFinalizeExport.ts
-// Phase C: Merge GPT objectives into prepared rows, call export API, return download link.
+// Step 3: prep_token + objectives → Excel download URL (via runKpiResultDownload)
 
 import type { VercelRequest, VercelResponse } from '@vercel/node';
-import { getBulkSession } from '../engine/bulkSessionStore';
-import type {
+import {
   BulkFinalizeExportRequest,
   BulkFinalizeExportResponse,
-  BulkPreparedRow
+  BulkPrepareTokenPayload,
+  BulkObjectiveInput,
+  decodePrepareToken,
+  encodeRowsForDownload,
+  KpiResultRow,
 } from '../engine/bulkTypes';
 
-function getBaseUrl(req: VercelRequest): string {
-  const proto =
-    (req.headers['x-forwarded-proto'] as string) ||
-    (req.headers['x-forwarded-proto'] as string[])?.[0] ||
-    'https';
-  const host = req.headers.host ?? '';
-  return `${proto}://${host}`;
-}
-
-async function postJson<T>(url: string, payload: unknown): Promise<T> {
-  const resp = await fetch(url, {
-    method: 'POST',
-    headers: {
-      'content-type': 'application/json'
-    },
-    body: JSON.stringify(payload)
-  });
-
-  if (!resp.ok) {
-    const text = await resp.text();
-    throw new Error(`POST ${url} failed: ${resp.status} – ${text}`);
+function parseBody(req: VercelRequest): BulkFinalizeExportRequest {
+  const body = req.body;
+  if (!body) {
+    return {} as BulkFinalizeExportRequest;
   }
-
-  return (await resp.json()) as T;
+  if (typeof body === 'string') {
+    try {
+      return JSON.parse(body) as BulkFinalizeExportRequest;
+    } catch {
+      return {} as BulkFinalizeExportRequest;
+    }
+  }
+  return body as BulkFinalizeExportRequest;
 }
 
-export default async function handler(req: VercelRequest, res: VercelResponse) {
+export default function handler(req: VercelRequest, res: VercelResponse) {
   if (req.method !== 'POST') {
-    return res.status(405).json({ error: 'Method not allowed.' });
+    res
+      .status(405)
+      .json({ error: 'Method not allowed. Use POST with JSON body.' });
+    return;
   }
 
+  const reqBody = parseBody(req);
+  const { prep_token, objectives } = reqBody;
+
+  if (!prep_token || typeof prep_token !== 'string') {
+    res.status(400).json({ error: 'Missing or invalid prep_token.' });
+    return;
+  }
+  if (!Array.isArray(objectives) || objectives.length === 0) {
+    res.status(400).json({ error: 'Missing objectives array.' });
+    return;
+  }
+
+  let payload: BulkPrepareTokenPayload;
   try {
-    const body = req.body as BulkFinalizeExportRequest;
-
-    if (!body || !body.bulk_session_id) {
-      return res.status(400).json({
-        error: 'Missing bulk_session_id in request.'
-      });
-    }
-
-    if (!body.objectives || !Array.isArray(body.objectives)) {
-      return res.status(400).json({
-        error: 'Missing objectives array in request.'
-      });
-    }
-
-    const session = getBulkSession(body.bulk_session_id);
-    if (!session || !session.preparedRows) {
-      return res.status(400).json({
-        error: 'Unknown bulk_session_id or prepared rows missing.'
-      });
-    }
-
-    const objectivesByRowId = new Map<
-      number,
-      { simple_objective: string; complex_objective: string }
-    >();
-
-    for (const obj of body.objectives) {
-      if (objectivesByRowId.has(obj.row_id)) {
-        console.warn(
-          JSON.stringify({
-            level: 'warn',
-            service: 'bulk-finalize-export',
-            event: 'duplicate_objective_row_id',
-            row_id: obj.row_id
-          })
-        );
-      }
-
-      const simple = obj.simple_objective ?? '';
-      const complex =
-        obj.complex_objective && obj.complex_objective.trim() !== ''
-          ? obj.complex_objective
-          : simple;
-
-      objectivesByRowId.set(obj.row_id, {
-        simple_objective: simple,
-        complex_objective: complex
-      });
-    }
-
-    // Merge objectives into prepared rows
-    const rowsWithObjectives = session.preparedRows.map((row: BulkPreparedRow) => {
-      const obj = objectivesByRowId.get(row.row_id) ?? {
-        simple_objective: '',
-        complex_objective: ''
-      };
-
-      return {
-        ...row,
-        simple_objective: obj.simple_objective,
-        complex_objective: obj.complex_objective
-      };
+    payload = decodePrepareToken(prep_token);
+  } catch (err) {
+    res.status(400).json({
+      error: 'Failed to decode prep_token.',
+      detail: String(err),
     });
+    return;
+  }
 
-    const baseUrl = getBaseUrl(req);
+  const preparedRows = payload.preparedRows || [];
+  const objectivesMap = new Map<number, BulkObjectiveInput>();
 
-    // Build minimal payload matching /api/runKpiResultExport schema (Action.json)
-    const exportRows = rowsWithObjectives.map((r) => ({
-      task_name: r.task_name ?? '',
-      task_type: r.task_type ?? '',
-      team_role: r.team_role ?? '',
-      dead_line: r.dead_line ?? '',
-      simple_objective: r.simple_objective ?? '',
-      complex_objective: r.simple_objective ?? '',
-      validation_status: r.status,
-      comments: r.comments ?? '',
-      summary_reason: r.summary_reason ?? ''
-    }));
+  for (const obj of objectives) {
+    if (
+      obj &&
+      typeof obj.row_id === 'number' &&
+      (typeof obj.simple_objective === 'string' ||
+        typeof obj.complex_objective === 'string')
+    ) {
+      objectivesMap.set(obj.row_id, obj);
+    }
+  }
 
-    const exportPayload = {
-      rows: exportRows
-    };
+  const rowsForExport: KpiResultRow[] = [];
 
-    const exportResult = await postJson<{ download_url: string }>(
-      `${baseUrl}/api/runKpiResultExport`,
-      exportPayload
-    );
+  for (const row of preparedRows) {
+    const obj = objectivesMap.get(row.row_id);
+    if (!obj) {
+      continue; // no objective for this row
+    }
 
-    const valid_count = rowsWithObjectives.filter((r) => r.status === 'VALID').length;
-    const needs_review_count = rowsWithObjectives.filter(
-      (r) => r.status === 'NEEDS_REVIEW'
-    ).length;
-    const invalid_count = rowsWithObjectives.filter(
-      (r) => r.status === 'INVALID'
-    ).length;
-
-    const ui_message =
-      `KPI export completed: ${valid_count} VALID, ` +
-      `${needs_review_count} NEEDS_REVIEW, ${invalid_count} INVALID row(s). ` +
-      `Download the Excel file using the link below.`;
-
-    const response: BulkFinalizeExportResponse = {
-      download_url: exportResult.download_url,
-      valid_count,
-      needs_review_count,
-      invalid_count,
-      ui_message
-    };
-
-    return res.status(200).json(response);
-  } catch (err: any) {
-    console.error(
-      JSON.stringify({
-        level: 'error',
-        service: 'bulk-finalize-export',
-        event: 'unhandled_exception',
-        message: err instanceof Error ? err.message : String(err)
-      })
-    );
-
-    return res.status(500).json({
-      error: 'Internal bulkFinalizeExport error.'
+    rowsForExport.push({
+      task_name: row.task_name ?? '',
+      task_type: row.task_type ?? '',
+      team_role: row.team_role ?? '',
+      dead_line: row.dead_line ?? '',
+      simple_objective: obj.simple_objective ?? '',
+      complex_objective: obj.complex_objective ?? '',
+      validation_status: row.isValid ? 'VALID' : 'NEEDS_REVIEW',
+      comments: row.isValid
+        ? 'Bulk flow: structurally valid.'
+        : row.invalidReason || 'Bulk flow: structural issues detected.',
+      summary_reason: '',
     });
   }
+
+  const valid_count = rowsForExport.length;
+  const invalid_count = 0; // invalid rows are not exported with objectives
+  const needs_review_count = rowsForExport.some((r) =>
+    r.validation_status === 'NEEDS_REVIEW'
+  )
+    ? rowsForExport.filter((r) => r.validation_status === 'NEEDS_REVIEW').length
+    : 0;
+
+  const hostHeader = req.headers.host || null;
+  const download_url = encodeRowsForDownload(rowsForExport, hostHeader);
+
+  const ui_message = `${valid_count} objective(s) exported. Download KPI_Output.xlsx.`;
+
+  const response: BulkFinalizeExportResponse = {
+    download_url,
+    valid_count,
+    needs_review_count,
+    invalid_count,
+    ui_message,
+  };
+
+  res.status(200).json(response);
 }
