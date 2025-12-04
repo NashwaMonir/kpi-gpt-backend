@@ -1,22 +1,23 @@
 // api/bulkInspect.ts
 import type { VercelRequest, VercelResponse } from '@vercel/node';
-import Busboy from 'busboy';
+import * as Busboy from 'busboy'; // use namespace import for safer typing
 
 import { parseKpiInputExcel } from '../engine/parseKpiInputExcel';
 import { saveBulkSession } from '../engine/bulkSessionStore';
-import type { BulkInspectSummary, ParsedExcelInspectionResult } from '../engine/bulkTypes';
+import type { BulkInspectSummary } from '../engine/bulkTypes';
 
 function readExcelFileFromMultipart(
   req: VercelRequest,
   fieldName: string
 ): Promise<Buffer> {
   return new Promise((resolve, reject) => {
-    const bb = Busboy({ headers: req.headers as any });
+    // Busboy module exports a constructor function; cast to any for runtime + TS
+    const bb = new (Busboy as any)({ headers: req.headers as any });
 
     const chunks: Buffer[] = [];
     let hasTargetFile = false;
 
-    bb.on('file', (name, file) => {
+    bb.on('file', (name: string, file: NodeJS.ReadableStream) => {
       if (name !== fieldName) {
         file.resume();
         return;
@@ -24,12 +25,12 @@ function readExcelFileFromMultipart(
 
       hasTargetFile = true;
 
-      file.on('data', (chunk) => {
+      file.on('data', (chunk: Buffer) => {
         chunks.push(Buffer.isBuffer(chunk) ? chunk : Buffer.from(chunk));
       });
 
       file.on('end', () => {
-        // no-op; concat on finish
+        // no-op; we concat on 'finish'
       });
     });
 
@@ -44,7 +45,7 @@ function readExcelFileFromMultipart(
       resolve(buf);
     });
 
-    bb.on('error', (err) => {
+    bb.on('error', (err: Error) => {
       reject(err);
     });
 
@@ -60,7 +61,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
   try {
     const fileBuffer = await readExcelFileFromMultipart(req, 'file');
 
-    const parsed: ParsedExcelInspectionResult = parseKpiInputExcel(fileBuffer);
+    const parsed = parseKpiInputExcel(fileBuffer);
 
     const bulk_session_id = saveBulkSession({
       state: 'INSPECTED',

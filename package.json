@@ -5,10 +5,12 @@
   "license": "MIT",
   "dependencies": {
     "@vercel/node": "^3.0.0",
+    "busboy": "^1.6.0",
     "exceljs": "^4.4.0",
     "xlsx": "^0.18.5"
   },
   "devDependencies": {
+    "@types/busboy": "^1.5.4",
     "@types/node": "^24.10.1",
     "@types/xlsx": "^0.0.35"
   }

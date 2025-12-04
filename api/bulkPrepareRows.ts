@@ -1,40 +1,92 @@
 // api/bulkPrepareRows.ts
 // Phase B: Apply user decision, run company-preflight (analyze+rewrite),
 // run KPI engine, return validated rows.
-
+// api/bulkPrepareRows.ts
 import type { VercelRequest, VercelResponse } from '@vercel/node';
+
 import { getBulkSession, updateBulkPreparedRows } from '../engine/bulkSessionStore';
 import type {
   BulkPrepareRowsRequest,
   BulkPrepareRowsResponse,
-  ParsedRow,
-  BulkPreparedRow
+  BulkPreparedRow,
+  ParsedRow
 } from '../engine/bulkTypes';
 
-function getBaseUrl(req: VercelRequest): string {
-  const proto =
-    (req.headers['x-forwarded-proto'] as string) ||
-    (req.headers['x-forwarded-proto'] as string[])?.[0] ||
-    'https';
-  const host = req.headers.host ?? '';
-  return `${proto}://${host}`;
+function parseRequestBody(req: VercelRequest): Promise<BulkPrepareRowsRequest> {
+  return new Promise((resolve, reject) => {
+    const chunks: Buffer[] = [];
+
+    req.on('data', (chunk: Buffer) => {
+      chunks.push(chunk);
+    });
+
+    req.on('end', () => {
+      try {
+        const bodyStr = Buffer.concat(chunks).toString('utf8');
+        const parsed = JSON.parse(bodyStr) as BulkPrepareRowsRequest;
+        resolve(parsed);
+      } catch (err) {
+        reject(err);
+      }
+    });
+
+    req.on('error', (err) => {
+      reject(err);
+    });
+  });
 }
 
-async function postJson<T>(url: string, payload: unknown): Promise<T> {
-  const resp = await fetch(url, {
-    method: 'POST',
-    headers: {
-      'content-type': 'application/json'
-    },
-    body: JSON.stringify(payload)
-  });
-
-  if (!resp.ok) {
-    const text = await resp.text();
-    throw new Error(`POST ${url} failed: ${resp.status} – ${text}`);
+function applyCompanyStrategy(
+  rows: ParsedRow[],
+  selected_company: string,
+  generic_mode: boolean,
+  apply_to_missing: boolean,
+  mismatched_strategy: 'keep' | 'overwrite'
+): ParsedRow[] {
+  if (generic_mode) {
+    return rows.map((r) => ({
+      ...r,
+      company: null
+    }));
   }
 
-  return (await resp.json()) as T;
+  const trimmedCompany = selected_company.trim();
+  if (!trimmedCompany) {
+    return rows;
+  }
+
+  return rows.map((r) => {
+    const hasCompany = !!(r.company && r.company.trim().length > 0);
+
+    if (!hasCompany && apply_to_missing) {
+      return { ...r, company: trimmedCompany };
+    }
+
+    if (hasCompany && mismatched_strategy === 'overwrite') {
+      return { ...r, company: trimmedCompany };
+    }
+
+    return r;
+  });
+}
+
+function filterRowsByInvalidHandling(
+  rows: ParsedRow[],
+  invalid_handling: 'skip' | 'abort'
+): { filtered: ParsedRow[]; aborted: boolean } {
+  const hasInvalid = rows.some((r) => r.isValid === false);
+
+  if (!hasInvalid) {
+    return { filtered: rows, aborted: false };
+  }
+
+  if (invalid_handling === 'abort') {
+    return { filtered: rows, aborted: true };
+  }
+
+  // invalid_handling === 'skip'
+  const filtered = rows.filter((r) => r.isValid !== false);
+  return { filtered, aborted: false };
 }
 
 export default async function handler(req: VercelRequest, res: VercelResponse) {
@@ -43,24 +95,9 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
   }
 
   try {
-    const body = req.body as BulkPrepareRowsRequest;
-
-    if (!body || !body.bulk_session_id) {
-      return res.status(400).json({
-        error: 'Missing bulk_session_id in request.'
-      });
-    }
-
-    const session = getBulkSession(body.bulk_session_id);
-    if (!session) {
-      return res.status(400).json({
-        error: 'Unknown or expired bulk_session_id.'
-      });
-    }
-
-    const { parsedRows, summary } = session;
-
+    const body = await parseRequestBody(req);
     const {
+      bulk_session_id,
       selected_company,
       generic_mode,
       apply_to_missing,
@@ -68,176 +105,87 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       invalid_handling
     } = body;
 
-    const baseUrl = getBaseUrl(req);
+    const session = getBulkSession(bulk_session_id);
+    if (!session) {
+      return res.status(404).json({ error: 'Bulk session not found.' });
+    }
 
-    // 1) Build rows for company-preflight
-    const preflightRows = parsedRows.map(r => ({
+    // Start from parsed rows stored during bulkInspect
+    const baseRows: ParsedRow[] = session.rows;
+
+    // Apply company strategy (generic / overwrite / fill missing)
+    const companyAdjustedRows = applyCompanyStrategy(
+      baseRows,
+      selected_company,
+      generic_mode,
+      apply_to_missing,
+      mismatched_strategy
+    );
+
+    // Apply invalid handling (skip / abort)
+    const { filtered: rowsForPreparation, aborted } = filterRowsByInvalidHandling(
+      companyAdjustedRows,
+      invalid_handling
+    );
+
+    if (aborted) {
+      const response: BulkPrepareRowsResponse = {
+        bulk_session_id,
+        state: 'INSPECTED',
+        ui_summary:
+          'Preparation aborted because some rows are invalid and invalid_handling was set to "abort".',
+        rows: []
+      };
+      return res.status(200).json(response);
+    }
+
+    // For now, we do not call KPI engine here.
+    // We simply create BulkPreparedRow entries based on ParsedRow + validation flags.
+    const preparedRows: BulkPreparedRow[] = rowsForPreparation.map((r) => ({
+      // From ParsedRow
       row_id: r.row_id,
-      company: (r.company ?? '').trim(),
-      strategic_benefit: (r.strategic_benefit ?? '').trim()
+      company: r.company,
+      team_role: r.team_role,
+      task_type: r.task_type,
+      task_name: r.task_name,
+      dead_line: r.dead_line,
+      strategic_benefit: r.strategic_benefit,
+      output_metric: r.output_metric,
+      quality_metric: r.quality_metric,
+      improvement_metric: r.improvement_metric,
+      mode: r.mode,
+      isValid: r.isValid,
+      invalidReason: r.invalidReason,
+
+      // BulkPreparedRow extensions
+      status: r.isValid === false ? 'INVALID' : 'VALID',
+      comments: r.isValid === false ? 'Row is invalid from Excel parsing.' : 'Pending KPI engine validation.',
+      summary_reason: r.isValid === false ? 'Invalid mandatory fields in Excel row.' : '',
+      errorCodes: [],
+      resolved_metrics: null
     }));
 
-    // 2) ANALYZE
-    const analyzePayload = {
-      mode: 'analyze' as const,
-      selected_company: selected_company ?? '',
-      generic_mode: !!generic_mode,
-      rows: preflightRows
-    };
-
-    const analyzeResult = await postJson<any>(
-      `${baseUrl}/api/company-preflight`,
-      analyzePayload
-    );
-
-    // Basic sanity check
-    const excelRowCount = parsedRows.length;
-    const preflightRowCount = Array.isArray(analyzeResult?.per_row_status)
-      ? analyzeResult.per_row_status.length
-      : 0;
-
-    if (excelRowCount > 0 && preflightRowCount === 0) {
-      // Mapping issue fallback: log warning for debugging.
-      console.warn(
-        JSON.stringify({
-          level: 'warn',
-          service: 'bulk-prepare-rows',
-          event: 'preflight_zero_rows',
-          excelRowCount,
-          preflightRowCount
-        })
-      );
-    }
-
-    // 3) Handle invalid rows policy
-    const effectiveRows: ParsedRow[] =
-      invalid_handling === 'skip'
-        ? parsedRows.filter(r => r.isValid !== false)
-        : parsedRows;
-
-    if (invalid_handling === 'abort' && summary.has_invalid_rows) {
-      return res.status(400).json({
-        error:
-          'Bulk file contains invalid rows and invalid_handling = "abort". No objectives will be generated.'
-      });
-    }
-
-    // 4) REWRITE (if there is at least one row)
-    let rewriteMap = new Map<
-      number,
-      { row_id: number; company: string; strategic_benefit: string }
-    >();
-
-    if (effectiveRows.length > 0) {
-      const rewritePayload = {
-        mode: 'rewrite' as const,
-        selected_company: selected_company ?? '',
-        generic_mode: !!generic_mode,
-        apply_to_missing: !!apply_to_missing,
-        mismatched_strategy: mismatched_strategy ?? 'keep',
-        rows: preflightRows
-      };
-
-      const rewriteResult = await postJson<{
-        rows: { row_id: number; company: string; strategic_benefit: string }[];
-      }>(`${baseUrl}/api/company-preflight`, rewritePayload);
-
-      rewriteMap = new Map(
-        (rewriteResult.rows || []).map(r => [r.row_id, r])
-      );
-    }
-
-    // 5) Build final rows for KPI engine with company precedence: rewrite > CSV > selected_company
-    const rowsForEngine = effectiveRows.map(input => {
-      const rewrite = rewriteMap.get(input.row_id);
-
-      const csvCompany = (input.company ?? '').trim();
-      const rewrittenCompany = (rewrite?.company ?? '').trim();
-      const finalCompany =
-        rewrittenCompany || csvCompany || (selected_company ?? '');
-
-      const finalStrategic =
-        (rewrite?.strategic_benefit || input.strategic_benefit || '').trim();
-
-      return {
-        row_id: input.row_id,
-        company: finalCompany || undefined,
-        team_role: (input.team_role ?? '').trim(),
-        task_type: (input.task_type ?? '').trim(),
-        task_name: (input.task_name ?? '').trim(),
-        dead_line: (input.dead_line ?? '').trim(),
-        strategic_benefit: finalStrategic,
-        output_metric: (input.output_metric ?? '').trim(),
-        quality_metric: (input.quality_metric ?? '').trim(),
-        improvement_metric: (input.improvement_metric ?? '').trim(),
-        mode: (input.mode ?? 'both') || 'both'
-      };
-    });
-
-    // 6) Call KPI engine
-    const kpiPayload = {
-      engine_version: 'v10.7.5',
-      default_company: selected_company ?? '',
-      rows: rowsForEngine
-    };
-
-    const kpiResult = await postJson<{ rows: any[] }>(
-      `${baseUrl}/api/kpi`,
-      kpiPayload
-    );
-
-    const preparedRows: BulkPreparedRow[] = (kpiResult.rows || []).map(row => ({
-      row_id: row.row_id,
-      company: row.company,
-      team_role: row.team_role,
-      task_type: row.task_type,
-      task_name: row.task_name,
-      dead_line: row.dead_line,
-      strategic_benefit: row.strategic_benefit,
-      output_metric: row.output_metric,
-      quality_metric: row.quality_metric,
-      improvement_metric: row.improvement_metric,
-      mode: row.mode,
-      status: row.status,
-      comments: row.comments,
-      summary_reason: row.summary_reason,
-      errorCodes: row.errorCodes || row.error_codes || [],
-      resolved_metrics: row.resolved_metrics
-    }));
-
-    updateBulkPreparedRows(body.bulk_session_id, preparedRows);
-
-    const validCount = preparedRows.filter(r => r.status === 'VALID').length;
-    const needsReviewCount = preparedRows.filter(
-      r => r.status === 'NEEDS_REVIEW'
-    ).length;
-    const invalidCount = preparedRows.filter(r => r.status === 'INVALID').length;
-
-    const ui_summary =
-      `Bulk KPI validation completed: ${validCount} VALID, ` +
-      `${needsReviewCount} NEEDS_REVIEW, ${invalidCount} INVALID row(s). ` +
-      `Generate objectives only for VALID and NEEDS_REVIEW rows.`;
+    // Persist prepared rows into session snapshot
+    updateBulkPreparedRows(bulk_session_id, preparedRows);
 
     const response: BulkPrepareRowsResponse = {
-      bulk_session_id: body.bulk_session_id,
-      state: 'READY_FOR_OBJECTIVES',
-      ui_summary,
+      bulk_session_id,
+      state: 'PREPARED',
+      ui_summary: `Prepared ${preparedRows.length} row(s) for KPI objective generation.`,
       rows: preparedRows
     };
 
     return res.status(200).json(response);
-  } catch (err) {
+  } catch (err: any) {
     console.error(
       JSON.stringify({
         level: 'error',
-        service: 'bulk-prepare-rows',
+        service: 'bulkPrepareRows',
         event: 'unhandled_exception',
         message: err instanceof Error ? err.message : String(err)
       })
     );
 
-    return res.status(500).json({
-      error: 'Internal bulkPrepareRows error.'
-    });
+    return res.status(500).json({ error: 'Internal bulkPrepareRows error.' });
   }
 }
