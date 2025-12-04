@@ -96,7 +96,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     };
 
     return res.status(200).json(summary);
-  } catch (err: any) {
+    } catch (err: any) {
     if (err instanceof Error && err.message === 'Missing Excel file in request body.') {
       return res.status(400).json({ error: 'Missing Excel file in request body.' });
     }
@@ -106,10 +106,14 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         level: 'error',
         service: 'bulkInspect',
         event: 'unhandled_exception',
-        message: err instanceof Error ? err.message : String(err)
+        message: err instanceof Error ? err.message : String(err),
+        stack: err instanceof Error ? err.stack : undefined
       })
     );
 
-    return res.status(500).json({ error: 'Internal bulkInspect error.' });
+    return res.status(500).json({
+      error: 'Internal bulkInspect error.',
+      detail: err instanceof Error ? err.message : String(err)
+    });
   }
 }
