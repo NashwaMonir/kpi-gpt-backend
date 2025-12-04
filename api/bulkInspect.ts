@@ -9,7 +9,7 @@ import {
   BulkInspectSummary,
   BulkInspectOption,
   BulkInspectTokenPayload,
-  encodeInspectToken,
+  encodeInspectToken
 } from '../engine/bulkTypes';
 
 interface ParseResult {
@@ -56,14 +56,14 @@ export default function handler(req: VercelRequest, res: VercelResponse) {
   bb.on('error', (err: unknown) => {
     res.status(500).json({
       error: 'Internal bulkInspect error.',
-      detail: String(err),
+      detail: String(err)
     });
   });
 
   bb.on('finish', async () => {
     if (!hasFile || chunks.length === 0) {
       res.status(400).json({
-        error: 'Missing Excel file in request body.',
+        error: 'Missing Excel file in request body.'
       });
       return;
     }
@@ -77,13 +77,13 @@ export default function handler(req: VercelRequest, res: VercelResponse) {
       if (parsed.has_company_column) {
         options.push({
           code: 'use_sheet_company',
-          label: 'Use the company from the sheet for all rows.',
+          label: 'Use the company from the sheet for all rows.'
         });
       }
 
       options.push({
         code: 'generic_mode',
-        label: 'Ignore company and generate generic objectives.',
+        label: 'Ignore company and generate generic objectives.'
       });
 
       let ui_prompt = `Detected ${parsed.row_count} row(s).`;
@@ -108,12 +108,12 @@ export default function handler(req: VercelRequest, res: VercelResponse) {
 
         state: 'INSPECTED',
         ui_prompt,
-        options,
+        options
       };
 
       const tokenPayload: BulkInspectTokenPayload = {
         parsedRows: parsed.rows,
-        summary,
+        summary
       };
 
       const rows_token = encodeInspectToken(tokenPayload);
@@ -131,12 +131,19 @@ export default function handler(req: VercelRequest, res: VercelResponse) {
         has_invalid_rows: summary.has_invalid_rows,
         state: summary.state,
         ui_prompt: summary.ui_prompt,
-        options: summary.options,
+        options: summary.options
       });
     } catch (err) {
+      const message = String(err);
+
+      if (message.includes('Bulk row limit exceeded')) {
+        res.status(400).json({ error: message });
+        return;
+      }
+
       res.status(500).json({
         error: 'Internal bulkInspect error.',
-        detail: String(err),
+        detail: message
       });
     }
   });

@@ -51,6 +51,14 @@ export function parseKpiInputExcel(fileBuffer: Buffer): ParsedExcelInspectionRes
     defval: ''
   } as any);
 
+  const MAX_BULK_ROWS = 50;
+
+  if (jsonRows.length > MAX_BULK_ROWS) {
+    throw new Error(
+      `Bulk row limit exceeded. Max ${MAX_BULK_ROWS} rows allowed, found ${jsonRows.length}.`
+    );
+  }
+
   const parsedRows: ParsedRow[] = [];
 
   let has_company_column = false;
