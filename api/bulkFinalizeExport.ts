@@ -58,15 +58,20 @@ export default function handler(req: VercelRequest, res: VercelResponse) {
     return;
   }
 
-  const preparedRows = payload.preparedRows || [];
+  // Robustly read prepared rows from token
+  const preparedRows =
+    (payload as any).preparedRows ||
+    (payload as any).prepared_rows ||
+    [];
+
   const objectivesMap = new Map<number, BulkObjectiveInput>();
 
   for (const obj of objectives) {
     if (
       obj &&
       typeof obj.row_id === 'number' &&
-      (typeof obj.simple_objective === 'string' ||
-        typeof obj.complex_objective === 'string')
+      typeof obj.simple_objective === 'string' &&
+      typeof obj.complex_objective === 'string'
     ) {
       objectivesMap.set(obj.row_id, obj);
     }
@@ -75,10 +80,10 @@ export default function handler(req: VercelRequest, res: VercelResponse) {
   const rowsForExport: KpiResultRow[] = [];
 
   for (const row of preparedRows) {
+    if (!row || typeof row.row_id !== 'number') continue;
+
     const obj = objectivesMap.get(row.row_id);
-    if (!obj) {
-      continue; // no objective for this row
-    }
+    if (!obj) continue; // no objective for this row
 
     rowsForExport.push({
       task_name: row.task_name ?? '',
@@ -96,12 +101,10 @@ export default function handler(req: VercelRequest, res: VercelResponse) {
   }
 
   const valid_count = rowsForExport.length;
-  const invalid_count = 0; // invalid rows are not exported with objectives
-  const needs_review_count = rowsForExport.some((r) =>
-    r.validation_status === 'NEEDS_REVIEW'
-  )
-    ? rowsForExport.filter((r) => r.validation_status === 'NEEDS_REVIEW').length
-    : 0;
+  const needs_review_count = rowsForExport.filter(
+    (r) => r.validation_status === 'NEEDS_REVIEW'
+  ).length;
+  const invalid_count = 0; // invalid rows are never exported with objectives
 
   const hostHeader = req.headers.host || null;
   const download_url = encodeRowsForDownload(rowsForExport, hostHeader);
