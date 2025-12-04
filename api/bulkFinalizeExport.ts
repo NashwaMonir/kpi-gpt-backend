@@ -18,10 +18,7 @@ function getBaseUrl(req: VercelRequest): string {
   return `${proto}://${host}`;
 }
 
-async function postJson<T>(
-  url: string,
-  payload: unknown
-): Promise<T> {
+async function postJson<T>(url: string, payload: unknown): Promise<T> {
   const resp = await fetch(url, {
     method: 'POST',
     headers: {
@@ -52,6 +49,12 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       });
     }
 
+    if (!body.objectives || !Array.isArray(body.objectives)) {
+      return res.status(400).json({
+        error: 'Missing objectives array in request.'
+      });
+    }
+
     const session = getBulkSession(body.bulk_session_id);
     if (!session || !session.preparedRows) {
       return res.status(400).json({
@@ -64,55 +67,55 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       { simple_objective: string; complex_objective: string }
     >();
 
-   for (const obj of body.objectives) {
-  if (objectivesByRowId.has(obj.row_id)) {
-    console.warn(
-      JSON.stringify({
-        level: 'warn',
-        service: 'bulk-finalize-export',
-        event: 'duplicate_objective_row_id',
-        row_id: obj.row_id
-      })
-    );
-  }
+    for (const obj of body.objectives) {
+      if (objectivesByRowId.has(obj.row_id)) {
+        console.warn(
+          JSON.stringify({
+            level: 'warn',
+            service: 'bulk-finalize-export',
+            event: 'duplicate_objective_row_id',
+            row_id: obj.row_id
+          })
+        );
+      }
 
-  const simple = obj.simple_objective ?? '';
-  const complex =
-    obj.complex_objective && obj.complex_objective.trim() !== ''
-      ? obj.complex_objective
-      : simple; // fallback: if complex is empty, use simple
+      const simple = obj.simple_objective ?? '';
+      const complex =
+        obj.complex_objective && obj.complex_objective.trim() !== ''
+          ? obj.complex_objective
+          : simple;
 
-  objectivesByRowId.set(obj.row_id, {
-    simple_objective: simple,
-    complex_objective: complex
-  });
-}
+      objectivesByRowId.set(obj.row_id, {
+        simple_objective: simple,
+        complex_objective: complex
+      });
+    }
 
     // Merge objectives into prepared rows
-const rowsWithObjectives = session.preparedRows.map((row: BulkPreparedRow) => {
-  const obj = objectivesByRowId.get(row.row_id) ?? {
-    simple_objective: '',
-    complex_objective: ''
-  };
+    const rowsWithObjectives = session.preparedRows.map((row: BulkPreparedRow) => {
+      const obj = objectivesByRowId.get(row.row_id) ?? {
+        simple_objective: '',
+        complex_objective: ''
+      };
 
-  return {
-    ...row,
-    simple_objective: obj.simple_objective,
-    complex_objective: obj.complex_objective
-  };
-});
+      return {
+        ...row,
+        simple_objective: obj.simple_objective,
+        complex_objective: obj.complex_objective
+      };
+    });
 
     const baseUrl = getBaseUrl(req);
 
     // Build minimal payload matching /api/runKpiResultExport schema (Action.json)
-    const exportRows = rowsWithObjectives.map(r => ({
+    const exportRows = rowsWithObjectives.map((r) => ({
       task_name: r.task_name ?? '',
       task_type: r.task_type ?? '',
       team_role: r.team_role ?? '',
       dead_line: r.dead_line ?? '',
       simple_objective: r.simple_objective ?? '',
-      complex_objective: r.complex_objective ?? '',
-      validation_status: r.status, // map engine status → schema field
+      complex_objective: r.simple_objective ?? '',
+      validation_status: r.status,
       comments: r.comments ?? '',
       summary_reason: r.summary_reason ?? ''
     }));
@@ -126,30 +129,29 @@ const rowsWithObjectives = session.preparedRows.map((row: BulkPreparedRow) => {
       exportPayload
     );
 
-    const valid_count = rowsWithObjectives.filter(r => r.status === 'VALID').length;
+    const valid_count = rowsWithObjectives.filter((r) => r.status === 'VALID').length;
     const needs_review_count = rowsWithObjectives.filter(
-      r => r.status === 'NEEDS_REVIEW'
+      (r) => r.status === 'NEEDS_REVIEW'
     ).length;
     const invalid_count = rowsWithObjectives.filter(
-      r => r.status === 'INVALID'
+      (r) => r.status === 'INVALID'
     ).length;
 
     const ui_message =
-    `KPI export completed: ${valid_count} VALID, ` +
-    `${needs_review_count} NEEDS_REVIEW, ${invalid_count} INVALID row(s). ` +
-    `Download the Excel file using the link below.`;
+      `KPI export completed: ${valid_count} VALID, ` +
+      `${needs_review_count} NEEDS_REVIEW, ${invalid_count} INVALID row(s). ` +
+      `Download the Excel file using the link below.`;
 
     const response: BulkFinalizeExportResponse = {
-    download_url: exportResult.download_url,
-    valid_count,
-    needs_review_count,
-    invalid_count,
-    ui_message
+      download_url: exportResult.download_url,
+      valid_count,
+      needs_review_count,
+      invalid_count,
+      ui_message
     };
 
     return res.status(200).json(response);
-
-  } catch (err) {
+  } catch (err: any) {
     console.error(
       JSON.stringify({
         level: 'error',

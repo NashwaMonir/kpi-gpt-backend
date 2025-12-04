@@ -1,7 +1,4 @@
 // api/bulkPrepareRows.ts
-// Phase B: Apply user decision, run company-preflight (analyze+rewrite),
-// run KPI engine, return validated rows.
-// api/bulkPrepareRows.ts
 import type { VercelRequest, VercelResponse } from '@vercel/node';
 
 import { getBulkSession, updateBulkPreparedRows } from '../engine/bulkSessionStore';
@@ -110,10 +107,8 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       return res.status(404).json({ error: 'Bulk session not found.' });
     }
 
-    // Start from parsed rows stored during bulkInspect
     const baseRows: ParsedRow[] = session.rows;
 
-    // Apply company strategy (generic / overwrite / fill missing)
     const companyAdjustedRows = applyCompanyStrategy(
       baseRows,
       selected_company,
@@ -122,7 +117,6 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       mismatched_strategy
     );
 
-    // Apply invalid handling (skip / abort)
     const { filtered: rowsForPreparation, aborted } = filterRowsByInvalidHandling(
       companyAdjustedRows,
       invalid_handling
@@ -139,10 +133,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       return res.status(200).json(response);
     }
 
-    // For now, we do not call KPI engine here.
-    // We simply create BulkPreparedRow entries based on ParsedRow + validation flags.
     const preparedRows: BulkPreparedRow[] = rowsForPreparation.map((r) => ({
-      // From ParsedRow
       row_id: r.row_id,
       company: r.company,
       team_role: r.team_role,
@@ -156,16 +147,17 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       mode: r.mode,
       isValid: r.isValid,
       invalidReason: r.invalidReason,
-
-      // BulkPreparedRow extensions
       status: r.isValid === false ? 'INVALID' : 'VALID',
-      comments: r.isValid === false ? 'Row is invalid from Excel parsing.' : 'Pending KPI engine validation.',
-      summary_reason: r.isValid === false ? 'Invalid mandatory fields in Excel row.' : '',
+      comments:
+        r.isValid === false
+          ? 'Row is invalid from Excel parsing.'
+          : 'Pending KPI engine validation.',
+      summary_reason:
+        r.isValid === false ? 'Invalid mandatory fields in Excel row.' : '',
       errorCodes: [],
       resolved_metrics: null
     }));
 
-    // Persist prepared rows into session snapshot
     updateBulkPreparedRows(bulk_session_id, preparedRows);
 
     const response: BulkPrepareRowsResponse = {
