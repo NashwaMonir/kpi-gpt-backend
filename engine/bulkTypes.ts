@@ -10,9 +10,10 @@ export type BulkSessionState =
   | 'FINALIZED';
 
 //
-// Input row (JSON coming from GPT → bulkInspectJson)
+// Raw row input (JSON form after Excel parsing)
 //
 export interface KpiJsonRowIn {
+  row_id: number;
   company?: string | null;
   team_role?: string | null;
   task_type?: string | null;
@@ -41,10 +42,9 @@ export interface ParsedRow {
   improvement_metric: string | null;
   mode: 'simple' | 'complex' | 'both';
   isValid: boolean;
-  invalidReason?: string;
+  invalidReason?: string | null;
 }
 
-//
 // Inspect summary (used by bulkInspectJson response)
 //
 export interface BulkInspectOption {
