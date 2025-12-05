@@ -27,6 +27,33 @@ function parseBody(req: VercelRequest): BulkFinalizeExportRequest {
   return body as BulkFinalizeExportRequest;
 }
 
+/**
+ * Try to extract the prepared rows array from the decoded token payload.
+ * We don't trust the exact key; we look for any array of objects with row_id.
+ */
+function extractPreparedRows(payload: BulkPrepareTokenPayload | any): any[] {
+  // 1) Preferred: explicit keys
+  if (Array.isArray(payload.preparedRows)) {
+    return payload.preparedRows;
+  }
+  if (Array.isArray(payload.prepared_rows)) {
+    return payload.prepared_rows;
+  }
+
+  // 2) Fallback: search any top-level array that looks like rows
+  for (const value of Object.values(payload)) {
+    if (Array.isArray(value) && value.length > 0) {
+      const first = value[0];
+      if (first && typeof first === 'object' && 'row_id' in first) {
+        return value;
+      }
+    }
+  }
+
+  // 3) Nothing found
+  return [];
+}
+
 export default function handler(req: VercelRequest, res: VercelResponse) {
   if (req.method !== 'POST') {
     res
@@ -47,7 +74,7 @@ export default function handler(req: VercelRequest, res: VercelResponse) {
     return;
   }
 
-  let payload: BulkPrepareTokenPayload;
+  let payload: BulkPrepareTokenPayload | any;
   try {
     payload = decodePrepareToken(prep_token);
   } catch (err) {
@@ -58,11 +85,8 @@ export default function handler(req: VercelRequest, res: VercelResponse) {
     return;
   }
 
-  // Robustly read prepared rows from token
-  const preparedRows =
-    (payload as any).preparedRows ||
-    (payload as any).prepared_rows ||
-    [];
+  // Extract prepared rows robustly
+  const preparedRows = extractPreparedRows(payload);
 
   const objectivesMap = new Map<number, BulkObjectiveInput>();
 
@@ -104,7 +128,7 @@ export default function handler(req: VercelRequest, res: VercelResponse) {
   const needs_review_count = rowsForExport.filter(
     (r) => r.validation_status === 'NEEDS_REVIEW'
   ).length;
-  const invalid_count = 0; // invalid rows are never exported with objectives
+  const invalid_count = 0; // invalid rows are not exported with objectives
 
   const hostHeader = req.headers.host || null;
   const download_url = encodeRowsForDownload(rowsForExport, hostHeader);
