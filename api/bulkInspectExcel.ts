@@ -20,7 +20,8 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
   }
 
   try {
-    const { file_id } = req.body as { file_id?: string };
+    const body = (req.body || {}) as { file_id?: string };
+    const file_id = body.file_id;
 
     if (!file_id || typeof file_id !== 'string') {
       res.status(400).json({ error: 'file_id is required and must be a string.' });
@@ -28,9 +29,10 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     }
 
     if (!process.env.OPENAI_API_KEY) {
-      // Hard fail with explicit message for debugging
-      console.error('Missing OPENAI_API_KEY in environment.');
-      res.status(500).json({ error: 'Server configuration error: OPENAI_API_KEY not set.' });
+      console.error('bulkInspectExcel error: OPENAI_API_KEY not set');
+      res
+        .status(500)
+        .json({ error: 'Bulk Excel processing failed (server): OPENAI_API_KEY not set' });
       return;
     }
 
@@ -47,17 +49,27 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
 
     res.status(200).json(result);
   } catch (err: any) {
-    const message = err?.message || String(err);
-    console.error('bulkInspectExcel error:', message);
+    // Extract as much detail as possible
+    const msg = err?.message || String(err);
+    const status = err?.status ?? err?.response?.status;
+    const data = err?.response?.data;
 
-    if (message.includes('Bulk row limit exceeded')) {
-      res
-        .status(400)
-        .json({ error: 'Error: Bulk row limit exceeded. Max 50 rows allowed.' });
+    console.error('bulkInspectExcel error:', {
+      message: msg,
+      status,
+      data,
+    });
+
+    if (msg.includes('Bulk row limit exceeded')) {
+      res.status(400).json({
+        error: 'Bulk Excel processing failed (server): Bulk row limit exceeded.',
+      });
       return;
     }
 
-    // Generic error, mapped to your BF0 fallback
-    res.status(500).json({ error: 'Bulk Excel processing failed.' });
+    // Return detailed message so we can see it via connector
+    res.status(500).json({
+      error: `Bulk Excel processing failed (server): ${msg}`,
+    });
   }
 }
