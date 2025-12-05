@@ -1,69 +1,63 @@
 // api/bulkInspectExcel.ts
-
-import type { NextApiRequest, NextApiResponse } from 'next';
+import type { VercelRequest, VercelResponse } from '@vercel/node';
 import OpenAI from 'openai';
+import { bulkInspectCore } from '../engine/bulkInspectCore';
 import { parseKpiInputExcelToJsonRows } from '../engine/parseKpiInputExcelToJsonRows';
-import { bulkInspectCore } from '../engine/bulkInspectCore'; // wrapper around JSON inspection core
 
 const openai = new OpenAI({
-  apiKey: process.env.OPENAI_API_KEY
+  apiKey: process.env.OPENAI_API_KEY,
 });
 
-export default async function handler(
-  req: NextApiRequest,
-  res: NextApiResponse
-) {
+/**
+ * POST /api/bulkInspectExcel
+ * Body: { file_id: string }
+ * Used ONLY by the Custom GPT via the file handle.
+ */
+export default async function handler(req: VercelRequest, res: VercelResponse) {
   if (req.method !== 'POST') {
-    res.setHeader('Allow', 'POST');
-    return res.status(405).json({ error: 'Method not allowed' });
-  }
-
-  const { file_id } = req.body as { file_id?: string };
-
-  if (!file_id || typeof file_id !== 'string') {
-    return res.status(400).json({
-      error: 'Invalid payload: \"file_id\" is required and must be a string.'
-    });
-  }
-
-  if (!process.env.OPENAI_API_KEY) {
-    return res.status(500).json({
-      error: 'OPENAI_API_KEY is not configured on the server.'
-    });
+    res.status(405).json({ error: 'Method not allowed. Use POST.' });
+    return;
   }
 
   try {
-    // 1) Download Excel from OpenAI
-    const fileResp = await openai.files.content(file_id);
-    const arrayBuf = await (fileResp as any).arrayBuffer();
-    const buffer = Buffer.from(arrayBuf);
+    const { file_id } = req.body as { file_id?: string };
 
-    // 2) Parse Excel → rows[]
-    const rows = await parseKpiInputExcelToJsonRows(buffer);
-
-    // 3) Hard limit (50 rows)
-    const MAX_ROWS = 50;
-    if (rows.length > MAX_ROWS) {
-      return res.status(400).json({
-        error: `Bulk row limit exceeded. Max ${MAX_ROWS} rows allowed, found ${rows.length}.`
-      });
+    if (!file_id || typeof file_id !== 'string') {
+      res.status(400).json({ error: 'file_id is required and must be a string.' });
+      return;
     }
 
-    // 4) Inspect using same JSON core
-    const summary = bulkInspectCore(rows); // BulkInspectSummary
+    if (!process.env.OPENAI_API_KEY) {
+      // Hard fail with explicit message for debugging
+      console.error('Missing OPENAI_API_KEY in environment.');
+      res.status(500).json({ error: 'Server configuration error: OPENAI_API_KEY not set.' });
+      return;
+    }
 
-    return res.status(200).json(summary);
+    // 1) Download Excel file from OpenAI file storage
+    const fileResponse = await openai.files.content(file_id);
+    const arrayBuffer = await fileResponse.arrayBuffer();
+    const buffer = Buffer.from(arrayBuffer);
+
+    // 2) Parse Excel → KpiJsonRowIn[]
+    const jsonRows = await parseKpiInputExcelToJsonRows(buffer);
+
+    // 3) Run the same core inspector used by /api/bulkInspectJson
+    const result = bulkInspectCore(jsonRows);
+
+    res.status(200).json(result);
   } catch (err: any) {
-    console.error('bulkInspectExcel error:', err);
-    const msg = err?.message ?? String(err);
+    const message = err?.message || String(err);
+    console.error('bulkInspectExcel error:', message);
 
-    if (msg.includes('Bulk row limit exceeded')) {
-      return res.status(400).json({ error: msg });
+    if (message.includes('Bulk row limit exceeded')) {
+      res
+        .status(400)
+        .json({ error: 'Error: Bulk row limit exceeded. Max 50 rows allowed.' });
+      return;
     }
 
-    return res.status(500).json({
-      error: 'Bulk Excel file inspection failed.',
-      details: msg
-    });
+    // Generic error, mapped to your BF0 fallback
+    res.status(500).json({ error: 'Bulk Excel processing failed.' });
   }
 }
