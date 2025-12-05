@@ -6,9 +6,9 @@ import {
   BulkPrepareRowsRequest,
   BulkPrepareRowsResponse,
   BulkPreparedRow,
-  BulkInspectTokenPayload,
+  RowsTokenPayload,
   BulkPrepareTokenPayload,
-  decodeInspectToken,
+  decodeRowsToken,
   encodePrepareToken,
 } from '../engine/bulkTypes';
 
@@ -50,9 +50,10 @@ export default function handler(req: VercelRequest, res: VercelResponse) {
     return;
   }
 
-  let payload: BulkInspectTokenPayload;
+  // Decode rows token (stateless)
+  let payload: RowsTokenPayload;
   try {
-    payload = decodeInspectToken(rows_token);
+    payload = decodeRowsToken(rows_token);
   } catch (err) {
     res.status(400).json({
       error: 'Failed to decode rows_token.',
@@ -62,10 +63,9 @@ export default function handler(req: VercelRequest, res: VercelResponse) {
   }
 
   const parsedRows = payload.parsedRows || [];
-  const summary = payload.summary;
+  const summaryMeta = payload.summaryMeta;
 
   // Company logic
-
   const finalCompany = generic_mode ? null : selected_company || null;
   const overwrite =
     !generic_mode && mismatched_strategy === 'overwrite' ? true : false;
@@ -100,7 +100,7 @@ export default function handler(req: VercelRequest, res: VercelResponse) {
   const valid_row_count = rowsForObjectives.length;
 
   const updatedSummary = {
-    ...summary,
+    ...summaryMeta,
     state: 'READY_FOR_OBJECTIVES' as const,
   };
 

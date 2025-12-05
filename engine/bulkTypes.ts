@@ -1,32 +1,57 @@
 // engine/bulkTypes.ts
-// Shared types for SMART KPI bulk flow (token-based, Option 2)
+// Core bulk types + token helpers for JSON-based bulk flow (v10.7.5).
 
-// ⸻ Core row types ⸻
+//
+// Session state
+//
+export type BulkSessionState =
+  | 'INSPECTED'
+  | 'READY_FOR_OBJECTIVES'
+  | 'FINALIZED';
 
-export type BulkSessionState = 'INSPECTED' | 'READY_FOR_OBJECTIVES' | 'FINALIZED';
+//
+// Input row (JSON coming from GPT → bulkInspectJson)
+//
+export interface KpiJsonRowIn {
+  company?: string | null;
+  team_role?: string | null;
+  task_type?: string | null;
+  task_name?: string | null;
+  dead_line?: string | null;
+  strategic_benefit?: string | null;
+  output_metric?: string | null;
+  quality_metric?: string | null;
+  improvement_metric?: string | null;
+  mode?: string | null;
+}
 
+//
+// Parsed row used inside bulk pipeline
+//
 export interface ParsedRow {
   row_id: number;
-
   company: string | null;
   team_role: string | null;
   task_type: string | null;
   task_name: string | null;
   dead_line: string | null;
-
   strategic_benefit: string | null;
   output_metric: string | null;
   quality_metric: string | null;
   improvement_metric: string | null;
-
   mode: 'simple' | 'complex' | 'both';
-
   isValid: boolean;
   invalidReason?: string;
 }
 
-// ⸻ Excel inspection result (used by parseKpiInputExcel) ⸻
-
+//
+// Inspect summary (used by bulkInspectJson response)
+//
+export interface BulkInspectOption {
+  code: string;
+  label: string;
+}
+// Excel inspection result (used by parseKpiInputExcel)
 export interface ParsedExcelInspectionResult {
   rows: ParsedRow[];
   row_count: number;
@@ -48,17 +73,29 @@ export interface ParsedExcelInspectionResult {
   has_invalid_rows: boolean;
 
   ui_prompt: string;
-  options: { code: string; label: string }[];
+  options: BulkInspectOption[];
 }
-
-// ⸻ Bulk inspection summary used in tokens / API ⸻
-
-export interface BulkInspectOption {
-  code: string;
-  label: string;
+export interface RowsTokenPayload {
+  parsedRows: ParsedRow[];
+  summaryMeta: {
+    row_count: number;
+    invalid_row_count: number;
+    has_company_column: boolean;
+    unique_companies: string[];
+    missing_company_count: number;
+    benefit_company_signals: string[];
+    company_case:
+      | 'no_company_data'
+      | 'single_company_column'
+      | 'multi_company_column'
+      | 'benefit_signal_only';
+    needs_company_decision: boolean;
+    has_invalid_rows: boolean;
+  };
 }
-
 export interface BulkInspectSummary {
+  rows_token: string;
+
   row_count: number;
   invalid_row_count: number;
 
@@ -82,24 +119,30 @@ export interface BulkInspectSummary {
   options: BulkInspectOption[];
 }
 
-// ⸻ Token payloads for stateless bulk flow ⸻
+//
+// Stateless token payloads for bulk flow
+//
 
-export interface BulkInspectTokenPayload {
+// Token used for rows_token (output of bulkInspectJson)
+/*export interface BulkInspectTokenPayload {
   parsedRows: ParsedRow[];
   summary: BulkInspectSummary;
-}
+}*/
 
+// Prepared rows extend ParsedRow (extension point)
 export interface BulkPreparedRow extends ParsedRow {
   // Extension point: add per-row bulk flags in future if needed
 }
 
+// Token used for prep_token (output of bulkPrepareRows)
 export interface BulkPrepareTokenPayload {
-  summary: BulkInspectSummary;
+  summary: RowsTokenPayload['summaryMeta'] & { state: BulkSessionState };
   preparedRows: BulkPreparedRow[];
 }
 
-// ⸻ API contracts: bulkPrepareRows ⸻
-
+//
+// API contracts: bulkPrepareRows
+//
 export interface BulkPrepareRowsRequest {
   rows_token: string;
 
@@ -123,8 +166,9 @@ export interface BulkPrepareRowsResponse {
   prepared_rows: BulkPreparedRow[];
 }
 
-// ⸻ API contracts: bulkFinalizeExport ⸻
-
+//
+// API contracts: bulkFinalizeExport
+//
 export interface BulkObjectiveInput {
   row_id: number;
   simple_objective: string;
@@ -144,8 +188,9 @@ export interface BulkFinalizeExportResponse {
   ui_message: string;
 }
 
-// ⸻ Shape for result rows used in Excel export / download ⸻
-
+//
+// Shape for rows passed to runKpiResultDownload (Excel export)
+//
 export interface KpiResultRow {
   task_name: string;
   task_type: string;
@@ -158,23 +203,37 @@ export interface KpiResultRow {
   summary_reason: string;
 }
 
-// ⸻ Base64 URL helpers (for tokens and download payload) ⸻
-
-function toBase64Url(input: string): string {
-  const base64 = Buffer.from(input, 'utf8').toString('base64');
+//
+// Base64-url helpers (internal)
+//
+function toBase64Url(json: string): string {
+  const base64 = Buffer.from(json, 'utf8').toString('base64');
   return base64.replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/g, '');
 }
 
-function fromBase64Url(input: string): string {
-  const padLength = (4 - (input.length % 4)) % 4;
-  const padded = input + '='.repeat(padLength);
-  const base64 = padded.replace(/-/g, '+').replace(/_/g, '/');
+function fromBase64Url(token: string): string {
+  let base64 = token.replace(/-/g, '+').replace(/_/g, '/');
+  const pad = base64.length % 4;
+  if (pad === 2) base64 += '==';
+  else if (pad === 3) base64 += '=';
   return Buffer.from(base64, 'base64').toString('utf8');
 }
 
-// ⸻ Stateless tokens for bulk flow ⸻
+//
+// ⸻ Base64-url encode/decode for rows_token (stateless) ⸻
 
-export function encodeInspectToken(payload: BulkInspectTokenPayload): string {
+export function encodeRowsToken(payload: RowsTokenPayload): string {
+  const json = JSON.stringify(payload);
+  return toBase64Url(json);
+}
+
+export function decodeRowsToken(token: string): RowsTokenPayload {
+  const json = fromBase64Url(token);
+  return JSON.parse(json) as RowsTokenPayload;
+}
+// Stateless tokens for bulk flow
+//
+/*export function encodeInspectToken(payload: BulkInspectTokenPayload): string {
   const json = JSON.stringify(payload);
   return toBase64Url(json);
 }
@@ -182,7 +241,7 @@ export function encodeInspectToken(payload: BulkInspectTokenPayload): string {
 export function decodeInspectToken(token: string): BulkInspectTokenPayload {
   const json = fromBase64Url(token);
   return JSON.parse(json) as BulkInspectTokenPayload;
-}
+}*/
 
 export function encodePrepareToken(payload: BulkPrepareTokenPayload): string {
   const json = JSON.stringify(payload);
@@ -194,8 +253,9 @@ export function decodePrepareToken(token: string): BulkPrepareTokenPayload {
   return JSON.parse(json) as BulkPrepareTokenPayload;
 }
 
-// ⸻ Helper for building runKpiResultDownload URL payload ⸻
-
+//
+// Helper for building runKpiResultDownload URL payload
+//
 export function encodeRowsForDownload(
   rows: KpiResultRow[],
   host?: string | null
