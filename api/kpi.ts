@@ -21,6 +21,7 @@ import { validateKpiTransport } from '../engine/validateTransport';
 import { validateDomain } from '../engine/validateDomain';
 import { resolveMetrics } from '../engine/metricsAutoSuggest';
 import { buildFinalMessage } from '../engine/buildErrorMessage';
+import { computeVariationSeed } from '../engine/variationSeed';
 
 // Simple in-memory metrics for KPI Engine endpoint
 let kpiRequestsTotal = 0;
@@ -198,7 +199,7 @@ export default function handler(req: VercelRequest, res: VercelResponse) {
       const metricsResult = resolveMetrics(domainResult.normalizedRow, errorCodes);
 
       // 3.3 Build final status + comments + summary_reason
-      const final = buildFinalMessage(domainResult, metricsResult, errorCodes);
+      const final = buildFinalMessage(domainResult, metricsResult, variationSeed, errorCodes);
 
       // 3.4 Assemble KpiRowOut (objectives still placeholders in v10.7.5)
       const simple_objective = '';

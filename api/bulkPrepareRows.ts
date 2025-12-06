@@ -1,117 +1,128 @@
 // api/bulkPrepareRows.ts
-// Step 2: rows_token + user options → prep_token + prepared_rows
 
 import type { VercelRequest, VercelResponse } from '@vercel/node';
 import {
   BulkPrepareRowsRequest,
   BulkPrepareRowsResponse,
-  BulkPreparedRow,
-  RowsTokenPayload,
   BulkPrepareTokenPayload,
+  ParsedRow,
+  PreparedRow,
   decodeRowsToken,
-  encodePrepareToken,
+  encodePrepareToken
 } from '../engine/bulkTypes';
 
-function parseBody(req: VercelRequest): BulkPrepareRowsRequest {
-  const body = req.body;
-  if (!body) {
-    return {} as BulkPrepareRowsRequest;
+function applyCompanyStrategy(
+  row: ParsedRow,
+  params: {
+    selected_company?: string | null;
+    generic_mode?: boolean;
+    apply_to_missing?: boolean;
+    mismatched_strategy?: 'keep' | 'overwrite';
   }
-  if (typeof body === 'string') {
-    try {
-      return JSON.parse(body) as BulkPrepareRowsRequest;
-    } catch {
-      return {} as BulkPrepareRowsRequest;
+): string {
+  const generic_mode = params.generic_mode === true;
+  const selected_company = (params.selected_company ?? '').trim();
+  const apply_to_missing = params.apply_to_missing !== false; // default true
+  const mismatched_strategy = params.mismatched_strategy ?? 'keep';
+
+  if (generic_mode) {
+    return '';
+  }
+
+  let company = row.company;
+
+  if (selected_company) {
+    if (!company && apply_to_missing) {
+      company = selected_company;
+    } else if (company && company !== selected_company) {
+      if (mismatched_strategy === 'overwrite') {
+        company = selected_company;
+      }
+      // if 'keep', do nothing
     }
   }
-  return body as BulkPrepareRowsRequest;
+
+  return company;
 }
 
 export default function handler(req: VercelRequest, res: VercelResponse) {
   if (req.method !== 'POST') {
-    res
-      .status(405)
-      .json({ error: 'Method not allowed. Use POST with JSON body.' });
-    return;
+    return res.status(405).json({ error: 'Method not allowed' });
   }
 
-  const reqBody = parseBody(req);
-  const {
-    rows_token,
-    selected_company,
-    generic_mode,
-    apply_to_missing,
-    mismatched_strategy,
-    invalid_handling,
-  } = reqBody;
+  const body = req.body as BulkPrepareRowsRequest | undefined;
 
-  if (!rows_token || typeof rows_token !== 'string') {
-    res.status(400).json({ error: 'Missing or invalid rows_token.' });
-    return;
-  }
-
-  // Decode rows token (stateless)
-  let payload: RowsTokenPayload;
-  try {
-    payload = decodeRowsToken(rows_token);
-  } catch (err) {
-    res.status(400).json({
-      error: 'Failed to decode rows_token.',
-      detail: String(err),
+  if (!body || typeof body.rows_token !== 'string' || body.rows_token.length === 0) {
+    return res.status(400).json({
+      error: true,
+      code: 'MISSING_ROWS_TOKEN',
+      message: 'bulkPrepareRows requires a non-empty rows_token.'
     });
-    return;
   }
 
-  const parsedRows = payload.parsedRows || [];
-  const summaryMeta = payload.summaryMeta;
+  let decoded;
+  try {
+    decoded = decodeRowsToken(body.rows_token);
+  } catch (err) {
+    return res.status(400).json({
+      error: true,
+      code: 'INVALID_ROWS_TOKEN',
+      message: 'rows_token could not be decoded.'
+    });
+  }
 
-  // Company logic
-  const finalCompany = generic_mode ? null : selected_company || null;
-  const overwrite =
-    !generic_mode && mismatched_strategy === 'overwrite' ? true : false;
-  const applyMissing = apply_to_missing !== false; // default true
+  const { parsedRows, summaryMeta } = decoded;
 
-  const preparedRows: BulkPreparedRow[] = parsedRows.map((row) => {
-    let company = row.company;
+  const invalid_handling = body.invalid_handling ?? 'skip';
 
-    if (generic_mode) {
-      company = null;
-    } else if (finalCompany) {
-      if (!company && applyMissing) {
-        company = finalCompany;
-      } else if (company && overwrite) {
-        company = finalCompany;
-      }
+  const preparedRows: PreparedRow[] = [];
+
+  for (const row of parsedRows) {
+    const finalCompany = applyCompanyStrategy(row, {
+      selected_company: body.selected_company,
+      generic_mode: body.generic_mode,
+      apply_to_missing: body.apply_to_missing,
+      mismatched_strategy: body.mismatched_strategy
+    });
+
+    const newRow: PreparedRow = {
+      ...row,
+      company: finalCompany
+    };
+
+    if (invalid_handling === 'skip' && !newRow.isValid) {
+      continue;
     }
 
-    return {
-      ...row,
-      company,
-    };
-  });
-
-  const includeInvalid = invalid_handling === 'include';
-  const rowsForObjectives = includeInvalid
-    ? preparedRows
-    : preparedRows.filter((r) => r.isValid !== false);
+    preparedRows.push(newRow);
+  }
 
   const row_count = preparedRows.length;
-  const invalid_row_count = preparedRows.length - rowsForObjectives.length;
-  const valid_row_count = rowsForObjectives.length;
+  const invalid_row_count = preparedRows.filter((r) => !r.isValid).length;
+  const valid_row_count = preparedRows.filter((r) => r.isValid).length;
+  const needs_review_count = 0; // extension point
 
-  const updatedSummary = {
-    ...summaryMeta,
-    state: 'READY_FOR_OBJECTIVES' as const,
+  const summary: BulkPrepareTokenPayload['summary'] = {
+    row_count,
+    invalid_row_count,
+    has_company_column: summaryMeta.has_company_column,
+    unique_companies: summaryMeta.unique_companies,
+    missing_company_count: summaryMeta.missing_company_count,
+    benefit_company_signals: summaryMeta.benefit_company_signals,
+    company_case: summaryMeta.company_case,
+    needs_company_decision: summaryMeta.needs_company_decision,
+    has_invalid_rows: summaryMeta.has_invalid_rows,
+    state: 'READY_FOR_OBJECTIVES'
   };
 
   const prepPayload: BulkPrepareTokenPayload = {
-    summary: updatedSummary,
-    preparedRows,
+    summary,
+    preparedRows
   };
 
   const prep_token = encodePrepareToken(prepPayload);
 
-  const ui_summary = `${valid_row_count} row(s) ready for objective generation.`;
+  const ui_summary = `${row_count} row(s) ready for objective generation.`;
 
   const response: BulkPrepareRowsResponse = {
     prep_token,
@@ -119,10 +130,10 @@ export default function handler(req: VercelRequest, res: VercelResponse) {
     row_count,
     valid_row_count,
     invalid_row_count,
-    needs_review_count: 0,
+    needs_review_count,
     ui_summary,
-    prepared_rows: rowsForObjectives,
+    prepared_rows: preparedRows
   };
 
-  res.status(200).json(response);
+  return res.status(200).json(response);
 }
