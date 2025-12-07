@@ -1,0 +1,33 @@
+{
+  "E201": "Missing mandatory field(s): Task Name.",
+  "E202": "Missing mandatory field(s): Task Type.",
+  "E203": "Missing mandatory field(s): Team Role.",
+  "E204": "Missing mandatory field(s): Deadline.",
+  "E205": "Missing mandatory field(s): Strategic Benefit.",
+
+  "E301": "Invalid value(s) for: Task Type.",
+  "E302": "Invalid value(s) for: Team Role.",
+  "E303": "Deadline outside valid calendar year.",
+  "E304": "Invalid deadline format.",
+  "E305": "Deadline contains non-parsable or textual content.",
+  "E306": "Mode fallback applied: defaulting to \"both\".",
+
+  "E401": "Invalid text format (dangerous content).",
+  "E402": "Invalid text format (low semantic signal).",
+  "E403": "Invalid text format (forbidden characters).",
+  "E404": "Invalid or corrupted text format.",
+  "E405": "Invalid text due to reserved parsing rule.",
+
+  "E501": "Metrics auto-suggested (Output, Quality, Improvement).",
+  "E502": "Metrics auto-suggested (one or more missing).",
+
+  "E601": "Invalid JSON body.",
+  "E602": "Invalid request structure.",
+  "E603": "Rows array is missing or invalid.",
+  "E604": "Rows array must not be empty.",
+  "E605": "One or more row entries contain invalid types.",
+  "E606": "Request contains unsafe or non-JSON-safe characters.",
+  "E607": "Internal KPI engine error.",
+
+  "default_message": "An error occurred while validating this KPI. Please correct the fields and try again."
+}

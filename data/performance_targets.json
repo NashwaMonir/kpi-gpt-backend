@@ -1,0 +1,6 @@
+{
+  "default_baseline": "current organizational baseline",
+  "improvement_baseline": "operational improvement baseline",
+  "quality_baseline": "quality measurement baseline",
+  "output_baseline": "output performance baseline"
+}

@@ -1,19 +1,6 @@
 // engine/objectiveEngine.ts
 //
 // Seed-driven objective generation for SMART KPI Engine.
-// Uses:
-//  - objective_patterns
-//  - verb_pool
-//  - connector_rules
-//  - variation_rules
-//  - cleanup_rules
-//  - humanization_rules
-//  - baseline_clause_rules
-//  - regex_rules
-//  - performance_targets
-//  - company_tail_rules
-//  - role_metric_matrix (optional here; primarily metricsAutoSuggest)
-//  - error_map (not used in text; for diagnostics only)
 
 import objective_patterns from '../data/objective_patterns.json';
 import verb_pool from '../data/verb_pool.json';
@@ -109,14 +96,6 @@ function selectVerb(
 // Metrics + baseline + targets
 // -----------------------------
 
-/**
- * Select a baseline rule given the row + present metrics + mode.
- * The exact structure of baseline_clause_rules.json is flexible; we only assume:
- *  - rule.mode?: 'simple' | 'complex' | 'both'
- *  - rule.metric_scope?: string[]   (e.g. ['output','quality','improvement','any'])
- *  - rule.template?: string         (may contain {metrics} and/or {target})
- *  - rule.target_key?: string       (key into performance_targets)
- */
 function selectBaselineRule(
   row: PreparedRow,
   presentMetrics: string[],
@@ -130,20 +109,15 @@ function selectBaselineRule(
 
     if (!okMode) return false;
 
-    // Optional metric_scope filter; if missing, rule is generic.
     const scope = r.metric_scope as string[] | undefined;
     if (!scope || scope.length === 0) {
       return true;
     }
 
-    // If scope includes 'any', always allow.
     if (scope.includes('any')) {
       return true;
     }
 
-    // Otherwise, require at least one metric present to satisfy scope.
-    // We don't inspect the actual metric text here – just require that
-    // some metrics exist (presentMetrics.length > 0).
     return presentMetrics.length > 0;
   });
 
@@ -152,13 +126,6 @@ function selectBaselineRule(
   return seededPick(row.variation_seed, `baseline|${mode}`, rules);
 }
 
-/**
- * Build a baseline clause string (e.g. " compared to the 2024 baseline")
- * based on baseline_clause_rules + performance_targets.
- *
- * It is intentionally conservative: if templates or target mappings are missing,
- * it simply returns an empty string (no baseline clause).
- */
 function buildBaselineClause(
   row: PreparedRow,
   presentMetrics: string[],
@@ -172,7 +139,6 @@ function buildBaselineClause(
 
   const metricsString = presentMetrics.join(', and ');
 
-  // Optional performance target insertion
   let targetText = '';
   const targetKey = (rule as any).target_key as string | undefined;
   if (targetKey) {
@@ -189,11 +155,9 @@ function buildBaselineClause(
   clause = clause.trim();
   if (!clause) return '';
 
-  // Ensure we prepend a space so it can be concatenated after the metrics clause.
   return ' ' + clause;
 }
 
-// Main metrics clause
 function buildMetricsClause(row: PreparedRow, mode: 'simple' | 'complex'): string {
   const metrics: string[] = [];
 
@@ -246,7 +210,6 @@ function buildTailClause(row: PreparedRow): string {
     .replace('{company}', companyName)
     .replace('{benefit}', benefit);
 
-  // Optional: connect using connector_rules
   const tailConnector = seededPick(
     row.variation_seed,
     'tail_connector',
@@ -302,7 +265,7 @@ function postProcessObjective(text: string): string {
 
   out = out.trim();
   if (!out.endsWith('.')) out += '.';
-  out = out.replace(/\.\.+$/, '.'); // avoid "..."
+  out = out.replace(/\.\.+$/, '.');
 
   return out;
 }
@@ -311,8 +274,6 @@ function postProcessObjective(text: string): string {
 // Variation rules (micro-variation)
 // -----------------------------
 
-// Optional micro-variation per slot, driven by variation_seed.
-// You can attach slot IDs in your patterns/templates and swap synonyms here.
 function applyVariationRules(
   text: string,
   row: PreparedRow,
@@ -357,7 +318,6 @@ function buildObjectiveInternal(row: PreparedRow, mode: 'simple' | 'complex'): s
   if (pattern && typeof (pattern as any).template === 'string') {
     template = (pattern as any).template as string;
   } else {
-    // fallback template if pattern not found
     template =
       '{verb} the {deliverable} by {deadline}{metrics_clause}{tail_clause}';
   }

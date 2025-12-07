@@ -1,0 +1,38 @@
+[
+  {
+    "id": "space_before_percent",
+    "pattern": "(\\d)%",
+    "replacement": "$1 %",
+    "flags": "g"
+  },
+  {
+    "id": "normalize_semicolon_to_comma",
+    "pattern": ";",
+    "replacement": ",",
+    "flags": "g"
+  },
+  {
+    "id": "remove_double_conjunctions",
+    "pattern": "\\b(?:and|while)\\s+(?:and|while)\\b",
+    "replacement": "and",
+    "flags": "gi"
+  },
+  {
+    "id": "soften_guarantee",
+    "pattern": "\\b[Gg]uarantee\\b",
+    "replacement": "ensure",
+    "flags": "g"
+  },
+  {
+    "id": "remove_informal_terms",
+    "pattern": "\\b(awesome|amazing|super|fantastic|lol)\\b",
+    "replacement": "",
+    "flags": "gi"
+  },
+  {
+    "id": "remove_emoticons",
+    "pattern": "(:\\)|😉)",
+    "replacement": "",
+    "flags": "g"
+  }
+]

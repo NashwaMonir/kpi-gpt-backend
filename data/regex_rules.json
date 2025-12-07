@@ -1,0 +1,32 @@
+[
+  {
+    "id": "fix_comma_before_period",
+    "pattern": ",\\s*\\.",
+    "replacement": ".",
+    "flags": "g"
+  },
+  {
+    "id": "normalize_percent_spacing",
+    "pattern": "(\\d)\\s*%",
+    "replacement": "$1 %",
+    "flags": "g"
+  },
+  {
+    "id": "collapse_multiple_spaces",
+    "pattern": "\\s{2,}",
+    "replacement": " ",
+    "flags": "g"
+  },
+  {
+    "id": "trim_leading_space",
+    "pattern": "^\\s+",
+    "replacement": "",
+    "flags": "g"
+  },
+  {
+    "id": "trim_trailing_space",
+    "pattern": "\\s+$",
+    "replacement": "",
+    "flags": "g"
+  }
+]

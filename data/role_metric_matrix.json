@@ -1,0 +1,523 @@
+{
+  "normalization": {
+    "role_mapping": {
+      "content": "content",
+      "content lead": "content",
+      "design": "design",
+      "design lead": "design",
+      "development": "development",
+      "development lead": "development"
+    },
+    "task_type_mapping": {
+      "project": "project",
+      "change request": "change_request",
+      "change_request": "change_request",
+      "consultation": "consultation"
+    }
+  },
+  "entries": [
+    {
+      "id": "content_lead_project_1",
+      "normalized_role": "content",
+      "task_type": "project",
+      "output_metric": "≥95% CMS content migration completed",
+      "quality_metric": "≤3% metadata or layout error",
+      "improvement_metric": "Improve upload throughput by 15%",
+      "base_line": "80% migration baseline"
+    },
+    {
+      "id": "content_lead_project_2",
+      "normalized_role": "content",
+      "task_type": "project",
+      "output_metric": "≥4.5/5 editorial quality score (post-review)",
+      "quality_metric": "≤2 content rejections per 100 assets",
+      "improvement_metric": "Increase editorial consistency by 10%",
+      "base_line": "Last quarter QA score"
+    },
+    {
+      "id": "content_lead_project_3",
+      "normalized_role": "content",
+      "task_type": "project",
+      "output_metric": "100% batch delivery before deadline",
+      "quality_metric": "≤5% missed publish slots",
+      "improvement_metric": "Reduce turnaround by 20%",
+      "base_line": "Avg 5 days per batch"
+    },
+
+    {
+      "id": "content_lead_cr_1",
+      "normalized_role": "content",
+      "task_type": "change_request",
+      "output_metric": "≥90% content update accuracy",
+      "quality_metric": "≤2% tagging or grammar errors",
+      "improvement_metric": "Reduce revision cycles by 10%",
+      "base_line": "85% update accuracy"
+    },
+    {
+      "id": "content_lead_cr_2",
+      "normalized_role": "content",
+      "task_type": "change_request",
+      "output_metric": "≥4.3/5 stakeholder satisfaction",
+      "quality_metric": "≤1 correction per update",
+      "improvement_metric": "Improve clarity perception by 15%",
+      "base_line": "Review form baseline"
+    },
+    {
+      "id": "content_lead_cr_3",
+      "normalized_role": "content",
+      "task_type": "change_request",
+      "output_metric": "≥85% requests closed same day",
+      "quality_metric": "≤10% reopened tickets",
+      "improvement_metric": "Improve closure ratio by 10%",
+      "base_line": "70% on-time closure"
+    },
+
+    {
+      "id": "content_lead_consult_1",
+      "normalized_role": "content",
+      "task_type": "consultation",
+      "output_metric": "≥10 audits/month (SEO, readability)",
+      "quality_metric": "≤5% post-audit rework",
+      "improvement_metric": "Increase completed audits by 10%",
+      "base_line": "8 per month"
+    },
+    {
+      "id": "content_lead_consult_2",
+      "normalized_role": "content",
+      "task_type": "consultation",
+      "output_metric": "≥4.5/5 client satisfaction",
+      "quality_metric": "≤1 follow-up per project",
+      "improvement_metric": "Improve feedback quality by 20%",
+      "base_line": "Last survey"
+    },
+    {
+      "id": "content_lead_consult_3",
+      "normalized_role": "content",
+      "task_type": "consultation",
+      "output_metric": "≥90% reports issued within 48 h",
+      "quality_metric": "≤3% delays",
+      "improvement_metric": "Improve report timeliness by 15%",
+      "base_line": "75% on-time"
+    },
+
+    {
+      "id": "design_lead_project_1",
+      "normalized_role": "design",
+      "task_type": "project",
+      "output_metric": "≥95% adherence to design system",
+      "quality_metric": "≤3% accessibility issues (WCAG)",
+      "improvement_metric": "Increase on-time delivery by 15%",
+      "base_line": "85% compliance"
+    },
+    {
+      "id": "design_lead_project_2",
+      "normalized_role": "design",
+      "task_type": "project",
+      "output_metric": "≥4.5/5 stakeholder design satisfaction",
+      "quality_metric": "≤2 iteration loops per design",
+      "improvement_metric": "Improve collaboration by 10%",
+      "base_line": "Survey avg"
+    },
+    {
+      "id": "design_lead_project_3",
+      "normalized_role": "design",
+      "task_type": "project",
+      "output_metric": "100% screens submitted before dev freeze",
+      "quality_metric": "≤5% late submissions",
+      "improvement_metric": "Reduce rework time by 20%",
+      "base_line": "Avg 7 days delay"
+    },
+
+    {
+      "id": "design_lead_cr_1",
+      "normalized_role": "design",
+      "task_type": "change_request",
+      "output_metric": "≥90% accuracy in UI component updates",
+      "quality_metric": "≤2% rollback",
+      "improvement_metric": "Reduce review time by 15%",
+      "base_line": "80% success rate"
+    },
+    {
+      "id": "design_lead_cr_2",
+      "normalized_role": "design",
+      "task_type": "change_request",
+      "output_metric": "≥4.2/5 UX peer review score",
+      "quality_metric": "≤1 escalation per sprint",
+      "improvement_metric": "Improve UX alignment by 10%",
+      "base_line": "UX audit log"
+    },
+    {
+      "id": "design_lead_cr_3",
+      "normalized_role": "design",
+      "task_type": "change_request",
+      "output_metric": "≥85% of requests closed in current sprint",
+      "quality_metric": "≤10% reopened",
+      "improvement_metric": "Increase closure ratio by 10%",
+      "base_line": "70% closure"
+    },
+
+    {
+      "id": "design_lead_consult_1",
+      "normalized_role": "design",
+      "task_type": "consultation",
+      "output_metric": "≥12 design reviews/month",
+      "quality_metric": "≤5% deviation from brand system",
+      "improvement_metric": "Improve audit output by 10%",
+      "base_line": "10 reviews/month"
+    },
+    {
+      "id": "design_lead_consult_2",
+      "normalized_role": "design",
+      "task_type": "consultation",
+      "output_metric": "≥4.5/5 cross-team feedback score",
+      "quality_metric": "≤1 client escalation/quarter",
+      "improvement_metric": "Improve perception by 20%",
+      "base_line": "Peer review data"
+    },
+    {
+      "id": "design_lead_consult_3",
+      "normalized_role": "design",
+      "task_type": "consultation",
+      "output_metric": "≥90% feedback reports shared ≤48 h",
+      "quality_metric": "≤3% late",
+      "improvement_metric": "Reduce review lag by 15%",
+      "base_line": "Avg 3 days baseline"
+    },
+
+    {
+      "id": "dev_lead_project_1",
+      "normalized_role": "development",
+      "task_type": "project",
+      "output_metric": "≥98% successful deployments",
+      "quality_metric": "≤1% post-release defects",
+      "improvement_metric": "Improve delivery velocity by 15%",
+      "base_line": "90% success"
+    },
+    {
+      "id": "dev_lead_project_2",
+      "normalized_role": "development",
+      "task_type": "project",
+      "output_metric": "≥4.5/5 internal satisfaction (QA/PM)",
+      "quality_metric": "≤1 rollback per release",
+      "improvement_metric": "Increase reliability perception by 10%",
+      "base_line": "Feedback baseline"
+    },
+    {
+      "id": "dev_lead_project_3",
+      "normalized_role": "development",
+      "task_type": "project",
+      "output_metric": "≥90% sprints delivered on schedule",
+      "quality_metric": "≤5% delays",
+      "improvement_metric": "Improve timeliness by 10%",
+      "base_line": "80% adherence"
+    },
+
+    {
+      "id": "dev_lead_cr_1",
+      "normalized_role": "development",
+      "task_type": "change_request",
+      "output_metric": "≥95% issue resolution accuracy",
+      "quality_metric": "≤2% regression bugs",
+      "improvement_metric": "Reduce average fix time by 15%",
+      "base_line": "88% accuracy"
+    },
+    {
+      "id": "dev_lead_cr_2",
+      "normalized_role": "development",
+      "task_type": "change_request",
+      "output_metric": "≥4.3/5 QA satisfaction",
+      "quality_metric": "≤1 reopened ticket per sprint",
+      "improvement_metric": "Improve quality perception by 10%",
+      "base_line": "QA form baseline"
+    },
+    {
+      "id": "dev_lead_cr_3",
+      "normalized_role": "development",
+      "task_type": "change_request",
+      "output_metric": "≥90% patches deployed first attempt",
+      "quality_metric": "≤5% rollback",
+      "improvement_metric": "Improve stability by 10%",
+      "base_line": "80% first-try success"
+    },
+
+    {
+      "id": "dev_lead_consult_1",
+      "normalized_role": "development",
+      "task_type": "consultation",
+      "output_metric": "≥10 tech audits/month",
+      "quality_metric": "≤3% non-compliance",
+      "improvement_metric": "Improve audit closure by 10%",
+      "base_line": "8/month"
+    },
+    {
+      "id": "dev_lead_consult_2",
+      "normalized_role": "development",
+      "task_type": "consultation",
+      "output_metric": "≥4.5/5 partner satisfaction",
+      "quality_metric": "≤1 follow-up per consultation",
+      "improvement_metric": "Improve partner feedback by 20%",
+      "base_line": "Partner survey"
+    },
+    {
+      "id": "dev_lead_consult_3",
+      "normalized_role": "development",
+      "task_type": "consultation",
+      "output_metric": "≥90% reports closed ≤3 days",
+      "quality_metric": "≤5% late closures",
+      "improvement_metric": "Improve efficiency by 15%",
+      "base_line": "Avg 4 days"
+    },
+
+    {
+      "id": "content_project_1",
+      "normalized_role": "content",
+      "task_type": "project",
+      "output_metric": "≥95% CMS content migration completed",
+      "quality_metric": "≤3% metadata or layout error",
+      "improvement_metric": "Improve upload throughput by 15%",
+      "base_line": "80% migration baseline"
+    },
+    {
+      "id": "content_project_2",
+      "normalized_role": "content",
+      "task_type": "project",
+      "output_metric": "≥4.5/5 editorial quality score (post-review)",
+      "quality_metric": "≤2 content rejections per 100 assets",
+      "improvement_metric": "Increase editorial consistency by 10%",
+      "base_line": "Last quarter QA score"
+    },
+    {
+      "id": "content_project_3",
+      "normalized_role": "content",
+      "task_type": "project",
+      "output_metric": "100% batch delivery before deadline",
+      "quality_metric": "≤5% missed publish slots",
+      "improvement_metric": "Reduce turnaround by 20%",
+      "base_line": "Avg 5 days per batch"
+    },
+
+    {
+      "id": "content_cr_1",
+      "normalized_role": "content",
+      "task_type": "change_request",
+      "output_metric": "≥90% content update accuracy",
+      "quality_metric": "≤2% tagging or grammar errors",
+      "improvement_metric": "Reduce revision cycles by 10%",
+      "base_line": "85% update accuracy"
+    },
+    {
+      "id": "content_cr_2",
+      "normalized_role": "content",
+      "task_type": "change_request",
+      "output_metric": "≥4.3/5 stakeholder satisfaction",
+      "quality_metric": "≤1 correction per update",
+      "improvement_metric": "Improve clarity perception by 15%",
+      "base_line": "Review form baseline"
+    },
+    {
+      "id": "content_cr_3",
+      "normalized_role": "content",
+      "task_type": "change_request",
+      "output_metric": "≥85% requests closed same day",
+      "quality_metric": "≤10% reopened tickets",
+      "improvement_metric": "Improve closure ratio by 10%",
+      "base_line": "70% on-time closure"
+    },
+
+    {
+      "id": "content_consult_1",
+      "normalized_role": "content",
+      "task_type": "consultation",
+      "output_metric": "≥10 audits/month (SEO, readability)",
+      "quality_metric": "≤5% post-audit rework",
+      "improvement_metric": "Increase completed audits by 10%",
+      "base_line": "8 per month"
+    },
+    {
+      "id": "content_consult_2",
+      "normalized_role": "content",
+      "task_type": "consultation",
+      "output_metric": "≥4.5/5 client satisfaction",
+      "quality_metric": "≤1 follow-up per project",
+      "improvement_metric": "Improve feedback quality by 20%",
+      "base_line": "Last survey"
+    },
+    {
+      "id": "content_consult_3",
+      "normalized_role": "content",
+      "task_type": "consultation",
+      "output_metric": "≥90% reports issued within 48 h",
+      "quality_metric": "≤3% delays",
+      "improvement_metric": "Improve report timeliness by 15%",
+      "base_line": "75% on-time"
+    },
+
+    {
+      "id": "design_project_1",
+      "normalized_role": "design",
+      "task_type": "project",
+      "output_metric": "≥95% adherence to design system",
+      "quality_metric": "≤3% accessibility issues (WCAG)",
+      "improvement_metric": "Increase on-time delivery by 15%",
+      "base_line": "85% compliance"
+    },
+    {
+      "id": "design_project_2",
+      "normalized_role": "design",
+      "task_type": "project",
+      "output_metric": "≥4.5/5 stakeholder design satisfaction",
+      "quality_metric": "≤2 iteration loops per design",
+      "improvement_metric": "Improve collaboration by 10%",
+      "base_line": "Survey avg"
+    },
+    {
+      "id": "design_project_3",
+      "normalized_role": "design",
+      "task_type": "project",
+      "output_metric": "100% screens submitted before dev freeze",
+      "quality_metric": "≤5% late submissions",
+      "improvement_metric": "Reduce rework time by 20%",
+      "base_line": "Avg 7 days delay"
+    },
+
+    {
+      "id": "design_cr_1",
+      "normalized_role": "design",
+      "task_type": "change_request",
+      "output_metric": "≥90% accuracy in UI component updates",
+      "quality_metric": "≤2% rollback",
+      "improvement_metric": "Reduce review time by 15%",
+      "base_line": "80% success rate"
+    },
+    {
+      "id": "design_cr_2",
+      "normalized_role": "design",
+      "task_type": "change_request",
+      "output_metric": "≥4.2/5 UX peer review score",
+      "quality_metric": "≤1 escalation per sprint",
+      "improvement_metric": "Improve UX alignment by 10%",
+      "base_line": "UX audit log"
+    },
+    {
+      "id": "design_cr_3",
+      "normalized_role": "design",
+      "task_type": "change_request",
+      "output_metric": "≥85% of requests closed in current sprint",
+      "quality_metric": "≤10% reopened",
+      "improvement_metric": "Increase closure ratio by 10%",
+      "base_line": "70% closure"
+    },
+
+    {
+      "id": "design_consult_1",
+      "normalized_role": "design",
+      "task_type": "consultation",
+      "output_metric": "≥12 design reviews/month",
+      "quality_metric": "≤5% deviation from brand system",
+      "improvement_metric": "Improve audit output by 10%",
+      "base_line": "10 reviews/month"
+    },
+    {
+      "id": "design_consult_2",
+      "normalized_role": "design",
+      "task_type": "consultation",
+      "output_metric": "≥4.5/5 cross-team feedback score",
+      "quality_metric": "≤1 client escalation/quarter",
+      "improvement_metric": "Improve perception by 20%",
+      "base_line": "Peer review data"
+    },
+    {
+      "id": "design_consult_3",
+      "normalized_role": "design",
+      "task_type": "consultation",
+      "output_metric": "≥90% feedback reports shared ≤48 h",
+      "quality_metric": "≤3% late",
+      "improvement_metric": "Reduce review lag by 15%",
+      "base_line": "Avg 3 days baseline"
+    },
+
+    {
+      "id": "dev_project_1",
+      "normalized_role": "development",
+      "task_type": "project",
+      "output_metric": "≥98% successful deployments",
+      "quality_metric": "≤1% post-release defects",
+      "improvement_metric": "Improve delivery velocity by 15%",
+      "base_line": "90% success"
+    },
+    {
+      "id": "dev_project_2",
+      "normalized_role": "development",
+      "task_type": "project",
+      "output_metric": "≥4.5/5 internal satisfaction (QA/PM)",
+      "quality_metric": "≤1 rollback per release",
+      "improvement_metric": "Increase reliability perception by 10%",
+      "base_line": "Feedback baseline"
+    },
+    {
+      "id": "dev_project_3",
+      "normalized_role": "development",
+      "task_type": "project",
+      "output_metric": "≥90% sprints delivered on schedule",
+      "quality_metric": "≤5% delays",
+      "improvement_metric": "Improve timeliness by 10%",
+      "base_line": "80% adherence"
+    },
+
+    {
+      "id": "dev_cr_1",
+      "normalized_role": "development",
+      "task_type": "change_request",
+      "output_metric": "≥95% issue resolution accuracy",
+      "quality_metric": "≤2% regression bugs",
+      "improvement_metric": "Reduce average fix time by 15%",
+      "base_line": "88% accuracy"
+    },
+    {
+      "id": "dev_cr_2",
+      "normalized_role": "development",
+      "task_type": "change_request",
+      "output_metric": "≥4.3/5 QA satisfaction",
+      "quality_metric": "≤1 reopened ticket per sprint",
+      "improvement_metric": "Improve quality perception by 10%",
+      "base_line": "QA form baseline"
+    },
+    {
+      "id": "dev_cr_3",
+      "normalized_role": "development",
+      "task_type": "change_request",
+      "output_metric": "≥90% patches deployed first attempt",
+      "quality_metric": "≤5% rollback",
+      "improvement_metric": "Improve stability by 10%",
+      "base_line": "80% first-try success"
+    },
+
+    {
+      "id": "dev_consult_1",
+      "normalized_role": "development",
+      "task_type": "consultation",
+      "output_metric": "≥10 tech audits/month",
+      "quality_metric": "≤3% non-compliance",
+      "improvement_metric": "Improve audit closure by 10%",
+      "base_line": "8/month"
+    },
+    {
+      "id": "dev_consult_2",
+      "normalized_role": "development",
+      "task_type": "consultation",
+      "output_metric": "≥4.5/5 partner satisfaction",
+      "quality_metric": "≤1 follow-up per consultation",
+      "improvement_metric": "Improve partner feedback by 20%",
+      "base_line": "Partner survey"
+    },
+    {
+      "id": "dev_consult_3",
+      "normalized_role": "development",
+      "task_type": "consultation",
+      "output_metric": "≥90% reports closed ≤3 days",
+      "quality_metric": "≤5% late closures",
+      "improvement_metric": "Improve efficiency by 15%",
+      "base_line": "Avg 4 days"
+    }
+  ]
+}

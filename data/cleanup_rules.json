@@ -1,0 +1,44 @@
+[
+  {
+    "id": "remove_trailing_commas_before_period",
+    "pattern": ",\\s*\\.",
+    "replacement": ".",
+    "flags": "g"
+  },
+  {
+    "id": "collapse_extra_commas",
+    "pattern": ",\\s*,+",
+    "replacement": ",",
+    "flags": "g"
+  },
+  {
+    "id": "remove_space_before_comma",
+    "pattern": "\\s+,",
+    "replacement": ",",
+    "flags": "g"
+  },
+  {
+    "id": "space_after_comma",
+    "pattern": ",(\\S)",
+    "replacement": ", $1",
+    "flags": "g"
+  },
+  {
+    "id": "collapse_internal_whitespace",
+    "pattern": "\\s{2,}",
+    "replacement": " ",
+    "flags": "g"
+  },
+  {
+    "id": "trim_leading_space",
+    "pattern": "^\\s+",
+    "replacement": "",
+    "flags": "g"
+  },
+  {
+    "id": "trim_trailing_space",
+    "pattern": "\\s+$",
+    "replacement": "",
+    "flags": "g"
+  }
+]

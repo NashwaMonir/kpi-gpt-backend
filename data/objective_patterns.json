@@ -1,0 +1,50 @@
+[
+  {
+    "id": "simple_standard",
+    "mode": "simple",
+    "applicable_roles": [],
+    "applicable_task_types": [],
+    "verb_slot": "deliver",
+    "template": "{verb} the {deliverable} by {deadline}{metrics_clause}{tail_clause}"
+  },
+  {
+    "id": "simple_deadline_lead",
+    "mode": "simple",
+    "applicable_roles": [],
+    "applicable_task_types": [],
+    "verb_slot": "deliver",
+    "template": "By {deadline}, {verb} the {deliverable}{metrics_clause}{tail_clause}"
+  },
+  {
+    "id": "simple_goal_driven",
+    "mode": "simple",
+    "applicable_roles": [],
+    "applicable_task_types": [],
+    "verb_slot": "deliver",
+    "template": "{verb} the {deliverable}{metrics_clause} by {deadline}{tail_clause}"
+  },
+  {
+    "id": "complex_standard",
+    "mode": "complex",
+    "applicable_roles": [],
+    "applicable_task_types": [],
+    "verb_slot": "deliver",
+    "template": "{verb} the {deliverable} by {deadline}{metrics_clause}{tail_clause}"
+  },
+  {
+    "id": "complex_deadline_lead",
+    "mode": "complex",
+    "applicable_roles": [],
+    "applicable_task_types": [],
+    "verb_slot": "deliver",
+    "template": "By {deadline}, {verb} the {deliverable}{metrics_clause}{tail_clause}"
+  },
+  {
+    "id": "complex_goal_driven",
+    "mode": "complex",
+    "applicable_roles": [],
+    "applicable_task_types": [],
+    "verb_slot": "deliver",
+    "template": "{verb} the {deliverable}{metrics_clause} by {deadline}{tail_clause}"
+  }
+]

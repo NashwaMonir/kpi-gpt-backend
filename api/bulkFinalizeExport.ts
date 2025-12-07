@@ -1,10 +1,5 @@
 // api/bulkFinalizeExport.ts
-// Final step of bulk flow:
-//  - Accepts prep_token from bulkPrepareRows
-//  - Decodes prepared rows
-//  - Computes variation_seed per row
-//  - Calls objectiveEngine (runObjectiveEngine) to generate objectives
-//  - Builds result rows and returns a download_url for KPI_Output.xlsx
+// Final step of bulk flow.
 
 import type { VercelRequest, VercelResponse } from '@vercel/node';
 
@@ -60,7 +55,6 @@ export default function handler(req: VercelRequest, res: VercelResponse) {
     });
   }
 
-  // Map bulk PreparedRow → canonical engine PreparedRow with variation_seed
   const engineRows: EnginePreparedRow[] = bulkRows.map((row) => {
     const kpiRow: KpiRowIn = {
       row_id: row.row_id,
@@ -96,10 +90,8 @@ export default function handler(req: VercelRequest, res: VercelResponse) {
     return engineRow;
   });
 
-  // Generate objectives via shared objective engine
   const objectiveOutputs = runObjectiveEngine(engineRows);
 
-  // Build a map row_id → objective for convenience
   const objectiveMap = new Map<number, { simple: string; complex: string }>();
   for (const obj of objectiveOutputs) {
     objectiveMap.set(obj.row_id, {
@@ -108,12 +100,9 @@ export default function handler(req: VercelRequest, res: VercelResponse) {
     });
   }
 
-  // Build final result rows for Excel
   const resultRows: KpiResultRow[] = bulkRows.map((row) => {
     const obj = objectiveMap.get(row.row_id);
 
-    // For now, use basic validity-derived status; future version can align
-    // with full VALID / NEEDS_REVIEW / INVALID engine status if needed.
     const validation_status = row.isValid ? 'VALID' : 'INVALID';
     const comments = row.invalidReason ?? '';
     const summary_reason = row.invalidReason ?? '';
@@ -137,7 +126,7 @@ export default function handler(req: VercelRequest, res: VercelResponse) {
   const invalid_count = resultRows.filter(
     (r) => r.validation_status === 'INVALID'
   ).length;
-  const needs_review_count = 0; // extension point for future NEEDS_REVIEW status
+  const needs_review_count = 0;
 
   const host = req.headers.host ?? null;
   const download_url = encodeRowsForDownload(resultRows, host);

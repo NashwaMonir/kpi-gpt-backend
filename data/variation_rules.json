@@ -1,0 +1,34 @@
+[
+  {
+    "slot_id": "improvement_link",
+    "variants": [
+      "and",
+      "and thereby",
+      "resulting in"
+    ]
+  },
+  {
+    "slot_id": "improvement_baseline_link",
+    "variants": [
+      "vs baseline",
+      "compared with baseline",
+      "relative to baseline"
+    ]
+  },
+  {
+    "slot_id": "tail_link",
+    "variants": [
+      "aligned with",
+      "in line with",
+      "supporting"
+    ]
+  },
+  {
+    "slot_id": "deadline_lead",
+    "variants": [
+      "by",
+      "no later than",
+      "before"
+    ]
+  }
+]

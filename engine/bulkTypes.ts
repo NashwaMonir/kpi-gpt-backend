@@ -1,7 +1,5 @@
 // engine/bulkTypes.ts
 
-// ⸻ Core bulk flow state ⸻
-
 export type BulkSessionState =
   | 'INSPECTED'
   | 'READY_FOR_OBJECTIVES'
@@ -13,8 +11,7 @@ export type CompanyCase =
   | 'multi_company_column'
   | 'benefit_signal_only';
 
-// ⸻ Input row shape from GPT (Step 1 JSON payload) ⸻
-
+// Input row shape from GPT (Step 1 JSON payload)
 export interface KpiJsonRowIn {
   row_id?: number;
 
@@ -30,8 +27,7 @@ export interface KpiJsonRowIn {
   mode?: string | null;
 }
 
-// ⸻ Normalized / parsed row used by bulk engine ⸻
-
+// Normalized / parsed row used by bulk engine
 export interface ParsedRow {
   row_id: number;
 
@@ -53,7 +49,7 @@ export interface ParsedRow {
 // After company strategies are applied
 export interface PreparedRow extends ParsedRow {}
 
-// ⸻ Inspect summary and options ⸻
+// Inspect summary and options
 
 export interface BulkInspectOption {
   code: string;
@@ -82,8 +78,6 @@ export interface BulkInspectSummary {
   options: BulkInspectOption[];
 }
 
-// ⸻ Token payload for inspect stage ⸻
-
 export interface RowsTokenPayload {
   parsedRows: ParsedRow[];
   summaryMeta: {
@@ -98,8 +92,6 @@ export interface RowsTokenPayload {
     has_invalid_rows: boolean;
   };
 }
-
-// ⸻ Token payload for prepare stage ⸻
 
 export interface BulkPrepareTokenPayload {
   summary: {
@@ -117,15 +109,13 @@ export interface BulkPrepareTokenPayload {
   preparedRows: PreparedRow[];
 }
 
-// ⸻ API contracts: bulkInspectJson ⸻
+// API contracts
 
 export interface BulkInspectJsonRequest {
   rows: KpiJsonRowIn[];
 }
 
 export interface BulkInspectJsonResponse extends BulkInspectSummary {}
-
-// ⸻ API contracts: bulkPrepareRows ⸻
 
 export interface BulkPrepareRowsRequest {
   rows_token: string;
@@ -150,8 +140,6 @@ export interface BulkPrepareRowsResponse {
   prepared_rows: PreparedRow[];
 }
 
-// ⸻ API contracts: bulkFinalizeExport ⸻
-
 export interface BulkFinalizeExportRequest {
   prep_token: string;
 }
@@ -164,7 +152,7 @@ export interface BulkFinalizeExportResponse {
   ui_message: string;
 }
 
-// ⸻ Objective engine output ⸻
+// Objective engine output
 
 export interface ObjectiveOutput {
   row_id: number;
@@ -172,7 +160,7 @@ export interface ObjectiveOutput {
   complex_objective: string;
 }
 
-// ⸻ Shape for result rows used by runKpiResultDownload ⸻
+// Shape for result rows used by runKpiResultDownload
 
 export interface KpiResultRow {
   task_name: string;
@@ -186,7 +174,7 @@ export interface KpiResultRow {
   summary_reason: string;
 }
 
-// ⸻ Base64-url helpers (stateless tokens) ⸻
+// Base64-url helpers
 
 function toBase64Url(json: string): string {
   const base64 = Buffer.from(json, 'utf8').toString('base64');
@@ -201,7 +189,7 @@ function fromBase64Url(token: string): string {
   return Buffer.from(base64, 'base64').toString('utf8');
 }
 
-// ⸻ Encode/decode for rows_token ⸻
+// Encode/decode for rows_token
 
 export function encodeRowsToken(payload: RowsTokenPayload): string {
   const json = JSON.stringify(payload);
@@ -213,7 +201,7 @@ export function decodeRowsToken(token: string): RowsTokenPayload {
   return JSON.parse(json) as RowsTokenPayload;
 }
 
-// ⸻ Encode/decode for prep_token ⸻
+// Encode/decode for prep_token
 
 export function encodePrepareToken(payload: BulkPrepareTokenPayload): string {
   const json = JSON.stringify(payload);
@@ -225,7 +213,7 @@ export function decodePrepareToken(token: string): BulkPrepareTokenPayload {
   return JSON.parse(json) as BulkPrepareTokenPayload;
 }
 
-// ⸻ Helper for building runKpiResultDownload URL payload ⸻
+// Helper for building runKpiResultDownload URL payload
 
 export function encodeRowsForDownload(
   rows: KpiResultRow[],

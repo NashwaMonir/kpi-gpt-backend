@@ -1,0 +1,37 @@
+[
+  {
+    "id": "vs_baseline",
+    "mode": "both",
+    "metric_scope": ["any"],
+    "template": " vs {target}",
+    "target_key": "default_baseline"
+  },
+  {
+    "id": "compared_with_baseline",
+    "mode": "both",
+    "metric_scope": ["any"],
+    "template": " compared with {target}",
+    "target_key": "default_baseline"
+  },
+  {
+    "id": "relative_to_baseline",
+    "mode": "both",
+    "metric_scope": ["any"],
+    "template": " relative to {target}",
+    "target_key": "default_baseline"
+  },
+  {
+    "id": "based_on_baseline",
+    "mode": "both",
+    "metric_scope": ["any"],
+    "template": " based on {target}",
+    "target_key": "default_baseline"
+  },
+  {
+    "id": "from_a_baseline_of",
+    "mode": "both",
+    "metric_scope": ["any"],
+    "template": " from a baseline of {target}",
+    "target_key": "default_baseline"
+  }
+]

@@ -1,11 +1,8 @@
 // engine/types.ts
 // Shared TypeScript interfaces for the KPI Engine (v10.7.5 with Option C-FULL)
-
-/*import type { MatrixKey } from './metricMatrixResolver';
-import type { MetricResolutionResult } from './metricsAutoSuggest';*/
+import { ErrorCodes, type ErrorCode } from '../engine/errorCodes';
 
 export type Mode = 'simple' | 'complex' | 'both';
-import type { ErrorCode } from './errorCodes';
 
 export interface ResolvedMetricsSnapshot {
   output_metric?: string;
@@ -35,7 +32,7 @@ export interface KpiRowIn {
   mode?: Mode;
 }
 
-// NEW: PreparedRow passes normalized + resolved metrics into objectiveEngine
+// PreparedRow passes normalized + resolved metrics into objectiveEngine
 export interface PreparedRow {
   row_id: number;
   team_role: string;
@@ -59,7 +56,7 @@ export interface ObjectiveOutput {
   complex_objective: string;
 }
 
-// Existing KpiRowOut – EXTEND with variation_seed + resolved_metrics + objectives
+// KpiRowOut – with variation_seed + resolved_metrics + objectives
 export interface KpiRowOut {
   row_id: number;
   simple_objective: string;
@@ -67,7 +64,7 @@ export interface KpiRowOut {
   status: 'VALID' | 'NEEDS_REVIEW' | 'INVALID';
   comments: string;
   summary_reason: string;
-  error_codes: ErrorCode[] ; // New for Option C-FULL
+  error_codes: ErrorCode[];
 
   /**
    * Optional resolved metrics snapshot exposed to GPT / clients.
@@ -76,7 +73,7 @@ export interface KpiRowOut {
    */
   resolved_metrics?: ResolvedMetricsSnapshot;
 
-  // NEW mandatory field for global seed
+  // Global seed
   variation_seed: number;
 }
 
@@ -99,22 +96,30 @@ export interface DeadlineParseResult {
 export interface FieldCheckResult {
   missing: string[];
   invalid: string[];
-  invalidText?: string[]; // domain-level invalid text fields (Company, Strategic Benefit, etc.)
+  invalidText?: string[];
 }
 
 export interface DomainValidationResult {
-  inputRow: KpiRowIn;              // ← REQUIRED
+  inputRow: KpiRowIn;
+
   normalizedRow: KpiRowIn;
+
   fieldChecks: FieldCheckResult;
+
   dangerousMetrics: string[];
+
   deadline: DeadlineParseResult;
+
   mode: Mode;
   modeWasInvalid: boolean;
+
   safeOutput: string;
   safeQuality: string;
   safeImprovement: string;
   safeCompany: string;
   safeStrategicBenefit: string;
+
   statusHint: 'VALID' | 'INVALID';
+
   hasBlockingErrors: boolean;
 }

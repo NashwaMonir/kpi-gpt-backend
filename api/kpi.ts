@@ -1,18 +1,5 @@
 // api/kpi.ts
 // SMART KPI Engine HTTP entrypoint (v10.7.5, Option C-FULL)
-//
-// Responsibilities:
-//  - Handle HTTP method + JSON parsing
-//  - Apply transport-level validation
-//  - For each row:
-//      * Run domain validation
-//      * Compute variation_seed (global hash)
-//      * Run metrics auto-suggest (role/task matrix + defaults)
-//      * Build final status + comments + summary_reason
-//      * Generate simple/complex objectives using objectiveEngine
-//  - Return KpiResponse with error_codes per row + resolved_metrics + variation_seed
-//
-// This file contains NO business rules itself; it only orchestrates engine modules.
 
 import type { VercelRequest, VercelResponse } from '@vercel/node';
 
@@ -31,64 +18,35 @@ import { buildFinalMessage } from '../engine/buildErrorMessage';
 import { computeVariationSeed } from '../engine/variationSeed';
 import { buildObjectivesForRow } from '../engine/objectiveEngine';
 
-// Simple in-memory metrics for KPI Engine endpoint
+// simple in-memory counters
 let kpiRequestsTotal = 0;
 let kpiRequests400 = 0;
 let kpiRequests500 = 0;
 
-const MAX_KPI_BODY_BYTES = 200_000; // ~200 KB hard limit for KPI JSON body
-const MAX_KPI_ROWS = 1000;          // hard upper bound for rows per request
+const MAX_KPI_BODY_BYTES = 200_000;
+const MAX_KPI_ROWS = 1000;
 
-// Lightweight structured logging helpers (console-based)
 function logKpiInfo(event: string, ctx: Record<string, unknown>) {
-  console.info(
-    JSON.stringify({
-      level: 'info',
-      service: 'kpi-engine',
-      event,
-      ...ctx
-    })
-  );
+  console.info(JSON.stringify({ level: 'info', service: 'kpi-engine', event, ...ctx }));
 }
-
 function logKpiWarn(event: string, ctx: Record<string, unknown>) {
-  console.warn(
-    JSON.stringify({
-      level: 'warn',
-      service: 'kpi-engine',
-      event,
-      ...ctx
-    })
-  );
+  console.warn(JSON.stringify({ level: 'warn', service: 'kpi-engine', event, ...ctx }));
 }
-
 function logKpiError(event: string, ctx: Record<string, unknown>) {
-  console.error(
-    JSON.stringify({
-      level: 'error',
-      service: 'kpi-engine',
-      event,
-      ...ctx
-    })
-  );
+  console.error(JSON.stringify({ level: 'error', service: 'kpi-engine', event, ...ctx }));
 }
 
 export default function handler(req: VercelRequest, res: VercelResponse) {
   if (req.method !== 'POST') {
     res.setHeader('Allow', 'POST');
     kpiRequests400++;
-    logKpiWarn('method_not_allowed', {
-      method: req.method
-    });
+    logKpiWarn('method_not_allowed', { method: req.method });
     return res.status(405).json({ error: 'Method Not Allowed' });
   }
 
-  // Count every POST KPI request
   kpiRequestsTotal++;
 
   let body: KpiRequest;
-
-  // Optional strict body-size guard, independent of Vercel platform limits
   const rawBody = req.body as any;
   let approxSize = 0;
 
@@ -115,29 +73,20 @@ export default function handler(req: VercelRequest, res: VercelResponse) {
   }
 
   try {
-    // --------------------------------------
-    // 1. Parse JSON safely
-    // --------------------------------------
     try {
       body =
         typeof req.body === 'string'
           ? JSON.parse(req.body)
           : (req.body as KpiRequest);
     } catch {
-      // JSON parsing error is transport-level
       kpiRequests400++;
-      logKpiWarn('invalid_json_body', {
-        method: req.method
-      });
+      logKpiWarn('invalid_json_body', { method: req.method });
       return res.status(400).json({
         error: 'Invalid JSON body.',
         error_codes: [ErrorCodes.INVALID_JSON_BODY as ErrorCode]
       });
     }
 
-    // --------------------------------------
-    // 2. Transport-level validation
-    // --------------------------------------
     const transportCheck = validateKpiTransport(body);
 
     if (!transportCheck.ok) {
@@ -166,7 +115,6 @@ export default function handler(req: VercelRequest, res: VercelResponse) {
         );
     }
 
-    // At this point, body.rows is a valid array.
     const rowsIn = body.rows;
 
     if (rowsIn.length > MAX_KPI_ROWS) {
@@ -181,7 +129,6 @@ export default function handler(req: VercelRequest, res: VercelResponse) {
       });
     }
 
-    // Optional logging for engine_version / default_company (used by GPT, not backend)
     if (!body.engine_version) {
       logKpiWarn('engine_version_missing', {});
     }
@@ -194,35 +141,24 @@ export default function handler(req: VercelRequest, res: VercelResponse) {
       });
     }
 
-    // --------------------------------------
-    // 3. Per-row processing
-    // --------------------------------------
     const rowsOut: KpiRowOut[] = rowsIn.map((rowIn) => {
       const errorCodes: ErrorCode[] = [];
 
-      // 3.1 Domain validation
       const domainResult = validateDomain(rowIn, errorCodes);
       const normalized = domainResult.normalizedRow;
 
-      // 3.2 Compute global variation seed
       const variation_seed = computeVariationSeed(normalized);
 
-      // 3.3 Metrics auto-suggest (role/task matrix + defaults)
       const metricsResult = resolveMetrics(normalized, variation_seed, errorCodes);
 
-      // 3.4 Build final status + comments + summary_reason
       const final = buildFinalMessage(domainResult, metricsResult, errorCodes);
 
-      // 3.5 Resolved metrics snapshot (as defined in types.ts)
-      // Use the metrics snapshot from final.metrics so GPT sees the
-      // actual metrics used after safety/defaulting.
       const resolvedMetrics: ResolvedMetricsSnapshot = {
         output_metric: final.metrics.output_metric ?? '',
         quality_metric: final.metrics.quality_metric ?? '',
         improvement_metric: final.metrics.improvement_metric ?? ''
       };
 
-      // 3.6 Build PreparedRow for objective engine
       const preparedRow: PreparedRow = {
         row_id: normalized.row_id,
         team_role: (normalized.team_role ?? '').toString(),
@@ -232,18 +168,14 @@ export default function handler(req: VercelRequest, res: VercelResponse) {
         strategic_benefit: (normalized.strategic_benefit ?? '').toString(),
         company: (normalized.company ?? '').toString(),
         mode: final.mode,
-
         output_metric: resolvedMetrics.output_metric ?? '',
         quality_metric: resolvedMetrics.quality_metric ?? '',
         improvement_metric: resolvedMetrics.improvement_metric ?? '',
-
         variation_seed
       };
 
-      // 3.7 Generate objectives via objectiveEngine
       const objectiveOutput = buildObjectivesForRow(preparedRow);
 
-      // 3.8 Apply INVALID semantics: no objectives when status is INVALID
       let simpleObjective = (objectiveOutput.simple_objective ?? '').toString();
       let complexObjective = (objectiveOutput.complex_objective ?? '').toString();
 
@@ -252,7 +184,6 @@ export default function handler(req: VercelRequest, res: VercelResponse) {
         complexObjective = '';
       }
 
-      // 3.9 Build final KpiRowOut
       const rowOut: KpiRowOut = {
         row_id: normalized.row_id,
         simple_objective: simpleObjective,
@@ -270,7 +201,6 @@ export default function handler(req: VercelRequest, res: VercelResponse) {
 
     const response: KpiResponse = { rows: rowsOut };
 
-    // Compute a tiny status distribution for logging
     const statusCounts = rowsOut.reduce<Record<string, number>>((acc, row) => {
       acc[row.status] = (acc[row.status] || 0) + 1;
       return acc;
@@ -282,12 +212,8 @@ export default function handler(req: VercelRequest, res: VercelResponse) {
       engine_version: body.engine_version ?? 'v10.7.5'
     });
 
-    // --------------------------------------
-    // 4. Return 200 OK with structured response
-    // --------------------------------------
     return res.status(200).json(response);
   } catch (err) {
-    // Unexpected engine-level error
     kpiRequests500++;
     logKpiError('kpi_engine_unhandled_exception', {
       message: err instanceof Error ? err.message : String(err)

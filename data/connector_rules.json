@@ -1,0 +1,18 @@
+[
+  {
+    "id": "tail_connector_comma",
+    "prefix": ", "
+  },
+  {
+    "id": "tail_connector_and",
+    "prefix": " and "
+  },
+  {
+    "id": "tail_connector_comma_while",
+    "prefix": ", while "
+  },
+  {
+    "id": "tail_connector_comma_as_well_as",
+    "prefix": ", as well as "
+  }
+]
