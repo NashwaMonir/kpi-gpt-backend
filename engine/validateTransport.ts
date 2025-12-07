@@ -9,6 +9,7 @@
 // This file follows strict API best practices (Google / Stripe / AWS style):
 
 import { ErrorCodes } from './errorCodes';
+import type { ErrorCode } from './errorCodes';
 import type { KpiRequest } from './types';
 
 
@@ -17,7 +18,7 @@ export interface TransportValidationResult {
   errorStatus?: number;
   errorBody?: {
     error: string;
-    error_codes?: string[];
+    error_codes?: ErrorCode[];
   };
 }
 

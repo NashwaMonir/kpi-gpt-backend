@@ -1,61 +1,407 @@
 // engine/objectiveEngine.ts
+//
+// Seed-driven objective generation for SMART KPI Engine.
+// Uses:
+//  - objective_patterns
+//  - verb_pool
+//  - connector_rules
+//  - variation_rules
+//  - cleanup_rules
+//  - humanization_rules
+//  - baseline_clause_rules
+//  - regex_rules
+//  - performance_targets
+//  - company_tail_rules
+//  - role_metric_matrix (optional here; primarily metricsAutoSuggest)
+//  - error_map (not used in text; for diagnostics only)
 
-import type { PreparedRow, ObjectiveOutput } from './bulkTypes';
+import objective_patterns from '../data/objective_patterns.json';
+import verb_pool from '../data/verb_pool.json';
+import connector_rules from '../data/connector_rules.json';
+import variation_rules from '../data/variation_rules.json';
+import cleanup_rules from '../data/cleanup_rules.json';
+import humanization_rules from '../data/humanization_rules.json';
+import baseline_clause_rules from '../data/baseline_clause_rules.json';
+import regex_rules from '../data/regex_rules.json';
+import performance_targets from '../data/performance_targets.json';
+import company_tail_rules from '../data/company_tail_rules.json';
+import role_metric_matrix from '../data/role_metric_matrix.json';
+import error_map from '../data/error_map.json';
 
-function buildSimpleObjective(row: PreparedRow): string {
-  const deadline = row.dead_line || 'the agreed deadline';
-  const base = `Deliver the ${row.task_name} ${row.task_type.toLowerCase()} by ${deadline}`;
+import type { PreparedRow, ObjectiveOutput } from './types';
+
+// -----------------------------
+// Generic seeded helpers
+// -----------------------------
+
+function hashString(str: string): number {
+  let hash = 2166136261;
+  for (let i = 0; i < str.length; i++) {
+    hash ^= str.charCodeAt(i);
+    hash = Math.imul(hash, 16777619);
+  }
+  return hash >>> 0;
+}
+
+function seededIndex(seed: number, salt: string, size: number): number {
+  if (size <= 0) return 0;
+  const h = hashString(seed.toString() + '|' + salt);
+  return h % size;
+}
+
+function seededPick<T>(seed: number, salt: string, items: T[]): T | null {
+  if (!items.length) return null;
+  const idx = seededIndex(seed, salt, items.length);
+  return items[idx];
+}
+
+// -----------------------------
+// Pattern + verb selection
+// -----------------------------
+
+function selectPattern(row: PreparedRow, mode: 'simple' | 'complex'): any | null {
+  const candidates = (objective_patterns as any[]).filter((p) => {
+    const okMode = !p.mode || p.mode === mode || p.mode === 'both';
+
+    const okRole =
+      !p.applicable_roles ||
+      p.applicable_roles.length === 0 ||
+      p.applicable_roles.includes(row.team_role);
+
+    const okType =
+      !p.applicable_task_types ||
+      p.applicable_task_types.length === 0 ||
+      p.applicable_task_types.includes(row.task_type);
+
+    return okMode && okRole && okType;
+  });
+
+  return seededPick(row.variation_seed, `pattern|${mode}`, candidates);
+}
+
+function selectVerb(
+  row: PreparedRow,
+  verbSlot: string,
+  mode: 'simple' | 'complex'
+): string {
+  const candidates = (verb_pool as any[]).filter((v) => {
+    const okSlot = !v.slot || v.slot === verbSlot;
+    const okRole =
+      !v.roles ||
+      v.roles.length === 0 ||
+      v.roles.includes(row.team_role);
+    const okType =
+      !v.task_types ||
+      v.task_types.length === 0 ||
+      v.task_types.includes(row.task_type);
+    const okMode =
+      !v.modes ||
+      v.modes.length === 0 ||
+      v.modes.includes(mode);
+    return okSlot && okRole && okType && okMode;
+  });
+
+  const chosen = seededPick(row.variation_seed, `verb|${verbSlot}|${mode}`, candidates);
+  return (chosen as any)?.text || 'Deliver';
+}
+
+// -----------------------------
+// Metrics + baseline + targets
+// -----------------------------
+
+/**
+ * Select a baseline rule given the row + present metrics + mode.
+ * The exact structure of baseline_clause_rules.json is flexible; we only assume:
+ *  - rule.mode?: 'simple' | 'complex' | 'both'
+ *  - rule.metric_scope?: string[]   (e.g. ['output','quality','improvement','any'])
+ *  - rule.template?: string         (may contain {metrics} and/or {target})
+ *  - rule.target_key?: string       (key into performance_targets)
+ */
+function selectBaselineRule(
+  row: PreparedRow,
+  presentMetrics: string[],
+  mode: 'simple' | 'complex'
+): any | null {
+  const rules = (baseline_clause_rules as any[]).filter((r) => {
+    const ruleMode = (r.mode as string | undefined) || 'both';
+    const okMode =
+      ruleMode === 'both' ||
+      ruleMode === mode;
+
+    if (!okMode) return false;
+
+    // Optional metric_scope filter; if missing, rule is generic.
+    const scope = r.metric_scope as string[] | undefined;
+    if (!scope || scope.length === 0) {
+      return true;
+    }
+
+    // If scope includes 'any', always allow.
+    if (scope.includes('any')) {
+      return true;
+    }
+
+    // Otherwise, require at least one metric present to satisfy scope.
+    // We don't inspect the actual metric text here – just require that
+    // some metrics exist (presentMetrics.length > 0).
+    return presentMetrics.length > 0;
+  });
+
+  if (!rules.length) return null;
+
+  return seededPick(row.variation_seed, `baseline|${mode}`, rules);
+}
+
+/**
+ * Build a baseline clause string (e.g. " compared to the 2024 baseline")
+ * based on baseline_clause_rules + performance_targets.
+ *
+ * It is intentionally conservative: if templates or target mappings are missing,
+ * it simply returns an empty string (no baseline clause).
+ */
+function buildBaselineClause(
+  row: PreparedRow,
+  presentMetrics: string[],
+  mode: 'simple' | 'complex'
+): string {
+  const rule = selectBaselineRule(row, presentMetrics, mode);
+  if (!rule) return '';
+
+  let template = String((rule as any).template || '').trim();
+  if (!template) return '';
+
+  const metricsString = presentMetrics.join(', and ');
+
+  // Optional performance target insertion
+  let targetText = '';
+  const targetKey = (rule as any).target_key as string | undefined;
+  if (targetKey) {
+    const targetsDict = performance_targets as any;
+    if (targetsDict && typeof targetsDict[targetKey] === 'string') {
+      targetText = String(targetsDict[targetKey]);
+    }
+  }
+
+  let clause = template;
+  clause = clause.replace('{metrics}', metricsString);
+  clause = clause.replace('{target}', targetText);
+
+  clause = clause.trim();
+  if (!clause) return '';
+
+  // Ensure we prepend a space so it can be concatenated after the metrics clause.
+  return ' ' + clause;
+}
+
+// Main metrics clause
+function buildMetricsClause(row: PreparedRow, mode: 'simple' | 'complex'): string {
   const metrics: string[] = [];
 
-  if (row.output_metric) {
-    metrics.push(row.output_metric);
-  }
-  if (row.quality_metric) {
-    metrics.push(row.quality_metric);
-  }
-  if (row.improvement_metric) {
-    metrics.push(row.improvement_metric);
-  }
+  if (row.output_metric) metrics.push(row.output_metric);
+  if (row.quality_metric) metrics.push(row.quality_metric);
+  if (row.improvement_metric) metrics.push(row.improvement_metric);
 
-  const metricsClause = metrics.length > 0 ? ` with ${metrics.join(' and ')}` : '';
+  if (!metrics.length) return '';
 
-  return `${base}${metricsClause}.`;
+  const baselineClause = buildBaselineClause(row, metrics, mode);
+  const connector = mode === 'simple' ? ' with ' : ', achieving ';
+
+  return connector + metrics.join(', and ') + baselineClause;
 }
 
-function buildComplexObjective(row: PreparedRow): string {
-  const deadline = row.dead_line || 'the agreed deadline';
-  const base = `Deliver the ${row.task_name} ${row.task_type.toLowerCase()} by ${deadline}`;
-  const clauses: string[] = [];
+// -----------------------------
+// Company tail + connectors
+// -----------------------------
 
-  if (row.output_metric) {
-    clauses.push(row.output_metric);
-  }
-  if (row.quality_metric) {
-    clauses.push(row.quality_metric);
-  }
-  if (row.improvement_metric) {
-    clauses.push(row.improvement_metric);
-  }
+function selectTailRule(row: PreparedRow): any | null {
+  const rules = (company_tail_rules as any[]).filter((r) => {
+    const okCompany =
+      !r.company ||
+      !row.company ||
+      r.company.toLowerCase() === row.company.toLowerCase();
 
-  const metricsClause =
-    clauses.length > 0 ? `, achieving ${clauses.join(', and ')}` : '';
+    const okRole =
+      !r.roles ||
+      r.roles.length === 0 ||
+      r.roles.includes(row.team_role);
 
-  const benefitClause = row.strategic_benefit
-    ? `, aligned with ${row.company || 'the organization'}’s goal to ${row.strategic_benefit}`
-    : '';
-
-  return `${base}${metricsClause}${benefitClause}.`;
-}
-
-export function runObjectiveEngine(rows: PreparedRow[]): ObjectiveOutput[] {
-  return rows.map((row) => {
-    const simple_objective = buildSimpleObjective(row);
-    const complex_objective = buildComplexObjective(row);
-
-    return {
-      row_id: row.row_id,
-      simple_objective,
-      complex_objective
-    };
+    return okCompany && okRole;
   });
+
+  return seededPick(row.variation_seed, 'tail_rule', rules);
+}
+
+function buildTailClause(row: PreparedRow): string {
+  const tailRule = selectTailRule(row);
+  if (!tailRule) {
+    if (!row.strategic_benefit) return '';
+    const companyName = row.company || 'the organization';
+    return `, aligned with ${companyName}’s goal to ${row.strategic_benefit}`;
+  }
+
+  const companyName = row.company || 'the organization';
+  const benefit = row.strategic_benefit || 'its strategic priorities';
+
+  let tail = String(tailRule.template || '')
+    .replace('{company}', companyName)
+    .replace('{benefit}', benefit);
+
+  // Optional: connect using connector_rules
+  const tailConnector = seededPick(
+    row.variation_seed,
+    'tail_connector',
+    connector_rules as any[]
+  );
+  if (tailConnector && (tailConnector as any).prefix) {
+    tail = (tailConnector as any).prefix + tail;
+  }
+
+  return tail;
+}
+
+// -----------------------------
+// Regex + cleanup + humanization
+// -----------------------------
+
+function applyRegexRules(text: string): string {
+  for (const rule of regex_rules as any[]) {
+    if (!rule.pattern) continue;
+    const flags = (rule.flags as string) || 'g';
+    const re = new RegExp(rule.pattern as string, flags);
+    text = text.replace(re, (rule.replacement as string) ?? '');
+  }
+  return text;
+}
+
+function applyCleanupRules(text: string): string {
+  for (const rule of cleanup_rules as any[]) {
+    if (!rule.pattern) continue;
+    const flags = (rule.flags as string) || 'g';
+    const re = new RegExp(rule.pattern as string, flags);
+    text = text.replace(re, (rule.replacement as string) ?? '');
+  }
+  return text;
+}
+
+function applyHumanizationRules(text: string): string {
+  for (const rule of humanization_rules as any[]) {
+    if (!rule.pattern) continue;
+    const flags = (rule.flags as string) || 'g';
+    const re = new RegExp(rule.pattern as string, flags);
+    text = text.replace(re, (rule.replacement as string) ?? '');
+  }
+  return text;
+}
+
+function postProcessObjective(text: string): string {
+  let out = text.trim();
+
+  out = applyRegexRules(out);
+  out = applyCleanupRules(out);
+  out = applyHumanizationRules(out);
+
+  out = out.trim();
+  if (!out.endsWith('.')) out += '.';
+  out = out.replace(/\.\.+$/, '.'); // avoid "..."
+
+  return out;
+}
+
+// -----------------------------
+// Variation rules (micro-variation)
+// -----------------------------
+
+// Optional micro-variation per slot, driven by variation_seed.
+// You can attach slot IDs in your patterns/templates and swap synonyms here.
+function applyVariationRules(
+  text: string,
+  row: PreparedRow,
+  mode: 'simple' | 'complex'
+): string {
+  for (const rule of variation_rules as any[]) {
+    const slotId = rule.slot_id as string | undefined;
+    if (!slotId) continue;
+
+    const variants = rule.variants as string[] | undefined;
+    if (!variants || variants.length === 0) continue;
+
+    const chosen = seededPick(
+      row.variation_seed,
+      `variation|${slotId}|${mode}`,
+      variants
+    );
+    if (!chosen) continue;
+
+    const placeholder = new RegExp(`\\{${slotId}\\}`, 'g');
+    text = text.replace(placeholder, chosen);
+  }
+  return text;
+}
+
+// -----------------------------
+// Main builders
+// -----------------------------
+
+function buildObjectiveInternal(row: PreparedRow, mode: 'simple' | 'complex'): string {
+  const deadline = row.dead_line || 'the agreed deadline';
+  const pattern = selectPattern(row, mode);
+
+  const deliverable = `${row.task_name} ${row.task_type.toLowerCase()}`.trim();
+  const verbSlot = (pattern && (pattern as any).verb_slot) || 'deliver';
+  const verb = selectVerb(row, verbSlot, mode);
+  const metricsClause = buildMetricsClause(row, mode);
+  const tailClause = buildTailClause(row);
+
+  let template: string;
+
+  if (pattern && typeof (pattern as any).template === 'string') {
+    template = (pattern as any).template as string;
+  } else {
+    // fallback template if pattern not found
+    template =
+      '{verb} the {deliverable} by {deadline}{metrics_clause}{tail_clause}';
+  }
+
+  let objective = template
+    .replace('{verb}', verb)
+    .replace('{deliverable}', deliverable)
+    .replace('{deadline}', deadline)
+    .replace('{metrics_clause}', metricsClause)
+    .replace('{tail_clause}', tailClause);
+
+  objective = applyVariationRules(objective, row, mode);
+  objective = postProcessObjective(objective);
+
+  return objective;
+}
+
+export function buildSimpleObjective(row: PreparedRow): string {
+  return buildObjectiveInternal(row, 'simple');
+}
+
+export function buildComplexObjective(row: PreparedRow): string {
+  return buildObjectiveInternal(row, 'complex');
+}
+
+export function buildObjectivesForRow(row: PreparedRow): ObjectiveOutput {
+  const simple =
+    row.mode === 'complex'
+      ? ''
+      : buildSimpleObjective(row);
+
+  const complex =
+    row.mode === 'simple'
+      ? ''
+      : buildComplexObjective(row);
+
+  return {
+    row_id: row.row_id,
+    simple_objective: simple,
+    complex_objective: complex
+  };
+}
+
+// Batch helper for bulk flow
+export function runObjectiveEngine(rows: PreparedRow[]): ObjectiveOutput[] {
+  return rows.map(buildObjectivesForRow);
 }

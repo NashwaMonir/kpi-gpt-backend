@@ -6,22 +6,30 @@
 //  - Apply transport-level validation
 //  - For each row:
 //      * Run domain validation
+//      * Compute variation_seed (global hash)
 //      * Run metrics auto-suggest (role/task matrix + defaults)
 //      * Build final status + comments + summary_reason
-//      * (v10.7.5) Leave objectives empty (GPT owns sentence generation)
-//  - Return KpiResponse with error_codes per row
+//      * Generate simple/complex objectives using objectiveEngine
+//  - Return KpiResponse with error_codes per row + resolved_metrics + variation_seed
 //
 // This file contains NO business rules itself; it only orchestrates engine modules.
 
 import type { VercelRequest, VercelResponse } from '@vercel/node';
 
 import { ErrorCodes, type ErrorCode } from '../engine/errorCodes';
-import type { KpiRequest, KpiResponse, KpiRowOut } from '../engine/types';
+import type {
+  KpiRequest,
+  KpiResponse,
+  KpiRowOut,
+  ResolvedMetricsSnapshot,
+  PreparedRow
+} from '../engine/types';
 import { validateKpiTransport } from '../engine/validateTransport';
 import { validateDomain } from '../engine/validateDomain';
 import { resolveMetrics } from '../engine/metricsAutoSuggest';
 import { buildFinalMessage } from '../engine/buildErrorMessage';
 import { computeVariationSeed } from '../engine/variationSeed';
+import { buildObjectivesForRow } from '../engine/objectiveEngine';
 
 // Simple in-memory metrics for KPI Engine endpoint
 let kpiRequestsTotal = 0;
@@ -192,29 +200,69 @@ export default function handler(req: VercelRequest, res: VercelResponse) {
     const rowsOut: KpiRowOut[] = rowsIn.map((rowIn) => {
       const errorCodes: ErrorCode[] = [];
 
-      // 3.1 Domain validation (structure, fields, deadline, dangerous text, etc.)
+      // 3.1 Domain validation
       const domainResult = validateDomain(rowIn, errorCodes);
+      const normalized = domainResult.normalizedRow;
 
-      // 3.2 Metrics auto-suggest logic (may mark NEEDS_REVIEW)
-      const metricsResult = resolveMetrics(domainResult.normalizedRow, errorCodes);
+      // 3.2 Compute global variation seed
+      const variation_seed = computeVariationSeed(normalized);
 
-      // 3.3 Build final status + comments + summary_reason
-      const final = buildFinalMessage(domainResult, metricsResult, variationSeed, errorCodes);
+      // 3.3 Metrics auto-suggest (role/task matrix + defaults)
+      const metricsResult = resolveMetrics(normalized, variation_seed, errorCodes);
 
-      // 3.4 Assemble KpiRowOut (objectives still placeholders in v10.7.5)
-      const simple_objective = '';
-      const complex_objective = '';
+      // 3.4 Build final status + comments + summary_reason
+      const final = buildFinalMessage(domainResult, metricsResult, errorCodes);
 
+      // 3.5 Resolved metrics snapshot (as defined in types.ts)
+      // Use the metrics snapshot from final.metrics so GPT sees the
+      // actual metrics used after safety/defaulting.
+      const resolvedMetrics: ResolvedMetricsSnapshot = {
+        output_metric: final.metrics.output_metric ?? '',
+        quality_metric: final.metrics.quality_metric ?? '',
+        improvement_metric: final.metrics.improvement_metric ?? ''
+      };
+
+      // 3.6 Build PreparedRow for objective engine
+      const preparedRow: PreparedRow = {
+        row_id: normalized.row_id,
+        team_role: (normalized.team_role ?? '').toString(),
+        task_type: (normalized.task_type ?? '').toString(),
+        task_name: (normalized.task_name ?? '').toString(),
+        dead_line: (normalized.dead_line ?? '').toString(),
+        strategic_benefit: (normalized.strategic_benefit ?? '').toString(),
+        company: (normalized.company ?? '').toString(),
+        mode: final.mode,
+
+        output_metric: resolvedMetrics.output_metric ?? '',
+        quality_metric: resolvedMetrics.quality_metric ?? '',
+        improvement_metric: resolvedMetrics.improvement_metric ?? '',
+
+        variation_seed
+      };
+
+      // 3.7 Generate objectives via objectiveEngine
+      const objectiveOutput = buildObjectivesForRow(preparedRow);
+
+      // 3.8 Apply INVALID semantics: no objectives when status is INVALID
+      let simpleObjective = (objectiveOutput.simple_objective ?? '').toString();
+      let complexObjective = (objectiveOutput.complex_objective ?? '').toString();
+
+      if (final.status === 'INVALID') {
+        simpleObjective = '';
+        complexObjective = '';
+      }
+
+      // 3.9 Build final KpiRowOut
       const rowOut: KpiRowOut = {
-        row_id: domainResult.normalizedRow.row_id,
-        simple_objective,
-        complex_objective,
+        row_id: normalized.row_id,
+        simple_objective: simpleObjective,
+        complex_objective: complexObjective,
         status: final.status,
         comments: final.comments,
         summary_reason: final.summary_reason,
         error_codes: final.errorCodes,
-        // Expose resolved metrics snapshot to GPT; omit if null
-        resolved_metrics: final.resolved_metrics ?? undefined
+        resolved_metrics: resolvedMetrics,
+        variation_seed
       };
 
       return rowOut;

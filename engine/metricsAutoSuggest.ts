@@ -6,7 +6,9 @@
 //  - If SOME metrics missing   → auto-suggest defaults + E502 (NEEDS_REVIEW)
 //  - If NONE missing           → no auto-suggest, no E501/E502
 //
-// v10.8: this module will be replaced by the role_metric_matrix engine.
+// v10.7.5+variant-seed:
+//  - Primary source = role_metric_matrix via metricMatrixResolver.resolveMatrixMetrics(row, variationSeed)
+//  - Fallback       = ROLE_DEFAULT_METRICS (role-family defaults)
 
 import type { KpiRowIn } from './types';
 import { ROLE_DEFAULT_METRICS } from './constants';
@@ -22,6 +24,10 @@ export interface MetricResolutionResult {
   quality_metric: string | null;
   improvement_metric: string | null;
   used_default_metrics: boolean;
+  /**
+   * Logical family-level key used when resolving metrics from the matrix.
+   * This is optional and mainly for diagnostics / analytics.
+   */
   default_source?: MatrixKey;
 }
 
@@ -29,9 +35,15 @@ export interface MetricResolutionResult {
  * Resolve metrics for a normalized row:
  *  - If all present → no changes, used_default_metrics = false.
  *  - If some/all missing → fill from matrix / role defaults + E501/E502.
+ *
+ * Inputs:
+ *  - row           : Domain-normalized KpiRowIn
+ *  - variationSeed : Deterministic seed for matrix rotation (per-row)
+ *  - errorCodes    : Shared error-code bucket (mutated in-place)
  */
 export function resolveMetrics(
   row: KpiRowIn,
+  variationSeed: number,
   errorCodes: ErrorCode[]
 ): MetricResolutionResult {
   const roleLower = row.team_role?.toLowerCase() ?? '';
@@ -45,7 +57,7 @@ export function resolveMetrics(
   let quality = currentQuality;
   let improvement = currentImprovement;
 
-  // 1) Detect missing
+  // 1) Detect missing metrics
   const missing: string[] = [];
   if (!currentOutput) missing.push('Output');
   if (!currentQuality) missing.push('Quality');
@@ -62,18 +74,22 @@ export function resolveMetrics(
   }
 
   // 3) Some/all missing → fill from matrix (if available) or role defaults
+  //
+  // 3.1 Family-level key kept only for diagnostics / default_source
   const key = resolveMatrixKey(row.team_role, row.task_type);
-  const matrixDefaults = key ? resolveMatrixMetrics(key) : null;
+
+  // 3.2 Canonical matrix resolver using normalization + seeded rotation
+  const matrixDefaults = resolveMatrixMetrics(row, variationSeed);
 
   if (!output) {
-    output = matrixDefaults ? matrixDefaults.output_metric : defaults.output;
+    output = matrixDefaults ? matrixDefaults.output : defaults.output;
   }
   if (!quality) {
-    quality = matrixDefaults ? matrixDefaults.quality_metric : defaults.quality;
+    quality = matrixDefaults ? matrixDefaults.quality : defaults.quality;
   }
   if (!improvement) {
     improvement = matrixDefaults
-      ? matrixDefaults.improvement_metric
+      ? matrixDefaults.improvement
       : defaults.improvement;
   }
 

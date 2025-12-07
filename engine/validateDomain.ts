@@ -244,18 +244,19 @@ const statusHint: 'VALID' | 'INVALID' = hasBlockingErrors ? 'INVALID' : 'VALID';
   // 8) Return structured result
   // ---------------------------------------------
   return {
-    normalizedRow,
-    fieldChecks,
-    deadline: deadlineResult,
-    mode: normalizedMode,
-    modeWasInvalid,
-    safeOutput,
-    safeQuality,
-    safeImprovement,
-    safeCompany,
-    safeStrategicBenefit,
-    statusHint,
-    hasBlockingErrors,
-    dangerousMetrics        // <--- add it here
-  };
+  inputRow: row,                     // ← add this
+  normalizedRow,
+  fieldChecks,
+  dangerousMetrics,             // keep this
+  deadline: deadlineResult,
+  mode: normalizedMode,
+  modeWasInvalid,
+  safeOutput,
+  safeQuality,
+  safeImprovement,
+  safeCompany,
+  safeStrategicBenefit,
+  statusHint,
+  hasBlockingErrors
+};
 }

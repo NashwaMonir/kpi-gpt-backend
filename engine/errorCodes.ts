@@ -51,7 +51,8 @@ export const ErrorCodes = {
 } as const;
 
 export type ErrorCodeKey = keyof typeof ErrorCodes;
-export type ErrorCode = (typeof ErrorCodes)[ErrorCodeKey];
+export type ErrorCode = (typeof ErrorCodes)[keyof typeof ErrorCodes];
+
 
 // Optional human-readable descriptions (for logs / future UI)
 export const ErrorCodeDescriptions: Record<ErrorCode, string> = {
@@ -119,7 +120,7 @@ export const ERROR_COMMENTS: Record<ErrorCode, string> = {
 };
 
 // Helper: add an error code only once, preserving insertion order
-export function addErrorCode(list: string[], code: ErrorCode): void {
+export function addErrorCode(list: ErrorCode[], code: ErrorCode): void {
   if (!list.includes(code)) {
     list.push(code);
   }
