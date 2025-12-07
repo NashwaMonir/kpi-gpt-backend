@@ -1,6 +1,10 @@
 // engine/objectiveEngine.ts
 //
 // Seed-driven objective generation for SMART KPI Engine.
+// - Uses objective_patterns, verb_pool, connector_rules, variation_rules,
+//   cleanup_rules, humanization_rules, regex_rules, company_tail_rules.
+// - Baseline logic is canonical (simple/complex).
+// - Benefit and task_name are normalized via benefit_transform and task_name_cleanup.
 
 import objective_patterns from '../data/objective_patterns.json';
 import verb_pool from '../data/verb_pool.json';
@@ -8,12 +12,12 @@ import connector_rules from '../data/connector_rules.json';
 import variation_rules from '../data/variation_rules.json';
 import cleanup_rules from '../data/cleanup_rules.json';
 import humanization_rules from '../data/humanization_rules.json';
-import baseline_clause_rules from '../data/baseline_clause_rules.json';
 import regex_rules from '../data/regex_rules.json';
-import performance_targets from '../data/performance_targets.json';
 import company_tail_rules from '../data/company_tail_rules.json';
-import role_metric_matrix from '../data/role_metric_matrix.json';
-import error_map from '../data/error_map.json';
+import benefit_transform from '../data/benefit_transform.json';
+import task_name_cleanup from '../data/task_name_cleanup.json';
+import baseline_clause_rules from '../data/baseline_clause_rules.json';
+import performance_targets from '../data/performance_targets.json';
 
 import type { PreparedRow, ObjectiveOutput } from './types';
 
@@ -47,7 +51,9 @@ function seededPick<T>(seed: number, salt: string, items: T[]): T | null {
 // -----------------------------
 
 function selectPattern(row: PreparedRow, mode: 'simple' | 'complex'): any | null {
-  const candidates = (objective_patterns as any[]).filter((p) => {
+  const patterns = objective_patterns as any[];
+
+  const candidates = patterns.filter((p) => {
     const okMode = !p.mode || p.mode === mode || p.mode === 'both';
 
     const okRole =
@@ -71,7 +77,9 @@ function selectVerb(
   verbSlot: string,
   mode: 'simple' | 'complex'
 ): string {
-  const candidates = (verb_pool as any[]).filter((v) => {
+  const verbs = verb_pool as any[];
+
+  const candidates = verbs.filter((v) => {
     const okSlot = !v.slot || v.slot === verbSlot;
     const okRole =
       !v.roles ||
@@ -93,84 +101,172 @@ function selectVerb(
 }
 
 // -----------------------------
-// Metrics + baseline + targets
+// Baseline + metrics
 // -----------------------------
 
-function selectBaselineRule(
-  row: PreparedRow,
-  presentMetrics: string[],
-  mode: 'simple' | 'complex'
-): any | null {
-  const rules = (baseline_clause_rules as any[]).filter((r) => {
-    const ruleMode = (r.mode as string | undefined) || 'both';
-    const okMode =
-      ruleMode === 'both' ||
-      ruleMode === mode;
+function hasBaselineWorthyImprovement(improvement: string): boolean {
+  if (!improvement) return false;
+  const lower = improvement.toLowerCase();
 
-    if (!okMode) return false;
+  const hasNumber = /\d/.test(lower);
+  const hasChangeVerb = /(increase|decrease|reduce|improve|boost|raise|grow|expand)/.test(lower);
+  const hasPercent = /%/.test(lower);
 
-    const scope = r.metric_scope as string[] | undefined;
-    if (!scope || scope.length === 0) {
-      return true;
-    }
+  return hasNumber && (hasChangeVerb || hasPercent);
+}
 
-    if (scope.includes('any')) {
-      return true;
-    }
+function pickBaselineLabel(improvementMetric: string): string {
+  const perf = performance_targets as any;
+  const lower = improvementMetric.toLowerCase();
 
-    return presentMetrics.length > 0;
-  });
+  // Quality-related improvements
+  if (/(quality|defect|error|bug|issues?)/.test(lower)) {
+    return perf.quality_baseline || perf.default_baseline || '';
+  }
 
-  if (!rules.length) return null;
+  // Output / throughput / delivery metrics
+  if (/(output|throughput|volume|delivery|capacity)/.test(lower)) {
+    return perf.output_baseline || perf.default_baseline || '';
+  }
 
-  return seededPick(row.variation_seed, `baseline|${mode}`, rules);
+  // Generic improvement (performance, efficiency, satisfaction, etc.)
+  if (/(improve|improvement|efficiency|performance|satisfaction|experience|engagement)/.test(lower)) {
+    return perf.improvement_baseline || perf.default_baseline || '';
+  }
+
+  // Fallback: default baseline
+  return perf.default_baseline || '';
 }
 
 function buildBaselineClause(
-  row: PreparedRow,
-  presentMetrics: string[],
+  improvementMetric: string,
   mode: 'simple' | 'complex'
 ): string {
-  const rule = selectBaselineRule(row, presentMetrics, mode);
-  if (!rule) return '';
+  if (!hasBaselineWorthyImprovement(improvementMetric)) return '';
 
-  let template = String((rule as any).template || '').trim();
-  if (!template) return '';
+  // 1. Base clause selection from JSON
+  const rules = baseline_clause_rules as any;
+  const baseClause =
+    mode === 'simple'
+      ? (rules.simple?.default ?? '')
+      : (rules.complex?.default ?? '');
 
-  const metricsString = presentMetrics.join(', and ');
+  // If JSON missing → do not attempt to generate a baseline clause
+  if (!baseClause) return '';
 
-  let targetText = '';
-  const targetKey = (rule as any).target_key as string | undefined;
-  if (targetKey) {
-    const targetsDict = performance_targets as any;
-    if (targetsDict && typeof targetsDict[targetKey] === 'string') {
-      targetText = String(targetsDict[targetKey]);
+  // 2. Pick contextual baseline label (quality / output / improvement / default)
+  const baselineLabel = pickBaselineLabel(improvementMetric).trim();
+  const perf = performance_targets as any;
+  const defaultLabel = (perf.default_baseline as string | undefined)?.trim();
+
+  // 3. If no label found or label equals default → return simple base clause
+  //    Example: "from the current organizational baseline"
+  if (!baselineLabel || (defaultLabel && baselineLabel === defaultLabel)) {
+    return baseClause;
+  }
+
+  // 4. Otherwise, enrich the clause with the baseline label
+  //    Example: "from the current organizational baseline (based on the quality measurement baseline)"
+  return `${baseClause} (based on the ${baselineLabel})`;
+}
+function buildMetricsClause(row: PreparedRow, mode: 'simple' | 'complex'): string {
+  const metricParts: string[] = [];
+
+  if (row.output_metric) {
+    metricParts.push(row.output_metric);
+  }
+  if (row.quality_metric) {
+    metricParts.push(row.quality_metric);
+  }
+
+  let improvementText = row.improvement_metric || '';
+  const baselineClause = buildBaselineClause(improvementText, mode);
+  if (improvementText) {
+    if (baselineClause) {
+      improvementText = `${improvementText} ${baselineClause}`;
+    }
+    metricParts.push(improvementText);
+  }
+
+  if (!metricParts.length) return '';
+
+  let metricsJoined = '';
+  if (metricParts.length === 1) {
+    metricsJoined = metricParts[0];
+  } else if (metricParts.length === 2) {
+    metricsJoined = metricParts.join(' and ');
+  } else {
+    metricsJoined =
+      metricParts.slice(0, -1).join(', ') + ', and ' + metricParts[metricParts.length - 1];
+  }
+
+  const connector = mode === 'simple' ? ' with ' : ', achieving ';
+  return connector + metricsJoined;
+}
+
+// -----------------------------
+// Benefit transform + task name cleanup
+// -----------------------------
+
+type BenefitTransformRule = {
+  pattern: string;
+  replacement: string;
+};
+
+function applyBenefitTransform(rawBenefit: string): string {
+  if (!rawBenefit) return '';
+
+  let benefit = rawBenefit.trim();
+  const rules = benefit_transform as BenefitTransformRule[];
+
+  for (const rule of rules) {
+    if (!rule.pattern) continue;
+    const re = new RegExp(rule.pattern, 'i');
+    if (re.test(benefit)) {
+      benefit = benefit.replace(re, rule.replacement);
+      break;
     }
   }
 
-  let clause = template;
-  clause = clause.replace('{metrics}', metricsString);
-  clause = clause.replace('{target}', targetText);
-
-  clause = clause.trim();
-  if (!clause) return '';
-
-  return ' ' + clause;
+  benefit = benefit.replace(/\s+/g, ' ').replace(/\s+([.,;:!?])/g, '$1').trim();
+  return benefit;
 }
 
-function buildMetricsClause(row: PreparedRow, mode: 'simple' | 'complex'): string {
-  const metrics: string[] = [];
+type TaskNameCleanupConfig = {
+  role_prefixes?: string[];
+  normalize_map?: { [key: string]: string };
+};
 
-  if (row.output_metric) metrics.push(row.output_metric);
-  if (row.quality_metric) metrics.push(row.quality_metric);
-  if (row.improvement_metric) metrics.push(row.improvement_metric);
+function normalizeTaskName(rawTaskName: string, teamRole: string): string {
+  if (!rawTaskName) return '';
 
-  if (!metrics.length) return '';
+  const cfg = task_name_cleanup as TaskNameCleanupConfig;
+  let name = rawTaskName.trim();
 
-  const baselineClause = buildBaselineClause(row, metrics, mode);
-  const connector = mode === 'simple' ? ' with ' : ', achieving ';
+  if (cfg.role_prefixes && cfg.role_prefixes.length) {
+    for (const prefix of cfg.role_prefixes) {
+      const re = new RegExp(`^${prefix}\\s+`, 'i');
+      if (re.test(name) && prefix.toLowerCase() === teamRole.toLowerCase()) {
+        name = name.replace(re, '');
+        break;
+      }
+    }
+  }
 
-  return connector + metrics.join(', and ') + baselineClause;
+  if (cfg.normalize_map) {
+    for (const [k, v] of Object.entries(cfg.normalize_map)) {
+      const re = new RegExp(`\\b${k}\\b`, 'ig');
+      name = name.replace(re, v);
+    }
+  }
+
+  name = name
+    .split(/\s+/)
+    .map((w) => (w ? w.charAt(0).toUpperCase() + w.slice(1) : w))
+    .join(' ')
+    .trim();
+
+  return name;
 }
 
 // -----------------------------
@@ -178,7 +274,9 @@ function buildMetricsClause(row: PreparedRow, mode: 'simple' | 'complex'): strin
 // -----------------------------
 
 function selectTailRule(row: PreparedRow): any | null {
-  const rules = (company_tail_rules as any[]).filter((r) => {
+  const rules = company_tail_rules as any[];
+
+  const filtered = rules.filter((r) => {
     const okCompany =
       !r.company ||
       !row.company ||
@@ -192,31 +290,41 @@ function selectTailRule(row: PreparedRow): any | null {
     return okCompany && okRole;
   });
 
-  return seededPick(row.variation_seed, 'tail_rule', rules);
+  return seededPick(row.variation_seed, 'tail_rule', filtered);
 }
 
 function buildTailClause(row: PreparedRow): string {
+  const rawCompany = (row.company || '').trim();
+  const isGeneric = !rawCompany || rawCompany.toLowerCase() === 'generic';
+  const companyName = isGeneric ? 'the organization' : rawCompany;
+
+  const rawBenefit = row.strategic_benefit || '';
+  const benefitText = applyBenefitTransform(rawBenefit) || 'its strategic priorities';
+
   const tailRule = selectTailRule(row);
+
+  let tail: string;
   if (!tailRule) {
-    if (!row.strategic_benefit) return '';
-    const companyName = row.company || 'the organization';
-    return `, aligned with ${companyName}’s goal to ${row.strategic_benefit}`;
+    tail = `aligned with ${companyName}’s strategic objectives to support ${benefitText}`;
+  } else {
+    tail = String(tailRule.template || '')
+      .replace('{company}', companyName)
+      .replace('{benefit}', benefitText);
+
+    const tailConnector = seededPick(
+      row.variation_seed,
+      'tail_connector',
+      connector_rules as any[]
+    );
+    if (tailConnector && (tailConnector as any).prefix) {
+      tail = (tailConnector as any).prefix + tail;
+    }
   }
 
-  const companyName = row.company || 'the organization';
-  const benefit = row.strategic_benefit || 'its strategic priorities';
+  tail = tail.replace(/aligned with\s+aligned with/gi, 'aligned with');
 
-  let tail = String(tailRule.template || '')
-    .replace('{company}', companyName)
-    .replace('{benefit}', benefit);
-
-  const tailConnector = seededPick(
-    row.variation_seed,
-    'tail_connector',
-    connector_rules as any[]
-  );
-  if (tailConnector && (tailConnector as any).prefix) {
-    tail = (tailConnector as any).prefix + tail;
+  if (!tail.startsWith(',') && !tail.startsWith(' ')) {
+    tail = ', ' + tail;
   }
 
   return tail;
@@ -232,6 +340,7 @@ function applyRegexRules(text: string): string {
     const flags = (rule.flags as string) || 'g';
     const re = new RegExp(rule.pattern as string, flags);
     text = text.replace(re, (rule.replacement as string) ?? '');
+
   }
   return text;
 }
@@ -307,7 +416,8 @@ function buildObjectiveInternal(row: PreparedRow, mode: 'simple' | 'complex'): s
   const deadline = row.dead_line || 'the agreed deadline';
   const pattern = selectPattern(row, mode);
 
-  const deliverable = `${row.task_name} ${row.task_type.toLowerCase()}`.trim();
+  const normalizedTaskName = normalizeTaskName(row.task_name, row.team_role);
+  const deliverable = `${normalizedTaskName} ${row.task_type.toLowerCase()}`.trim();
   const verbSlot = (pattern && (pattern as any).verb_slot) || 'deliver';
   const verb = selectVerb(row, verbSlot, mode);
   const metricsClause = buildMetricsClause(row, mode);
@@ -364,4 +474,4 @@ export function buildObjectivesForRow(row: PreparedRow): ObjectiveOutput {
 // Batch helper for bulk flow
 export function runObjectiveEngine(rows: PreparedRow[]): ObjectiveOutput[] {
   return rows.map(buildObjectivesForRow);
-}
+} 

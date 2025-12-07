@@ -1,22 +1,16 @@
 [
   {
-    "id": "tail_named_supports_benefit",
+    "id": "generic_default",
+    "description": "Generic organizational tail.",
+    "company": "generic",
+    "roles": [],
+    "template": "aligned with the organization’s strategic objectives to support {benefit}"
+  },
+  {
+    "id": "company_default",
+    "description": "Default company tail.",
+    "company": null,
     "roles": [],
     "template": "aligned with {company}’s strategic objectives to support {benefit}"
-  },
-  {
-    "id": "tail_named_aligned_with_benefit",
-    "roles": [],
-    "template": "aligned with {company}’s strategic objectives aligned with {benefit}"
-  },
-  {
-    "id": "tail_generic_strategic_objectives",
-    "roles": [],
-    "template": "aligned with {company}’s strategic objectives"
-  },
-  {
-    "id": "tail_generic_strategy",
-    "roles": [],
-    "template": "aligned with {company}’s strategy"
   }
 ]

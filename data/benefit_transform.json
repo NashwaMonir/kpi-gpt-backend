@@ -1,0 +1,26 @@
+[
+  {
+    "pattern": "^Increase\\s+(.+)$",
+    "replacement": "increasing $1"
+  },
+  {
+    "pattern": "^Improve\\s+(.+)$",
+    "replacement": "improving $1"
+  },
+  {
+    "pattern": "^Enhance\\s+(.+)$",
+    "replacement": "enhancing $1"
+  },
+  {
+    "pattern": "^Support\\s+(.+)$",
+    "replacement": "supporting $1"
+  },
+  {
+    "pattern": "^increa[sz]e?\\s+(.+)$",
+    "replacement": "increasing $1"
+  },
+  {
+    "pattern": "^increa[zs]e? company\\s+(.+)$",
+    "replacement": "increasing the company’s $1"
+  }
+]

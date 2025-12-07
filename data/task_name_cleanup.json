@@ -1,0 +1,7 @@
+{
+  "role_prefixes": ["Design", "Development", "Content"],
+  "normalize_map": {
+    "home page": "Home Page",
+    "homepage": "Home Page"
+  }
+}

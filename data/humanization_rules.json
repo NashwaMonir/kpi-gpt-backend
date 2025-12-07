@@ -1,38 +1,14 @@
 [
   {
-    "id": "space_before_percent",
-    "pattern": "(\\d)%",
-    "replacement": "$1 %",
+    "id": "capitalize_by",
+    "pattern": "\\bby\\s+(\\d{4}-\\d{2}-\\d{2})",
+    "replacement": "By $1",
     "flags": "g"
   },
   {
-    "id": "normalize_semicolon_to_comma",
-    "pattern": ";",
-    "replacement": ",",
-    "flags": "g"
-  },
-  {
-    "id": "remove_double_conjunctions",
-    "pattern": "\\b(?:and|while)\\s+(?:and|while)\\b",
-    "replacement": "and",
-    "flags": "gi"
-  },
-  {
-    "id": "soften_guarantee",
-    "pattern": "\\b[Gg]uarantee\\b",
-    "replacement": "ensure",
-    "flags": "g"
-  },
-  {
-    "id": "remove_informal_terms",
-    "pattern": "\\b(awesome|amazing|super|fantastic|lol)\\b",
-    "replacement": "",
-    "flags": "gi"
-  },
-  {
-    "id": "remove_emoticons",
-    "pattern": "(:\\)|😉)",
-    "replacement": "",
+    "id": "normalize_vs",
+    "pattern": "\\bvs\\b",
+    "replacement": "vs.",
     "flags": "g"
   }
 ]

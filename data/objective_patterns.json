@@ -1,50 +1,35 @@
 [
   {
-    "id": "simple_standard",
+    "id": "simple_default_v1",
+    "description": "By DATE, VERB the DELIVERABLE, achieving metrics, plus company tail.",
+    "template": "By {deadline}, {verb} the {deliverable}{metrics_clause}{tail_clause}",
     "mode": "simple",
     "applicable_roles": [],
-    "applicable_task_types": [],
-    "verb_slot": "deliver",
-    "template": "{verb} the {deliverable} by {deadline}{metrics_clause}{tail_clause}"
+    "applicable_task_types": []
   },
   {
-    "id": "simple_deadline_lead",
+    "id": "complex_default_v1",
+    "description": "By DATE, VERB the DELIVERABLE, achieving metrics, plus company tail.",
+    "template": "By {deadline}, {verb} the {deliverable}{metrics_clause}{tail_clause}",
+    "mode": "complex",
+    "applicable_roles": [],
+    "applicable_task_types": []
+  },
+
+  {
+    "id": "simple_design_project",
+    "description": "Design Projects – simple mode.",
+    "template": "By {deadline}, {verb} the {deliverable}{metrics_clause}{tail_clause}",
     "mode": "simple",
-    "applicable_roles": [],
-    "applicable_task_types": [],
-    "verb_slot": "deliver",
-    "template": "By {deadline}, {verb} the {deliverable}{metrics_clause}{tail_clause}"
+    "applicable_roles": ["Design", "Design Lead"],
+    "applicable_task_types": ["Project"]
   },
   {
-    "id": "simple_goal_driven",
-    "mode": "simple",
-    "applicable_roles": [],
-    "applicable_task_types": [],
-    "verb_slot": "deliver",
-    "template": "{verb} the {deliverable}{metrics_clause} by {deadline}{tail_clause}"
-  },
-  {
-    "id": "complex_standard",
+    "id": "complex_design_project",
+    "description": "Design Projects – complex mode.",
+    "template": "By {deadline}, {verb} the {deliverable}{metrics_clause}{tail_clause}",
     "mode": "complex",
-    "applicable_roles": [],
-    "applicable_task_types": [],
-    "verb_slot": "deliver",
-    "template": "{verb} the {deliverable} by {deadline}{metrics_clause}{tail_clause}"
-  },
-  {
-    "id": "complex_deadline_lead",
-    "mode": "complex",
-    "applicable_roles": [],
-    "applicable_task_types": [],
-    "verb_slot": "deliver",
-    "template": "By {deadline}, {verb} the {deliverable}{metrics_clause}{tail_clause}"
-  },
-  {
-    "id": "complex_goal_driven",
-    "mode": "complex",
-    "applicable_roles": [],
-    "applicable_task_types": [],
-    "verb_slot": "deliver",
-    "template": "{verb} the {deliverable}{metrics_clause} by {deadline}{tail_clause}"
+    "applicable_roles": ["Design", "Design Lead"],
+    "applicable_task_types": ["Project"]
   }
 ]
