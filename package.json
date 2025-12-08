@@ -1,8 +1,8 @@
 {
   "name": "kpi-gpt-backend",
   "version": "1.0.0",
-  "main": "index.js",
   "license": "MIT",
+  "private": true,
   "dependencies": {
     "busboy": "^1.6.0",
     "csv-parse": "^6.1.0",
@@ -16,8 +16,8 @@
     "typescript": "^5.9.3"
   },
   "scripts": {
-    "dev": "next dev",
-    "build": "next build",
-    "start": "next start"
+    "dev": "vercel dev",
+    "build": "echo \"Vercel builds serverless functions automatically\"",
+    "start": "echo \"Use 'vercel dev' for local development\""
   }
 }
