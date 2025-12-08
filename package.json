@@ -14,9 +14,9 @@
     "@types/node": "^24.10.1",
     "typescript": "^5.9.3"
   },
-"scripts": {
-  "dev": "echo \"Use 'npx vercel dev' for local development\"",
-  "build": "echo \"Vercel builds serverless functions automatically\"",
-  "start": "echo \"Use 'npx vercel dev' for local development\""
-}
+  "scripts": {
+    "dev": "echo \"Local development: run the Vercel CLI manually\"",
+    "build": "echo \"Vercel builds serverless functions automatically\"",
+    "start": "echo \"Local development: use the Vercel CLI\""
+  }
 }
