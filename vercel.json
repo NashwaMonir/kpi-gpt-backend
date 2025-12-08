@@ -1,6 +1,5 @@
 {
-  "framework": "other",
-  "devCommand": "echo \"No custom dev command (use 'npx vercel dev')\"",
+  "devCommand": "echo \"No custom dev command (use 'npx vercel dev' manually)\"",
   "buildCommand": "npm run build",
   "outputDirectory": "."
 }
