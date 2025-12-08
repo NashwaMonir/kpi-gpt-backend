@@ -12,12 +12,11 @@
   "devDependencies": {
     "@types/busboy": "^1.5.4",
     "@types/node": "^24.10.1",
-    "@vercel/node": "^2.5.0",
     "typescript": "^5.9.3"
   },
-  "scripts": {
-    "dev": "echo \"Use 'npx vercel dev' for local development\"",
-    "build": "echo \"Vercel builds serverless functions automatically\"",
-    "start": "echo \"Use 'npx vercel dev' for local development\""
-  }
+"scripts": {
+  "dev": "echo \"Use 'npx vercel dev' for local development\"",
+  "build": "echo \"Vercel builds serverless functions automatically\"",
+  "start": "echo \"Use 'npx vercel dev' for local development\""
+}
 }
