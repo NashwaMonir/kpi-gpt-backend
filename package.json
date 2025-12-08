@@ -16,7 +16,7 @@
     "typescript": "^5.9.3"
   },
   "scripts": {
-    "dev": "echo \"Use Vercel CLI locally (run: npx vercel dev)\"",
+    "dev": "echo \"No dev script configured.\"",
     "build": "echo \"Vercel builds serverless functions automatically\"",
     "start": "echo \"Use Vercel CLI locally (run: npx vercel dev)\""
   }
