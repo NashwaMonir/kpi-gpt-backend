@@ -4,17 +4,21 @@
   "main": "index.js",
   "license": "MIT",
   "dependencies": {
-    "@vercel/node": "^3.0.0",
     "busboy": "^1.6.0",
     "csv-parse": "^6.1.0",
     "exceljs": "^4.4.0",
     "next": "^16.0.7",
-    "openai": "^6.10.0",
-    "xlsx": "^0.18.5"
+    "openai": "^6.10.0"
   },
   "devDependencies": {
+    "@vercel/node": "^2.5.0",
     "@types/busboy": "^1.5.4",
     "@types/node": "^24.10.1",
-    "@types/xlsx": "^0.0.35"
+    "typescript": "^5.9.3"
+  },
+  "scripts": {
+    "dev": "next dev",
+    "build": "next build",
+    "start": "next start"
   }
 }
