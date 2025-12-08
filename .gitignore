@@ -2,3 +2,5 @@ node_modules/
 .DS_Store
 KPI_*.xlsx
 ~$KPI_Input_Lite_test.xlsx
+.vercel
+.env*.local
