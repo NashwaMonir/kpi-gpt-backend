@@ -16,8 +16,8 @@
     "typescript": "^5.9.3"
   },
   "scripts": {
-    "dev": "vercel dev",
+    "dev": "echo \"Use 'npx vercel dev' for local development\"",
     "build": "echo \"Vercel builds serverless functions automatically\"",
-    "start": "echo \"Use 'vercel dev' for local development\""
+    "start": "echo \"Use 'npx vercel dev' for local development\""
   }
 }
