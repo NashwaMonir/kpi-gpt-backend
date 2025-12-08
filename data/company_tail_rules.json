@@ -1,16 +1,215 @@
-[
-  {
-    "id": "generic_default",
-    "description": "Generic organizational tail.",
-    "company": "generic",
-    "roles": [],
-    "template": "aligned with the organization’s strategic objectives to support {benefit}"
+{
+  "buckets": {
+    "named_with_benefit": {
+      "id": "named_with_benefit",
+      "description": "Company is explicitly named (non-generic) and a strategic benefit is provided.",
+      "conditions": {
+        "has_company": true,
+        "company_is_generic": false,
+        "has_benefit": true
+      },
+      "variants": [
+        {
+          "id": "nwb_1",
+          "template": " aligned with {company}'s strategic goal to {benefit}",
+          "notes": "Standard enterprise wording; neutral and cross-industry."
+        },
+        {
+          "id": "nwb_2",
+          "template": " in support of {company}'s priority to {benefit}",
+          "notes": "Emphasises support, suitable for transformation or change programmes."
+        },
+        {
+          "id": "nwb_3",
+          "template": " contributing to {company}'s ambition to {benefit}",
+          "notes": "Softer, ambition-focused framing; good for long-term programmes."
+        },
+        {
+          "id": "nwb_4",
+          "template": " enabling {company} to better {benefit}",
+          "notes": "Outcome-focused, useful when benefit is clearly action-verb based."
+        },
+        {
+          "id": "nwb_5",
+          "template": " strengthening {company}'s ability to {benefit}",
+          "notes": "Good for capability-building initiatives (platforms, tooling, ways of working)."
+        }
+      ]
+    },
+
+    "named_no_benefit": {
+      "id": "named_no_benefit",
+      "description": "Company is explicitly named (non-generic) but no strategic benefit text is provided.",
+      "conditions": {
+        "has_company": true,
+        "company_is_generic": false,
+        "has_benefit": false
+      },
+      "variants": [
+        {
+          "id": "nnb_1",
+          "template": " aligned with {company}'s strategic priorities",
+          "notes": "Default when only the company name is known."
+        },
+        {
+          "id": "nnb_2",
+          "template": " in support of {company}'s digital and business objectives",
+          "notes": "Safe wording for most digital, product, or service initiatives."
+        },
+        {
+          "id": "nnb_3",
+          "template": " contributing to {company}'s long-term growth agenda",
+          "notes": "Useful when initiatives are clearly growth-oriented but no detail is provided."
+        },
+        {
+          "id": "nnb_4",
+          "template": " supporting {company}'s overall strategic roadmap",
+          "notes": "Generic but enterprise-sounding; avoids guessing concrete benefits."
+        }
+      ]
+    },
+
+    "generic_with_benefit": {
+      "id": "generic_with_benefit",
+      "description": "No specific company name, but a strategic benefit is provided. Uses generic labels like “the organization”.",
+      "conditions": {
+        "has_company": false,
+        "company_is_generic": true,
+        "has_benefit": true
+      },
+      "variants": [
+        {
+          "id": "gwb_1",
+          "template": " aligned with the organization's strategic goal to {benefit}",
+          "notes": "Primary generic pattern for benefit-driven objectives."
+        },
+        {
+          "id": "gwb_2",
+          "template": " in support of the company's ambition to {benefit}",
+          "notes": "Balanced between generic “company” wording and outcome focus."
+        },
+        {
+          "id": "gwb_3",
+          "template": " contributing to the business objective to {benefit}",
+          "notes": "Good when benefit text already sounds like a business objective."
+        },
+        {
+          "id": "gwb_4",
+          "template": " helping the organization to better {benefit}",
+          "notes": "Softer, outcome-oriented framing, useful for customer experience work."
+        },
+        {
+          "id": "gwb_5",
+          "template": " strengthening the organization's ability to {benefit}",
+          "notes": "Capability-building focus without naming the company."
+        }
+      ]
+    },
+
+    "generic_no_benefit": {
+      "id": "generic_no_benefit",
+      "description": "No specific company name and no benefit text. Purely generic strategic alignment tails.",
+      "conditions": {
+        "has_company": false,
+        "company_is_generic": true,
+        "has_benefit": false
+      },
+      "variants": [
+        {
+          "id": "gnb_1",
+          "template": " aligned with the organization's strategic priorities",
+          "notes": "Default generic tail when no benefit is provided."
+        },
+        {
+          "id": "gnb_2",
+          "template": " in support of the organization's digital and business objectives",
+          "notes": "Safe phrase for any digital or transformation initiative."
+        },
+        {
+          "id": "gnb_3",
+          "template": " contributing to the company's long-term growth agenda",
+          "notes": "Long-horizon framing when details are limited."
+        },
+        {
+          "id": "gnb_4",
+          "template": " supporting the business roadmap and portfolio goals",
+          "notes": "Neutral wording that fits portfolio and roadmap contexts."
+        }
+      ]
+    },
+
+    "named_generic_company": {
+      "id": "named_generic_company",
+      "description": "Company text looks generic or placeholder (e.g., “ACME”, “Company ABC”) and a benefit is present. Treat name as optional flavour.",
+      "conditions": {
+        "has_company": true,
+        "company_is_generic": true,
+        "has_benefit": true
+      },
+      "variants": [
+        {
+          "id": "ngc_1",
+          "template": " aligned with the organization's strategic goal to {benefit}",
+          "notes": "Ignores the generic label and focuses on benefit."
+        },
+        {
+          "id": "ngc_2",
+          "template": " supporting the company's ambition to {benefit}",
+          "notes": "Keeps “company” wording but does not lean on the fake name."
+        },
+        {
+          "id": "ngc_3",
+          "template": " contributing to the business objective to {benefit}",
+          "notes": "Suitable when benefit is clear and structured as an objective."
+        }
+      ]
+    },
+
+    "named_generic_no_benefit": {
+      "id": "named_generic_no_benefit",
+      "description": "Company text looks generic or placeholder and no benefit is provided.",
+      "conditions": {
+        "has_company": true,
+        "company_is_generic": true,
+        "has_benefit": false
+      },
+      "variants": [
+        {
+          "id": "ngnb_1",
+          "template": " aligned with the organization's strategic priorities",
+          "notes": "Completely generic; hides the placeholder company name."
+        },
+        {
+          "id": "ngnb_2",
+          "template": " supporting the company's overall strategic direction",
+          "notes": "Generic enough for most use cases when benefit is missing."
+        }
+      ]
+    }
   },
-  {
-    "id": "company_default",
-    "description": "Default company tail.",
-    "company": null,
-    "roles": [],
-    "template": "aligned with {company}’s strategic objectives to support {benefit}"
+
+  "behavior": {
+    "selection_order": [
+      "named_with_benefit",
+      "named_no_benefit",
+      "named_generic_company",
+      "named_generic_no_benefit",
+      "generic_with_benefit",
+      "generic_no_benefit"
+    ],
+    "generic_company_labels": [
+      "the organization",
+      "the company",
+      "the business"
+    ],
+    "generic_detection": {
+      "treat_as_generic_if_matches_regex": [
+        "^(acme|example|sample|demo|test)\\b",
+        "company\\s+(abc|xyz)$",
+        "organisation\\s+(abc|xyz)$"
+      ],
+      "treat_as_generic_if_missing_suffix": true
+    },
+    "fallback_bucket": "generic_no_benefit"
   }
-]
+}

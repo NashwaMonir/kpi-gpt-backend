@@ -1,14 +1,50 @@
 [
   {
-    "id": "capitalize_by",
-    "pattern": "\\bby\\s+(\\d{4}-\\d{2}-\\d{2})",
-    "replacement": "By $1",
-    "flags": "g"
+    "id": "simplify_in_order_to",
+    "pattern": "\\bin order to\\b",
+    "flags": "gi",
+    "replacement": "to"
   },
   {
-    "id": "normalize_vs",
-    "pattern": "\\bvs\\b",
-    "replacement": "vs.",
-    "flags": "g"
+    "id": "simplify_in_order_for",
+    "pattern": "\\bin order for\\b",
+    "flags": "gi",
+    "replacement": "so that"
+  },
+  {
+    "id": "simplify_so_as_to",
+    "pattern": "\\bso as to\\b",
+    "flags": "gi",
+    "replacement": "to"
+  },
+  {
+    "id": "normalize_aligned_to_with",
+    "pattern": "\\baligned to\\b",
+    "flags": "gi",
+    "replacement": "aligned with"
+  },
+  {
+    "id": "normalize_in_support_to_of",
+    "pattern": "\\bin support to\\b",
+    "flags": "gi",
+    "replacement": "in support of"
+  },
+  {
+    "id": "normalize_help_to_better",
+    "pattern": "\\bhelp to better\\b",
+    "flags": "gi",
+    "replacement": "help"
+  },
+  {
+    "id": "normalize_strengthen_to_improve",
+    "pattern": "\\bstrengthen the ability to\\b",
+    "flags": "gi",
+    "replacement": "strengthen the organization's ability to"
+  },
+  {
+    "id": "remove_redundant_that",
+    "pattern": "\\bthat that\\b",
+    "flags": "gi",
+    "replacement": "that"
   }
 ]

@@ -3,521 +3,709 @@
     "role_mapping": {
       "content": "content",
       "content lead": "content",
+      "content team": "content",
+      "editorial": "content",
+      "copywriter": "content",
+      "copywriting": "content",
+      "brand content": "content",
+
       "design": "design",
       "design lead": "design",
+      "ux": "design",
+      "ux designer": "design",
+      "ui": "design",
+      "ui designer": "design",
+      "product design": "design",
+      "ux/ui": "design",
+
       "development": "development",
-      "development lead": "development"
+      "development lead": "development",
+      "developer": "development",
+      "frontend": "development",
+      "backend": "development",
+      "fullstack": "development",
+      "engineering": "development",
+      "software engineer": "development"
     },
     "task_type_mapping": {
       "project": "project",
+      "projects": "project",
+
       "change request": "change_request",
       "change_request": "change_request",
-      "consultation": "consultation"
+      "change req": "change_request",
+      "bugfix": "change_request",
+      "enhancement": "change_request",
+
+      "consultation": "consultation",
+      "advisory": "consultation",
+      "workshop": "consultation",
+      "review": "consultation"
     }
   },
   "entries": [
     {
-      "id": "content_lead_project_1",
-      "normalized_role": "content",
-      "task_type": "project",
-      "output_metric": "≥95% CMS content migration completed",
-      "quality_metric": "≤3% metadata or layout error",
-      "improvement_metric": "Improve upload throughput by 15%",
-      "base_line": "80% migration baseline"
-    },
-    {
-      "id": "content_lead_project_2",
-      "normalized_role": "content",
-      "task_type": "project",
-      "output_metric": "≥4.5/5 editorial quality score (post-review)",
-      "quality_metric": "≤2 content rejections per 100 assets",
-      "improvement_metric": "Increase editorial consistency by 10%",
-      "base_line": "Last quarter QA score"
-    },
-    {
-      "id": "content_lead_project_3",
-      "normalized_role": "content",
-      "task_type": "project",
-      "output_metric": "100% batch delivery before deadline",
-      "quality_metric": "≤5% missed publish slots",
-      "improvement_metric": "Reduce turnaround by 20%",
-      "base_line": "Avg 5 days per batch"
-    },
-
-    {
-      "id": "content_lead_cr_1",
-      "normalized_role": "content",
-      "task_type": "change_request",
-      "output_metric": "≥90% content update accuracy",
-      "quality_metric": "≤2% tagging or grammar errors",
-      "improvement_metric": "Reduce revision cycles by 10%",
-      "base_line": "85% update accuracy"
-    },
-    {
-      "id": "content_lead_cr_2",
-      "normalized_role": "content",
-      "task_type": "change_request",
-      "output_metric": "≥4.3/5 stakeholder satisfaction",
-      "quality_metric": "≤1 correction per update",
-      "improvement_metric": "Improve clarity perception by 15%",
-      "base_line": "Review form baseline"
-    },
-    {
-      "id": "content_lead_cr_3",
-      "normalized_role": "content",
-      "task_type": "change_request",
-      "output_metric": "≥85% requests closed same day",
-      "quality_metric": "≤10% reopened tickets",
-      "improvement_metric": "Improve closure ratio by 10%",
-      "base_line": "70% on-time closure"
-    },
-
-    {
-      "id": "content_lead_consult_1",
-      "normalized_role": "content",
-      "task_type": "consultation",
-      "output_metric": "≥10 audits/month (SEO, readability)",
-      "quality_metric": "≤5% post-audit rework",
-      "improvement_metric": "Increase completed audits by 10%",
-      "base_line": "8 per month"
-    },
-    {
-      "id": "content_lead_consult_2",
-      "normalized_role": "content",
-      "task_type": "consultation",
-      "output_metric": "≥4.5/5 client satisfaction",
-      "quality_metric": "≤1 follow-up per project",
-      "improvement_metric": "Improve feedback quality by 20%",
-      "base_line": "Last survey"
-    },
-    {
-      "id": "content_lead_consult_3",
-      "normalized_role": "content",
-      "task_type": "consultation",
-      "output_metric": "≥90% reports issued within 48 h",
-      "quality_metric": "≤3% delays",
-      "improvement_metric": "Improve report timeliness by 15%",
-      "base_line": "75% on-time"
-    },
-
-    {
-      "id": "design_lead_project_1",
-      "normalized_role": "design",
-      "task_type": "project",
-      "output_metric": "≥95% adherence to design system",
-      "quality_metric": "≤3% accessibility issues (WCAG)",
-      "improvement_metric": "Increase on-time delivery by 15%",
-      "base_line": "85% compliance"
-    },
-    {
-      "id": "design_lead_project_2",
-      "normalized_role": "design",
-      "task_type": "project",
-      "output_metric": "≥4.5/5 stakeholder design satisfaction",
-      "quality_metric": "≤2 iteration loops per design",
-      "improvement_metric": "Improve collaboration by 10%",
-      "base_line": "Survey avg"
-    },
-    {
-      "id": "design_lead_project_3",
-      "normalized_role": "design",
-      "task_type": "project",
-      "output_metric": "100% screens submitted before dev freeze",
-      "quality_metric": "≤5% late submissions",
-      "improvement_metric": "Reduce rework time by 20%",
-      "base_line": "Avg 7 days delay"
-    },
-
-    {
-      "id": "design_lead_cr_1",
-      "normalized_role": "design",
-      "task_type": "change_request",
-      "output_metric": "≥90% accuracy in UI component updates",
-      "quality_metric": "≤2% rollback",
-      "improvement_metric": "Reduce review time by 15%",
-      "base_line": "80% success rate"
-    },
-    {
-      "id": "design_lead_cr_2",
-      "normalized_role": "design",
-      "task_type": "change_request",
-      "output_metric": "≥4.2/5 UX peer review score",
-      "quality_metric": "≤1 escalation per sprint",
-      "improvement_metric": "Improve UX alignment by 10%",
-      "base_line": "UX audit log"
-    },
-    {
-      "id": "design_lead_cr_3",
-      "normalized_role": "design",
-      "task_type": "change_request",
-      "output_metric": "≥85% of requests closed in current sprint",
-      "quality_metric": "≤10% reopened",
-      "improvement_metric": "Increase closure ratio by 10%",
-      "base_line": "70% closure"
-    },
-
-    {
-      "id": "design_lead_consult_1",
-      "normalized_role": "design",
-      "task_type": "consultation",
-      "output_metric": "≥12 design reviews/month",
-      "quality_metric": "≤5% deviation from brand system",
-      "improvement_metric": "Improve audit output by 10%",
-      "base_line": "10 reviews/month"
-    },
-    {
-      "id": "design_lead_consult_2",
-      "normalized_role": "design",
-      "task_type": "consultation",
-      "output_metric": "≥4.5/5 cross-team feedback score",
-      "quality_metric": "≤1 client escalation/quarter",
-      "improvement_metric": "Improve perception by 20%",
-      "base_line": "Peer review data"
-    },
-    {
-      "id": "design_lead_consult_3",
-      "normalized_role": "design",
-      "task_type": "consultation",
-      "output_metric": "≥90% feedback reports shared ≤48 h",
-      "quality_metric": "≤3% late",
-      "improvement_metric": "Reduce review lag by 15%",
-      "base_line": "Avg 3 days baseline"
-    },
-
-    {
-      "id": "dev_lead_project_1",
-      "normalized_role": "development",
-      "task_type": "project",
-      "output_metric": "≥98% successful deployments",
-      "quality_metric": "≤1% post-release defects",
-      "improvement_metric": "Improve delivery velocity by 15%",
-      "base_line": "90% success"
-    },
-    {
-      "id": "dev_lead_project_2",
-      "normalized_role": "development",
-      "task_type": "project",
-      "output_metric": "≥4.5/5 internal satisfaction (QA/PM)",
-      "quality_metric": "≤1 rollback per release",
-      "improvement_metric": "Increase reliability perception by 10%",
-      "base_line": "Feedback baseline"
-    },
-    {
-      "id": "dev_lead_project_3",
-      "normalized_role": "development",
-      "task_type": "project",
-      "output_metric": "≥90% sprints delivered on schedule",
-      "quality_metric": "≤5% delays",
-      "improvement_metric": "Improve timeliness by 10%",
-      "base_line": "80% adherence"
-    },
-
-    {
-      "id": "dev_lead_cr_1",
-      "normalized_role": "development",
-      "task_type": "change_request",
-      "output_metric": "≥95% issue resolution accuracy",
-      "quality_metric": "≤2% regression bugs",
-      "improvement_metric": "Reduce average fix time by 15%",
-      "base_line": "88% accuracy"
-    },
-    {
-      "id": "dev_lead_cr_2",
-      "normalized_role": "development",
-      "task_type": "change_request",
-      "output_metric": "≥4.3/5 QA satisfaction",
-      "quality_metric": "≤1 reopened ticket per sprint",
-      "improvement_metric": "Improve quality perception by 10%",
-      "base_line": "QA form baseline"
-    },
-    {
-      "id": "dev_lead_cr_3",
-      "normalized_role": "development",
-      "task_type": "change_request",
-      "output_metric": "≥90% patches deployed first attempt",
-      "quality_metric": "≤5% rollback",
-      "improvement_metric": "Improve stability by 10%",
-      "base_line": "80% first-try success"
-    },
-
-    {
-      "id": "dev_lead_consult_1",
-      "normalized_role": "development",
-      "task_type": "consultation",
-      "output_metric": "≥10 tech audits/month",
-      "quality_metric": "≤3% non-compliance",
-      "improvement_metric": "Improve audit closure by 10%",
-      "base_line": "8/month"
-    },
-    {
-      "id": "dev_lead_consult_2",
-      "normalized_role": "development",
-      "task_type": "consultation",
-      "output_metric": "≥4.5/5 partner satisfaction",
-      "quality_metric": "≤1 follow-up per consultation",
-      "improvement_metric": "Improve partner feedback by 20%",
-      "base_line": "Partner survey"
-    },
-    {
-      "id": "dev_lead_consult_3",
-      "normalized_role": "development",
-      "task_type": "consultation",
-      "output_metric": "≥90% reports closed ≤3 days",
-      "quality_metric": "≤5% late closures",
-      "improvement_metric": "Improve efficiency by 15%",
-      "base_line": "Avg 4 days"
-    },
-
-    {
       "id": "content_project_1",
       "normalized_role": "content",
       "task_type": "project",
-      "output_metric": "≥95% CMS content migration completed",
-      "quality_metric": "≤3% metadata or layout error",
-      "improvement_metric": "Improve upload throughput by 15%",
-      "base_line": "80% migration baseline"
+      "output_metric": "≥95% of planned content assets delivered on time",
+      "quality_metric": "≤2% language or factual error rate in live assets",
+      "improvement_metric": "Increase content engagement rate by 15%",
+      "base_line": "Current average engagement rate on content assets"
     },
     {
       "id": "content_project_2",
       "normalized_role": "content",
       "task_type": "project",
-      "output_metric": "≥4.5/5 editorial quality score (post-review)",
-      "quality_metric": "≤2 content rejections per 100 assets",
-      "improvement_metric": "Increase editorial consistency by 10%",
-      "base_line": "Last quarter QA score"
+      "output_metric": "≥90% of target pages populated with updated copy",
+      "quality_metric": "≥4.5/5 internal editorial review score",
+      "improvement_metric": "Increase organic click-through rate on updated pages by 10%",
+      "base_line": "Current CTR on targeted pages"
     },
     {
       "id": "content_project_3",
       "normalized_role": "content",
       "task_type": "project",
-      "output_metric": "100% batch delivery before deadline",
-      "quality_metric": "≤5% missed publish slots",
-      "improvement_metric": "Reduce turnaround by 20%",
-      "base_line": "Avg 5 days per batch"
+      "output_metric": "≥95% metadata and on-page SEO fields completed for in-scope pages",
+      "quality_metric": "≤3% SEO validation issues in post-launch audits",
+      "improvement_metric": "Increase organic traffic to in-scope pages by 20%",
+      "base_line": "Current organic traffic to in-scope pages"
+    },
+    {
+      "id": "content_project_4",
+      "normalized_role": "content",
+      "task_type": "project",
+      "output_metric": "≥90% of planned campaign content localized for all target markets",
+      "quality_metric": "≤3% localization or terminology issues reported",
+      "improvement_metric": "Improve localized campaign engagement rates by 15%",
+      "base_line": "Current engagement on localized campaigns"
     },
 
     {
-      "id": "content_cr_1",
+      "id": "content_change_request_1",
       "normalized_role": "content",
       "task_type": "change_request",
-      "output_metric": "≥90% content update accuracy",
-      "quality_metric": "≤2% tagging or grammar errors",
-      "improvement_metric": "Reduce revision cycles by 10%",
-      "base_line": "85% update accuracy"
+      "output_metric": "≥95% of requested content updates implemented within agreed scope",
+      "quality_metric": "≤2% defects or rework requests after go-live",
+      "improvement_metric": "Reduce turnaround time for content changes by 20%",
+      "base_line": "Current average turnaround time for content changes"
     },
     {
-      "id": "content_cr_2",
+      "id": "content_change_request_2",
       "normalized_role": "content",
       "task_type": "change_request",
-      "output_metric": "≥4.3/5 stakeholder satisfaction",
-      "quality_metric": "≤1 correction per update",
-      "improvement_metric": "Improve clarity perception by 15%",
-      "base_line": "Review form baseline"
+      "output_metric": "≥90% of impacted pages updated with approved messaging",
+      "quality_metric": "≤3% stakeholder change complaints received",
+      "improvement_metric": "Increase approval-at-first-review rate for content changes by 15%",
+      "base_line": "Current first-pass approval rate for content changes"
     },
     {
-      "id": "content_cr_3",
+      "id": "content_change_request_3",
       "normalized_role": "content",
       "task_type": "change_request",
-      "output_metric": "≥85% requests closed same day",
-      "quality_metric": "≤10% reopened tickets",
-      "improvement_metric": "Improve closure ratio by 10%",
-      "base_line": "70% on-time closure"
+      "output_metric": "≥95% compliance with latest legal and regulatory content requirements",
+      "quality_metric": "0 critical compliance findings in spot checks",
+      "improvement_metric": "Reduce legal wording rework by 25%",
+      "base_line": "Current volume of legal-driven content rework"
+    },
+    {
+      "id": "content_change_request_4",
+      "normalized_role": "content",
+      "task_type": "change_request",
+      "output_metric": "≥95% of campaign assets updated to reflect new offer or pricing",
+      "quality_metric": "≤2% inconsistencies in offer or pricing details",
+      "improvement_metric": "Reduce customer queries caused by outdated content by 20%",
+      "base_line": "Current volume of queries caused by outdated content"
     },
 
     {
-      "id": "content_consult_1",
+      "id": "content_consultation_1",
       "normalized_role": "content",
       "task_type": "consultation",
-      "output_metric": "≥10 audits/month (SEO, readability)",
-      "quality_metric": "≤5% post-audit rework",
-      "improvement_metric": "Increase completed audits by 10%",
-      "base_line": "8 per month"
+      "output_metric": "Deliver content strategy recommendations for ≥3 key journeys",
+      "quality_metric": "≥4.5/5 stakeholder satisfaction with advisory quality",
+      "improvement_metric": "Increase adoption of content recommendations to ≥80% of agreed actions",
+      "base_line": "Current adoption rate of content recommendations"
     },
     {
-      "id": "content_consult_2",
+      "id": "content_consultation_2",
       "normalized_role": "content",
       "task_type": "consultation",
-      "output_metric": "≥4.5/5 client satisfaction",
-      "quality_metric": "≤1 follow-up per project",
-      "improvement_metric": "Improve feedback quality by 20%",
-      "base_line": "Last survey"
+      "output_metric": "Produce a consolidated content audit covering ≥95% of in-scope assets",
+      "quality_metric": "≤5% factual or classification issues in the audit deliverables",
+      "improvement_metric": "Identify opportunities to improve content performance by ≥20%",
+      "base_line": "Current performance on audited assets"
     },
     {
-      "id": "content_consult_3",
+      "id": "content_consultation_3",
       "normalized_role": "content",
       "task_type": "consultation",
-      "output_metric": "≥90% reports issued within 48 h",
-      "quality_metric": "≤3% delays",
-      "improvement_metric": "Improve report timeliness by 15%",
-      "base_line": "75% on-time"
+      "output_metric": "Develop content guidelines for ≥5 priority use cases or channels",
+      "quality_metric": "≥4.5/5 internal rating for clarity and usability of guidelines",
+      "improvement_metric": "Achieve ≥70% guideline adoption in new content within the first release cycle",
+      "base_line": "Current usage of existing content guidelines"
+    },
+    {
+      "id": "content_consultation_4",
+      "normalized_role": "content",
+      "task_type": "consultation",
+      "output_metric": "Provide content advisory support to ≥2 cross-functional initiatives",
+      "quality_metric": "≥4.3/5 satisfaction score from supported initiative owners",
+      "improvement_metric": "Increase perceived clarity of messaging in supported initiatives by 15%",
+      "base_line": "Current internal survey score for messaging clarity"
     },
 
     {
       "id": "design_project_1",
       "normalized_role": "design",
       "task_type": "project",
-      "output_metric": "≥95% adherence to design system",
-      "quality_metric": "≤3% accessibility issues (WCAG)",
-      "improvement_metric": "Increase on-time delivery by 15%",
-      "base_line": "85% compliance"
+      "output_metric": "Deliver ≥95% of in-scope UX/UI screens and flows by design freeze",
+      "quality_metric": "≤3% usability defects identified in post-launch UX testing",
+      "improvement_metric": "Increase task success rate in key journeys by 15%",
+      "base_line": "Current task success rate in key journeys"
     },
     {
       "id": "design_project_2",
       "normalized_role": "design",
       "task_type": "project",
-      "output_metric": "≥4.5/5 stakeholder design satisfaction",
-      "quality_metric": "≤2 iteration loops per design",
-      "improvement_metric": "Improve collaboration by 10%",
-      "base_line": "Survey avg"
+      "output_metric": "Achieve ≥90% adherence to the design system for new or updated screens",
+      "quality_metric": "≤2% visual or interaction inconsistencies in design QA",
+      "improvement_metric": "Improve design-to-development handoff quality to reduce rework by 20%",
+      "base_line": "Current level of design-related rework raised by development"
     },
     {
       "id": "design_project_3",
       "normalized_role": "design",
       "task_type": "project",
-      "output_metric": "100% screens submitted before dev freeze",
-      "quality_metric": "≤5% late submissions",
-      "improvement_metric": "Reduce rework time by 20%",
-      "base_line": "Avg 7 days delay"
+      "output_metric": "Complete UX research and validated prototypes for ≥3 priority flows",
+      "quality_metric": "≥4.3/5 average usability rating in moderated testing",
+      "improvement_metric": "Increase user satisfaction scores for redesigned journeys by 10%",
+      "base_line": "Current satisfaction scores for the same journeys"
+    },
+    {
+      "id": "design_project_4",
+      "normalized_role": "design",
+      "task_type": "project",
+      "output_metric": "Deliver responsive layouts for ≥95% of in-scope breakpoints",
+      "quality_metric": "≤3% visual defects reported across supported devices",
+      "improvement_metric": "Reduce design-related production issues by 25%",
+      "base_line": "Current volume of design-related production issues"
     },
 
     {
-      "id": "design_cr_1",
+      "id": "design_change_request_1",
       "normalized_role": "design",
       "task_type": "change_request",
-      "output_metric": "≥90% accuracy in UI component updates",
-      "quality_metric": "≤2% rollback",
-      "improvement_metric": "Reduce review time by 15%",
-      "base_line": "80% success rate"
+      "output_metric": "Deliver ≥95% of requested UX/UI updates within agreed scope",
+      "quality_metric": "≤3% rework due to misinterpreted change requirements",
+      "improvement_metric": "Reduce average cycle time for design changes by 20%",
+      "base_line": "Current average cycle time for design changes"
     },
     {
-      "id": "design_cr_2",
+      "id": "design_change_request_2",
       "normalized_role": "design",
       "task_type": "change_request",
-      "output_metric": "≥4.2/5 UX peer review score",
-      "quality_metric": "≤1 escalation per sprint",
-      "improvement_metric": "Improve UX alignment by 10%",
-      "base_line": "UX audit log"
+      "output_metric": "Align ≥90% of affected components with latest design-system standards",
+      "quality_metric": "≤2% unresolved design-system deviations after review",
+      "improvement_metric": "Increase design-system compliance for legacy screens by 15%",
+      "base_line": "Current design-system compliance level on legacy screens"
     },
     {
-      "id": "design_cr_3",
+      "id": "design_change_request_3",
       "normalized_role": "design",
       "task_type": "change_request",
-      "output_metric": "≥85% of requests closed in current sprint",
-      "quality_metric": "≤10% reopened",
-      "improvement_metric": "Increase closure ratio by 10%",
-      "base_line": "70% closure"
+      "output_metric": "Implement accessibility-related design updates for ≥95% of in-scope elements",
+      "quality_metric": "No critical WCAG violations in post-change accessibility review",
+      "improvement_metric": "Increase accessibility compliance scores by 10%",
+      "base_line": "Current accessibility compliance score"
+    },
+    {
+      "id": "design_change_request_4",
+      "normalized_role": "design",
+      "task_type": "change_request",
+      "output_metric": "Update UX writing and microcopy for ≥90% of impacted touchpoints",
+      "quality_metric": "≥4.3/5 internal review score for clarity and tone",
+      "improvement_metric": "Reduce user confusion-related support contacts by 15%",
+      "base_line": "Current volume of support contacts caused by unclear UX copy"
     },
 
     {
-      "id": "design_consult_1",
+      "id": "design_consultation_1",
       "normalized_role": "design",
       "task_type": "consultation",
-      "output_metric": "≥12 design reviews/month",
-      "quality_metric": "≤5% deviation from brand system",
-      "improvement_metric": "Improve audit output by 10%",
-      "base_line": "10 reviews/month"
+      "output_metric": "Deliver UX review and recommendations for ≥3 key journeys or features",
+      "quality_metric": "≥4.5/5 stakeholder satisfaction with UX recommendations",
+      "improvement_metric": "Achieve adoption of ≥75% of prioritized UX recommendations",
+      "base_line": "Current adoption rate of UX recommendations"
     },
     {
-      "id": "design_consult_2",
+      "id": "design_consultation_2",
       "normalized_role": "design",
       "task_type": "consultation",
-      "output_metric": "≥4.5/5 cross-team feedback score",
-      "quality_metric": "≤1 client escalation/quarter",
-      "improvement_metric": "Improve perception by 20%",
-      "base_line": "Peer review data"
+      "output_metric": "Produce a consolidated UX audit for ≥90% of in-scope interfaces",
+      "quality_metric": "≤5% classification or severity issues in UX findings",
+      "improvement_metric": "Identify opportunities to reduce UX pain points by ≥20%",
+      "base_line": "Current number of UX pain points identified in feedback"
     },
     {
-      "id": "design_consult_3",
+      "id": "design_consultation_3",
       "normalized_role": "design",
       "task_type": "consultation",
-      "output_metric": "≥90% feedback reports shared ≤48 h",
-      "quality_metric": "≤3% late",
-      "improvement_metric": "Reduce review lag by 15%",
-      "base_line": "Avg 3 days baseline"
+      "output_metric": "Facilitate ≥2 cross-functional UX workshops with documented outcomes",
+      "quality_metric": "≥4.3/5 workshop effectiveness rating from participants",
+      "improvement_metric": "Increase shared understanding of target experiences by 20%",
+      "base_line": "Current internal survey score on shared UX understanding"
+    },
+    {
+      "id": "design_consultation_4",
+      "normalized_role": "design",
+      "task_type": "consultation",
+      "output_metric": "Provide UX advisory support to ≥2 strategic initiatives",
+      "quality_metric": "≥4.3/5 satisfaction rating from initiative owners",
+      "improvement_metric": "Improve early-stage UX risk identification rate by 20%",
+      "base_line": "Current rate of early-stage UX risk identification"
     },
 
     {
-      "id": "dev_project_1",
+      "id": "development_project_1",
       "normalized_role": "development",
       "task_type": "project",
-      "output_metric": "≥98% successful deployments",
-      "quality_metric": "≤1% post-release defects",
-      "improvement_metric": "Improve delivery velocity by 15%",
-      "base_line": "90% success"
+      "output_metric": "Deliver ≥95% of in-scope features within the planned release window",
+      "quality_metric": "≤1% critical or high-severity defects in the first 30 days post-release",
+      "improvement_metric": "Improve deployment success rate by 15%",
+      "base_line": "Current deployment success rate"
     },
     {
-      "id": "dev_project_2",
+      "id": "development_project_2",
       "normalized_role": "development",
       "task_type": "project",
-      "output_metric": "≥4.5/5 internal satisfaction (QA/PM)",
-      "quality_metric": "≤1 rollback per release",
-      "improvement_metric": "Increase reliability perception by 10%",
-      "base_line": "Feedback baseline"
+      "output_metric": "Achieve ≥99.5% uptime for the in-scope services over the measurement period",
+      "quality_metric": "≤0.5% of incidents caused by regressions from this project",
+      "improvement_metric": "Improve service response times by 20%",
+      "base_line": "Current average response time for in-scope services"
     },
     {
-      "id": "dev_project_3",
+      "id": "development_project_3",
       "normalized_role": "development",
       "task_type": "project",
-      "output_metric": "≥90% sprints delivered on schedule",
-      "quality_metric": "≤5% delays",
-      "improvement_metric": "Improve timeliness by 10%",
-      "base_line": "80% adherence"
+      "output_metric": "Migrate ≥95% of targeted components or services to the new architecture",
+      "quality_metric": "≤2% rollback events related to the migration",
+      "improvement_metric": "Reduce infrastructure or runtime costs for migrated scope by 15%",
+      "base_line": "Current cost baseline for migrated components"
+    },
+    {
+      "id": "development_project_4",
+      "normalized_role": "development",
+      "task_type": "project",
+      "output_metric": "Automate ≥80% of critical regression test cases for the in-scope area",
+      "quality_metric": "≤2% missed critical defects that should have been covered by automation",
+      "improvement_metric": "Reduce average regression testing time by 25%",
+      "base_line": "Current average duration of regression testing cycles"
     },
 
     {
-      "id": "dev_cr_1",
+      "id": "development_change_request_1",
       "normalized_role": "development",
       "task_type": "change_request",
-      "output_metric": "≥95% issue resolution accuracy",
-      "quality_metric": "≤2% regression bugs",
-      "improvement_metric": "Reduce average fix time by 15%",
-      "base_line": "88% accuracy"
+      "output_metric": "Implement ≥95% of approved change requests in the agreed scope",
+      "quality_metric": "≤2% re-opened tickets due to technical defects",
+      "improvement_metric": "Reduce average lead time for change implementation by 20%",
+      "base_line": "Current average lead time for change implementation"
     },
     {
-      "id": "dev_cr_2",
+      "id": "development_change_request_2",
       "normalized_role": "development",
       "task_type": "change_request",
-      "output_metric": "≥4.3/5 QA satisfaction",
-      "quality_metric": "≤1 reopened ticket per sprint",
-      "improvement_metric": "Improve quality perception by 10%",
-      "base_line": "QA form baseline"
+      "output_metric": "Resolve ≥90% of critical defects in the affected modules",
+      "quality_metric": "≤5% recurrence rate for fixed defects",
+      "improvement_metric": "Reduce critical incident volume in the affected modules by 25%",
+      "base_line": "Current critical incident volume for affected modules"
     },
     {
-      "id": "dev_cr_3",
+      "id": "development_change_request_3",
       "normalized_role": "development",
       "task_type": "change_request",
-      "output_metric": "≥90% patches deployed first attempt",
-      "quality_metric": "≤5% rollback",
-      "improvement_metric": "Improve stability by 10%",
-      "base_line": "80% first-try success"
+      "output_metric": "Complete performance optimization changes for ≥90% of identified hotspots",
+      "quality_metric": "No new critical performance regressions introduced",
+      "improvement_metric": "Improve throughput or response time for optimized paths by 20%",
+      "base_line": "Current throughput or response time on identified hotspots"
+    },
+    {
+      "id": "development_change_request_4",
+      "normalized_role": "development",
+      "task_type": "change_request",
+      "output_metric": "Apply security-related fixes for ≥95% of identified vulnerabilities in scope",
+      "quality_metric": "0 unresolved critical security findings after re-scan",
+      "improvement_metric": "Reduce security vulnerability backlog for the in-scope area by 30%",
+      "base_line": "Current security vulnerability backlog for the in-scope area"
     },
 
     {
-      "id": "dev_consult_1",
+      "id": "development_consultation_1",
       "normalized_role": "development",
       "task_type": "consultation",
-      "output_metric": "≥10 tech audits/month",
-      "quality_metric": "≤3% non-compliance",
-      "improvement_metric": "Improve audit closure by 10%",
-      "base_line": "8/month"
+      "output_metric": "Deliver technical advisory or architecture review for ≥3 systems or features",
+      "quality_metric": "≥4.5/5 stakeholder satisfaction with technical guidance",
+      "improvement_metric": "Achieve adoption of ≥75% of prioritized technical recommendations",
+      "base_line": "Current adoption rate of technical recommendations"
     },
     {
-      "id": "dev_consult_2",
+      "id": "development_consultation_2",
       "normalized_role": "development",
       "task_type": "consultation",
-      "output_metric": "≥4.5/5 partner satisfaction",
-      "quality_metric": "≤1 follow-up per consultation",
-      "improvement_metric": "Improve partner feedback by 20%",
-      "base_line": "Partner survey"
+      "output_metric": "Produce a consolidated technical risk and dependency assessment for in-scope initiatives",
+      "quality_metric": "≤5% gaps or inaccuracies identified in risk assessments",
+      "improvement_metric": "Reduce unplanned technical risk materialization by 20%",
+      "base_line": "Current rate of unplanned technical risk materialization"
     },
     {
-      "id": "dev_consult_3",
+      "id": "development_consultation_3",
       "normalized_role": "development",
       "task_type": "consultation",
-      "output_metric": "≥90% reports closed ≤3 days",
-      "quality_metric": "≤5% late closures",
-      "improvement_metric": "Improve efficiency by 15%",
-      "base_line": "Avg 4 days"
+      "output_metric": "Support ≥2 cross-team design or architecture workshops with documented outcomes",
+      "quality_metric": "≥4.3/5 workshop usefulness rating from participants",
+      "improvement_metric": "Increase early alignment on technical direction by 20%",
+      "base_line": "Current alignment score on technical direction from internal surveys"
+    },
+    {
+      "id": "development_consultation_4",
+      "normalized_role": "development",
+      "task_type": "consultation",
+      "output_metric": "Provide implementation feasibility assessments for ≥90% of in-scope proposals",
+      "quality_metric": "≤5% proposals requiring major rework due to overlooked technical constraints",
+      "improvement_metric": "Improve accuracy of effort estimates for assessed proposals by 15%",
+      "base_line": "Current variance between estimated and actual effort for similar work"
+    },{
+      "id": "content_lead_project_1",
+      "normalized_role": "content",
+      "task_type": "project",
+      "output_metric": "Achieve ≥95% delivery of in-scope content assets across all agreed channels",
+      "quality_metric": "≤2% content defects or rework requests raised after internal review",
+      "improvement_metric": "Increase cross-channel content consistency score by 20%",
+      "base_line": "Current cross-channel content consistency score from content audits"
+    },
+    {
+      "id": "content_lead_project_2",
+      "normalized_role": "content",
+      "task_type": "project",
+      "output_metric": "Ensure ≥90% of key journeys have an approved content strategy and asset plan",
+      "quality_metric": "≥4.5/5 stakeholder satisfaction with content deliverables",
+      "improvement_metric": "Increase on-time content delivery rate by 15%",
+      "base_line": "Current on-time delivery rate for content projects"
+    },
+    {
+      "id": "content_lead_project_3",
+      "normalized_role": "content",
+      "task_type": "project",
+      "output_metric": "Reach ≥90% adherence to content governance guidelines across in-scope assets",
+      "quality_metric": "≤3% deviations from brand and tone of voice standards in QA",
+      "improvement_metric": "Reduce governance-related content escalations by 25%",
+      "base_line": "Current number of governance-related content escalations per quarter"
+    },
+    {
+      "id": "content_lead_project_4",
+      "normalized_role": "content",
+      "task_type": "project",
+      "output_metric": "Establish and track content KPIs for ≥95% of in-scope campaigns and journeys",
+      "quality_metric": "≥85% of content reports delivered on time and without data gaps",
+      "improvement_metric": "Improve campaign-level content ROI by 15%",
+      "base_line": "Current content ROI for comparable campaigns"
+    },
+
+    {
+      "id": "content_lead_change_request_1",
+      "normalized_role": "content",
+      "task_type": "change_request",
+      "output_metric": "Deliver ≥95% of approved content changes within agreed SLAs",
+      "quality_metric": "≤2% of completed changes requiring rework due to content quality issues",
+      "improvement_metric": "Reduce average turnaround time for content changes by 20%",
+      "base_line": "Current average end-to-end turnaround time for content change requests"
+    },
+    {
+      "id": "content_lead_change_request_2",
+      "normalized_role": "content",
+      "task_type": "change_request",
+      "output_metric": "Ensure ≥90% coverage of impacted assets in each content change request",
+      "quality_metric": "≤3% inconsistencies detected across related content items after changes",
+      "improvement_metric": "Reduce open content change backlog by 25%",
+      "base_line": "Current volume of open content change requests in the backlog"
+    },
+    {
+      "id": "content_lead_change_request_3",
+      "normalized_role": "content",
+      "task_type": "change_request",
+      "output_metric": "Achieve ≥95% compliance with regulatory and legal requirements in updated content",
+      "quality_metric": "0 critical legal or compliance findings in post-change audits",
+      "improvement_metric": "Reduce legal-driven content rework volume by 30%",
+      "base_line": "Current level of legal-driven content rework for in-scope areas"
+    },
+    {
+      "id": "content_lead_change_request_4",
+      "normalized_role": "content",
+      "task_type": "change_request",
+      "output_metric": "Maintain ≥90% first-pass approval rate on content changes from key stakeholders",
+      "quality_metric": "≤3% escalations related to missed business requirements in changes",
+      "improvement_metric": "Increase first-pass approval rate for content changes by 15%",
+      "base_line": "Current first-pass approval rate for content change requests"
+    },
+
+    {
+      "id": "content_lead_consultation_1",
+      "normalized_role": "content",
+      "task_type": "consultation",
+      "output_metric": "Provide content advisory support to ≥3 strategic initiatives with documented recommendations",
+      "quality_metric": "≥4.5/5 satisfaction score from initiative owners on content leadership support",
+      "improvement_metric": "Achieve ≥75% adoption of prioritized content recommendations",
+      "base_line": "Current adoption rate of content recommendations across strategic initiatives"
+    },
+    {
+      "id": "content_lead_consultation_2",
+      "normalized_role": "content",
+      "task_type": "consultation",
+      "output_metric": "Deliver content audits and gap analyses for ≥90% of in-scope journeys",
+      "quality_metric": "≤5% classification or severity issues in audit findings",
+      "improvement_metric": "Identify opportunities to improve content performance by ≥20%",
+      "base_line": "Current performance benchmarks for audited journeys"
+    },
+    {
+      "id": "content_lead_consultation_3",
+      "normalized_role": "content",
+      "task_type": "consultation",
+      "output_metric": "Publish or update content governance guidelines covering ≥95% priority use cases",
+      "quality_metric": "≥4.3/5 internal rating for clarity and usability of guidelines",
+      "improvement_metric": "Increase adoption of content governance guidelines to ≥80% of new assets",
+      "base_line": "Current adoption level of content governance guidelines"
+    },
+    {
+      "id": "content_lead_consultation_4",
+      "normalized_role": "content",
+      "task_type": "consultation",
+      "output_metric": "Facilitate ≥2 cross-functional content planning or alignment workshops per quarter",
+      "quality_metric": "≥4.3/5 effectiveness rating from workshop participants",
+      "improvement_metric": "Increase cross-team alignment on content priorities by 20%",
+      "base_line": "Current internal survey score for alignment on content priorities"
+    },
+
+    {
+      "id": "design_lead_project_1",
+      "normalized_role": "design",
+      "task_type": "project",
+      "output_metric": "Ensure ≥95% of in-scope journeys have approved UX/UI designs at design freeze",
+      "quality_metric": "≤3% usability or accessibility defects identified post-launch",
+      "improvement_metric": "Increase task success rate in prioritized journeys by 15%",
+      "base_line": "Current task success rate measured in UX tests for the same journeys"
+    },
+    {
+      "id": "design_lead_project_2",
+      "normalized_role": "design",
+      "task_type": "project",
+      "output_metric": "Achieve ≥90% design-system compliance for new or redesigned interfaces",
+      "quality_metric": "≤2% critical design-system deviations remaining after design QA",
+      "improvement_metric": "Reduce design-related production issues by 25%",
+      "base_line": "Current volume of production incidents attributed to design issues"
+    },
+    {
+      "id": "design_lead_project_3",
+      "normalized_role": "design",
+      "task_type": "project",
+      "output_metric": "Deliver validated prototypes and UX research for ≥3 critical flows per project",
+      "quality_metric": "≥4.3/5 usability rating in moderated or unmoderated UX testing",
+      "improvement_metric": "Increase user satisfaction scores for redesigned experiences by 10%",
+      "base_line": "Current satisfaction scores for the corresponding journeys"
+    },
+    {
+      "id": "design_lead_project_4",
+      "normalized_role": "design",
+      "task_type": "project",
+      "output_metric": "Coordinate UX/UI designs for ≥95% supported platforms and breakpoints in scope",
+      "quality_metric": "≤3% cross-platform visual or interaction inconsistencies in QA",
+      "improvement_metric": "Reduce cross-platform UX defects reported after launch by 25%",
+      "base_line": "Current level of cross-platform UX defects for similar projects"
+    },
+
+    {
+      "id": "design_lead_change_request_1",
+      "normalized_role": "design",
+      "task_type": "change_request",
+      "output_metric": "Deliver ≥95% of approved UX/UI changes within agreed service levels",
+      "quality_metric": "≤3% rework due to misinterpreted or incomplete UX requirements",
+      "improvement_metric": "Reduce average cycle time for design changes by 20%",
+      "base_line": "Current average cycle time for UX/UI change requests"
+    },
+    {
+      "id": "design_lead_change_request_2",
+      "normalized_role": "design",
+      "task_type": "change_request",
+      "output_metric": "Bring ≥90% of impacted components into alignment with the design system",
+      "quality_metric": "≤2% unresolved design-system deviations after review",
+      "improvement_metric": "Increase design-system adoption for legacy screens by 20%",
+      "base_line": "Current design-system adoption level across legacy interfaces"
+    },
+    {
+      "id": "design_lead_change_request_3",
+      "normalized_role": "design",
+      "task_type": "change_request",
+      "output_metric": "Implement accessibility design updates for ≥95% of identified issues",
+      "quality_metric": "No critical WCAG violations remaining in post-change audits",
+      "improvement_metric": "Increase accessibility compliance scores by 10%",
+      "base_line": "Current accessibility compliance score for in-scope experiences"
+    },
+    {
+      "id": "design_lead_change_request_4",
+      "normalized_role": "design",
+      "task_type": "change_request",
+      "output_metric": "Update UX content and microcopy for ≥90% of impacted touchpoints in scope",
+      "quality_metric": "≥4.3/5 internal review score for clarity, tone, and consistency",
+      "improvement_metric": "Reduce customer support contacts related to confusing UX by 20%",
+      "base_line": "Current volume of UX-related support contacts for the same area"
+    },
+
+    {
+      "id": "design_lead_consultation_1",
+      "normalized_role": "design",
+      "task_type": "consultation",
+      "output_metric": "Deliver UX reviews and recommendations for ≥3 high-impact products or journeys",
+      "quality_metric": "≥4.5/5 stakeholder satisfaction with UX leadership support",
+      "improvement_metric": "Achieve ≥75% adoption of prioritized UX recommendations",
+      "base_line": "Current adoption rate of UX recommendations in similar engagements"
+    },
+    {
+      "id": "design_lead_consultation_2",
+      "normalized_role": "design",
+      "task_type": "consultation",
+      "output_metric": "Produce a consolidated UX maturity or audit assessment for ≥90% of in-scope surfaces",
+      "quality_metric": "≤5% material inaccuracies in UX findings or recommendations",
+      "improvement_metric": "Identify opportunities to reduce UX pain points by ≥20%",
+      "base_line": "Current volume of user-reported UX pain points"
+    },
+    {
+      "id": "design_lead_consultation_3",
+      "normalized_role": "design",
+      "task_type": "consultation",
+      "output_metric": "Facilitate ≥2 cross-functional UX alignment or prioritization workshops per quarter",
+      "quality_metric": "≥4.3/5 effectiveness rating from business and tech participants",
+      "improvement_metric": "Increase early alignment on UX priorities by 20%",
+      "base_line": "Current internal survey score for alignment on UX priorities"
+    },
+    {
+      "id": "design_lead_consultation_4",
+      "normalized_role": "design",
+      "task_type": "consultation",
+      "output_metric": "Provide UX leadership input to ≥2 strategic roadmaps or portfolio discussions",
+      "quality_metric": "≥4.3/5 satisfaction rating from portfolio or product owners",
+      "improvement_metric": "Improve integration of UX considerations into roadmap decisions by 20%",
+      "base_line": "Current level of UX consideration in roadmap decision logs or reviews"
+    },
+
+    {
+      "id": "development_lead_project_1",
+      "normalized_role": "development",
+      "task_type": "project",
+      "output_metric": "Deliver ≥95% of committed scope within the planned release window",
+      "quality_metric": "≤1% critical or high-severity defects in the first 30 days post-release",
+      "improvement_metric": "Improve deployment success rate by 15%",
+      "base_line": "Current deployment success rate for comparable releases"
+    },
+    {
+      "id": "development_lead_project_2",
+      "normalized_role": "development",
+      "task_type": "project",
+      "output_metric": "Achieve ≥99.5% uptime for in-scope services over the measurement period",
+      "quality_metric": "≤0.5% of incidents caused by regressions from this project",
+      "improvement_metric": "Improve end-to-end response times for key APIs or journeys by 20%",
+      "base_line": "Current response time baselines for in-scope services"
+    },
+    {
+      "id": "development_lead_project_3",
+      "normalized_role": "development",
+      "task_type": "project",
+      "output_metric": "Migrate ≥95% of targeted components or services to the agreed architecture or platform",
+      "quality_metric": "≤2% rollbacks or emergency fixes linked to migration changes",
+      "improvement_metric": "Reduce operational or infrastructure cost for migrated scope by 15%",
+      "base_line": "Current operational or infrastructure cost for the migrated components"
+    },
+    {
+      "id": "development_lead_project_4",
+      "normalized_role": "development",
+      "task_type": "project",
+      "output_metric": "Increase automation coverage to ≥80% of critical regression scenarios in scope",
+      "quality_metric": "≤2% critical defects that should have been caught by automated tests",
+      "improvement_metric": "Reduce regression testing cycle time by 25%",
+      "base_line": "Current average duration of regression test cycles for similar releases"
+    },
+
+    {
+      "id": "development_lead_change_request_1",
+      "normalized_role": "development",
+      "task_type": "change_request",
+      "output_metric": "Implement ≥95% of approved change requests within agreed SLAs",
+      "quality_metric": "≤2% re-opened tickets due to technical defects",
+      "improvement_metric": "Reduce average lead time for change implementation by 20%",
+      "base_line": "Current average lead time for implementing development change requests"
+    },
+    {
+      "id": "development_lead_change_request_2",
+      "normalized_role": "development",
+      "task_type": "change_request",
+      "output_metric": "Resolve ≥90% of critical or high-severity defects in affected modules",
+      "quality_metric": "≤5% recurrence rate for fixed defects in the same area",
+      "improvement_metric": "Reduce critical incident volume in affected modules by 25%",
+      "base_line": "Current critical incident volume for the modules in scope"
+    },
+    {
+      "id": "development_lead_change_request_3",
+      "normalized_role": "development",
+      "task_type": "change_request",
+      "output_metric": "Complete performance optimization changes for ≥90% of identified hotspots",
+      "quality_metric": "No new critical performance regressions introduced by the changes",
+      "improvement_metric": "Improve throughput or latency for optimized paths by 20%",
+      "base_line": "Current throughput or latency baselines for identified hotspots"
+    },
+    {
+      "id": "development_lead_change_request_4",
+      "normalized_role": "development",
+      "task_type": "change_request",
+      "output_metric": "Apply security fixes for ≥95% of identified vulnerabilities in scope",
+      "quality_metric": "0 outstanding critical security findings after re-scan",
+      "improvement_metric": "Reduce security vulnerability backlog for in-scope systems by 30%",
+      "base_line": "Current security vulnerability backlog for the systems covered"
+    },
+
+    {
+      "id": "development_lead_consultation_1",
+      "normalized_role": "development",
+      "task_type": "consultation",
+      "output_metric": "Provide technical advisory or architecture review for ≥3 key systems or initiatives",
+      "quality_metric": "≥4.5/5 satisfaction score from initiative owners on technical leadership",
+      "improvement_metric": "Achieve ≥75% adoption of prioritized technical recommendations",
+      "base_line": "Current adoption rate of technical recommendations in similar reviews"
+    },
+    {
+      "id": "development_lead_consultation_2",
+      "normalized_role": "development",
+      "task_type": "consultation",
+      "output_metric": "Deliver consolidated risk, dependency, and impact assessments for ≥90% in-scope changes",
+      "quality_metric": "≤5% material gaps identified in risk or impact analysis",
+      "improvement_metric": "Reduce unplanned technical risk materialization by 20%",
+      "base_line": "Current rate of unplanned technical risk materialization for similar work"
+    },
+    {
+      "id": "development_lead_consultation_3",
+      "normalized_role": "development",
+      "task_type": "consultation",
+      "output_metric": "Facilitate ≥2 cross-team technical design or architecture workshops per quarter",
+      "quality_metric": "≥4.3/5 usefulness rating from participants",
+      "improvement_metric": "Increase early alignment on technical direction by 20%",
+      "base_line": "Current alignment score on technical direction from internal surveys"
+    },
+    {
+      "id": "development_lead_consultation_4",
+      "normalized_role": "development",
+      "task_type": "consultation",
+      "output_metric": "Provide feasibility and effort assessments for ≥90% strategic proposals reviewed",
+      "quality_metric": "≤5% proposals requiring major rework due to missed technical constraints",
+      "improvement_metric": "Improve accuracy of effort estimates for assessed proposals by 15%",
+      "base_line": "Current variance between estimated and actual effort for similar initiatives"
     }
   ]
 }

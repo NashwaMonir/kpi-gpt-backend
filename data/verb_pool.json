@@ -1,109 +1,748 @@
 [
   {
-    "id": "design_project_simple_1",
-    "text": "Design",
+    "id": "generic_operational_1",
     "slot": "deliver",
-    "roles": ["Design", "Design Lead"],
-    "task_types": ["Project"],
-    "modes": ["simple"]
-  },
-  {
-    "id": "design_project_simple_2",
-    "text": "Implement",
-    "slot": "deliver",
-    "roles": ["Design", "Design Lead"],
-    "task_types": ["Project"],
-    "modes": ["simple"]
-  },
-  {
-    "id": "design_project_complex_1",
-    "text": "Prototype and validate",
-    "slot": "deliver",
-    "roles": ["Design", "Design Lead"],
-    "task_types": ["Project"],
-    "modes": ["complex"]
-  },
-  {
-    "id": "design_project_complex_2",
-    "text": "Design and iterate",
-    "slot": "deliver",
-    "roles": ["Design", "Design Lead"],
-    "task_types": ["Project"],
-    "modes": ["complex"]
-  },
-
-  {
-    "id": "development_project_simple_1",
-    "text": "Implement",
-    "slot": "deliver",
-    "roles": ["Development", "Development Lead"],
-    "task_types": ["Project"],
-    "modes": ["simple"]
-  },
-  {
-    "id": "development_project_complex_1",
-    "text": "Implement and stabilize",
-    "slot": "deliver",
-    "roles": ["Development", "Development Lead"],
-    "task_types": ["Project"],
-    "modes": ["complex"]
-  },
-
-  {
-    "id": "content_project_simple_1",
     "text": "Deliver",
-    "slot": "deliver",
-    "roles": ["Content", "Content Lead"],
-    "task_types": ["Project"],
+    "roles": [],
+    "task_types": [],
     "modes": ["simple"]
   },
   {
-    "id": "content_project_simple_2",
-    "text": "Produce",
+    "id": "generic_operational_2",
     "slot": "deliver",
-    "roles": ["Content", "Content Lead"],
-    "task_types": ["Project"],
+    "text": "Execute",
+    "roles": [],
+    "task_types": [],
     "modes": ["simple"]
   },
   {
-    "id": "content_project_complex_1",
-    "text": "Produce and roll out",
+    "id": "generic_strategic_1",
     "slot": "deliver",
-    "roles": ["Content", "Content Lead"],
-    "task_types": ["Project"],
+    "text": "Drive",
+    "roles": [],
+    "task_types": [],
     "modes": ["complex"]
   },
+  {
+    "id": "generic_strategic_2",
+    "slot": "deliver",
+    "text": "Lead",
+    "roles": [],
+    "task_types": [],
+    "modes": ["complex"]
+  },{
+  "id": "content_project_1",
+  "slot": "deliver",
+  "text": "Produce",
+  "roles": ["Content","Content Lead"],
+  "task_types": ["Project"],
+  "modes": ["simple"]
+},
+{
+  "id": "content_project_2",
+  "slot": "deliver",
+  "text": "Publish",
+  "roles": ["Content","Content Lead"],
+  "task_types": ["Project"],
+  "modes": ["simple"]
+},
+{
+  "id": "content_project_3",
+  "slot": "deliver",
+  "text": "Author",
+  "roles": ["Content","Content Lead"],
+  "task_types": ["Project"],
+  "modes": ["simple"]
+},
+{
+  "id": "content_project_4",
+  "slot": "deliver",
+  "text": "Curate",
+  "roles": ["Content","Content Lead"],
+  "task_types": ["Project"],
+  "modes": ["simple"]
+},
+{
+  "id": "content_project_5",
+  "slot": "deliver",
+  "text": "Finalize",
+  "roles": ["Content","Content Lead"],
+  "task_types": ["Project"],
+  "modes": ["simple"]
+},
+{
+  "id": "content_project_6",
+  "slot": "deliver",
+  "text": "Oversee content delivery for",
+  "roles": ["Content Lead"],
+  "task_types": ["Project"],
+  "modes": ["complex"]
+},
+{
+  "id": "content_project_7",
+  "slot": "deliver",
+  "text": "Ensure narrative consistency across",
+  "roles": ["Content Lead"],
+  "task_types": ["Project"],
+  "modes": ["complex"]
+},
+{
+  "id": "content_project_8",
+  "slot": "deliver",
+  "text": "Drive editorial excellence for",
+  "roles": ["Content Lead"],
+  "task_types": ["Project"],
+  "modes": ["complex"]
+},
+{
+  "id": "content_project_9",
+  "slot": "deliver",
+  "text": "Steer content strategy for",
+  "roles": ["Content Lead"],
+  "task_types": ["Project"],
+  "modes": ["complex"]
+},
+{
+  "id": "content_project_10",
+  "slot": "deliver",
+  "text": "Govern content quality for",
+  "roles": ["Content Lead"],
+  "task_types": ["Project"],
+  "modes": ["complex"]
+},{
+  "id": "content_cr_1",
+  "slot": "deliver",
+  "text": "Update",
+  "roles": ["Content","Content Lead"],
+  "task_types": ["Change Request"],
+  "modes": ["simple"]
+},
+{
+  "id": "content_cr_2",
+  "slot": "deliver",
+  "text": "Revise",
+  "roles": ["Content","Content Lead"],
+  "task_types": ["Change Request"],
+  "modes": ["simple"]
+},
+{
+  "id": "content_cr_3",
+  "slot": "deliver",
+  "text": "Refine",
+  "roles": ["Content","Content Lead"],
+  "task_types": ["Change Request"],
+  "modes": ["simple"]
+},
+{
+  "id": "content_cr_4",
+  "slot": "deliver",
+  "text": "Correct",
+  "roles": ["Content","Content Lead"],
+  "task_types": ["Change Request"],
+  "modes": ["simple"]
+},
+{
+  "id": "content_cr_5",
+  "slot": "deliver",
+  "text": "Localize",
+  "roles": ["Content"],
+  "task_types": ["Change Request"],
+  "modes": ["simple"]
+},
+{
+  "id": "content_cr_6",
+  "slot": "deliver",
+  "text": "Oversee content updates for",
+  "roles": ["Content Lead"],
+  "task_types": ["Change Request"],
+  "modes": ["complex"]
+},
+{
+  "id": "content_cr_7",
+  "slot": "deliver",
+  "text": "Ensure content accuracy for",
+  "roles": ["Content Lead"],
+  "task_types": ["Change Request"],
+  "modes": ["complex"]
+},
+{
+  "id": "content_cr_8",
+  "slot": "deliver",
+  "text": "Direct editorial refinements for",
+  "roles": ["Content Lead"],
+  "task_types": ["Change Request"],
+  "modes": ["complex"]
+},
+{
+  "id": "content_cr_9",
+  "slot": "deliver",
+  "text": "Govern terminology and messaging for",
+  "roles": ["Content Lead"],
+  "task_types": ["Change Request"],
+  "modes": ["complex"]
+},
+{
+  "id": "content_cr_10",
+  "slot": "deliver",
+  "text": "Drive alignment with brand tone for",
+  "roles": ["Content Lead"],
+  "task_types": ["Change Request"],
+  "modes": ["complex"]
+},{
+  "id": "content_consult_1",
+  "slot": "deliver",
+  "text": "Provide guidance on",
+  "roles": ["Content","Content Lead"],
+  "task_types": ["Consultation"],
+  "modes": ["simple"]
+},
+{
+  "id": "content_consult_2",
+  "slot": "deliver",
+  "text": "Recommend",
+  "roles": ["Content","Content Lead"],
+  "task_types": ["Consultation"],
+  "modes": ["simple"]
+},
+{
+  "id": "content_consult_3",
+  "slot": "deliver",
+  "text": "Support content strategy for",
+  "roles": ["Content","Content Lead"],
+  "task_types": ["Consultation"],
+  "modes": ["simple"]
+},
+{
+  "id": "content_consult_4",
+  "slot": "deliver",
+  "text": "Advise on",
+  "roles": ["Content","Content Lead"],
+  "task_types": ["Consultation"],
+  "modes": ["complex"]
+},
+{
+  "id": "content_consult_5",
+  "slot": "deliver",
+  "text": "Evaluate messaging approaches for",
+  "roles": ["Content"],
+  "task_types": ["Consultation"],
+  "modes": ["simple"]
+},
+{
+  "id": "content_consult_6",
+  "slot": "deliver",
+  "text": "Oversee content advisory for",
+  "roles": ["Content Lead"],
+  "task_types": ["Consultation"],
+  "modes": ["complex"]
+},
+{
+  "id": "content_consult_7",
+  "slot": "deliver",
+  "text": "Steer content recommendations for",
+  "roles": ["Content Lead"],
+  "task_types": ["Consultation"],
+  "modes": ["complex"]
+},
+{
+  "id": "content_consult_8",
+  "slot": "deliver",
+  "text": "Drive content alignment for",
+  "roles": ["Content Lead"],
+  "task_types": ["Consultation"],
+  "modes": ["complex"]
+},
+{
+  "id": "content_consult_9",
+  "slot": "deliver",
+  "text": "Govern strategic content direction for",
+  "roles": ["Content Lead"],
+  "task_types": ["Consultation"],
+  "modes": ["complex"]
+},
+{
+  "id": "content_consult_10",
+  "slot": "deliver",
+  "text": "Ensure content coherence for",
+  "roles": ["Content Lead"],
+  "task_types": ["Consultation"],
+  "modes": ["complex"]
+},{
+  "id": "dev_project_1",
+  "slot": "deliver",
+  "text": "Implement",
+  "roles": ["Development","Development Lead"],
+  "task_types": ["Project"],
+  "modes": ["simple"]
+},
+{
+  "id": "dev_project_2",
+  "slot": "deliver",
+  "text": "Build",
+  "roles": ["Development","Development Lead"],
+  "task_types": ["Project"],
+  "modes": ["simple"]
+},
+{
+  "id": "dev_project_3",
+  "slot": "deliver",
+  "text": "Develop",
+  "roles": ["Development","Development Lead"],
+  "task_types": ["Project"],
+  "modes": ["simple"]
+},
+{
+  "id": "dev_project_4",
+  "slot": "deliver",
+  "text": "Integrate",
+  "roles": ["Development","Development Lead"],
+  "task_types": ["Project"],
+  "modes": ["simple"]
+},
+{
+  "id": "dev_project_5",
+  "slot": "deliver",
+  "text": "Configure",
+  "roles": ["Development"],
+  "task_types": ["Project"],
+  "modes": ["simple"]
+},
+{
+  "id": "dev_project_6",
+  "slot": "deliver",
+  "text": "Deploy",
+  "roles": ["Development","Development Lead"],
+  "task_types": ["Project"],
+  "modes": ["simple","complex"]
+},
+{
+  "id": "dev_project_7",
+  "slot": "deliver",
+  "text": "Engineer",
+  "roles": ["Development","Development Lead"],
+  "task_types": ["Project"],
+  "modes": ["simple","complex"]
+},
+{
+  "id": "dev_project_8",
+  "slot": "deliver",
+  "text": "Oversee end-to-end implementation for",
+  "roles": ["Development Lead"],
+  "task_types": ["Project"],
+  "modes": ["complex"]
+},
+{
+  "id": "dev_project_9",
+  "slot": "deliver",
+  "text": "Architect the technical delivery for",
+  "roles": ["Development Lead"],
+  "task_types": ["Project"],
+  "modes": ["complex"]
+},
+{
+  "id": "dev_project_10",
+  "slot": "deliver",
+  "text": "Drive engineering execution for",
+  "roles": ["Development Lead"],
+  "task_types": ["Project"],
+  "modes": ["complex"]
+},{
+  "id": "dev_cr_1",
+  "slot": "deliver",
+  "text": "Modify",
+  "roles": ["Development","Development Lead"],
+  "task_types": ["Change Request"],
+  "modes": ["simple"]
+},
+{
+  "id": "dev_cr_2",
+  "slot": "deliver",
+  "text": "Enhance",
+  "roles": ["Development","Development Lead"],
+  "task_types": ["Change Request"],
+  "modes": ["simple"]
+},
+{
+  "id": "dev_cr_3",
+  "slot": "deliver",
+  "text": "Optimize",
+  "roles": ["Development","Development Lead"],
+  "task_types": ["Change Request"],
+  "modes": ["simple"]
+},
+{
+  "id": "dev_cr_4",
+  "slot": "deliver",
+  "text": "Refactor",
+  "roles": ["Development","Development Lead"],
+  "task_types": ["Change Request"],
+  "modes": ["simple","complex"]
+},
+{
+  "id": "dev_cr_5",
+  "slot": "deliver",
+  "text": "Patch",
+  "roles": ["Development"],
+  "task_types": ["Change Request"],
+  "modes": ["simple"]
+},
+{
+  "id": "dev_cr_6",
+  "slot": "deliver",
+  "text": "Stabilize",
+  "roles": ["Development","Development Lead"],
+  "task_types": ["Change Request"],
+  "modes": ["complex"]
+},
+{
+  "id": "dev_cr_7",
+  "slot": "deliver",
+  "text": "Ensure safe deployment of",
+  "roles": ["Development Lead"],
+  "task_types": ["Change Request"],
+  "modes": ["complex"]
+},
+{
+  "id": "dev_cr_8",
+  "slot": "deliver",
+  "text": "Oversee technical updates for",
+  "roles": ["Development Lead"],
+  "task_types": ["Change Request"],
+  "modes": ["complex"]
+},
+{
+  "id": "dev_cr_9",
+  "slot": "deliver",
+  "text": "Direct engineering refinements for",
+  "roles": ["Development Lead"],
+  "task_types": ["Change Request"],
+  "modes": ["complex"]
+},
+{
+  "id": "dev_cr_10",
+  "slot": "deliver",
+  "text": "Govern code-quality improvements for",
+  "roles": ["Development Lead"],
+  "task_types": ["Change Request"],
+  "modes": ["complex"]
+},{
+  "id": "dev_consult_1",
+  "slot": "deliver",
+  "text": "Evaluate",
+  "roles": ["Development","Development Lead"],
+  "task_types": ["Consultation"],
+  "modes": ["simple"]
+},
+{
+  "id": "dev_consult_2",
+  "slot": "deliver",
+  "text": "Assess",
+  "roles": ["Development","Development Lead"],
+  "task_types": ["Consultation"],
+  "modes": ["simple"]
+},
+{
+  "id": "dev_consult_3",
+  "slot": "deliver",
+  "text": "Review technical approaches for",
+  "roles": ["Development","Development Lead"],
+  "task_types": ["Consultation"],
+  "modes": ["simple"]
+},
+{
+  "id": "dev_consult_4",
+  "slot": "deliver",
+  "text": "Advise on",
+  "roles": ["Development","Development Lead"],
+  "task_types": ["Consultation"],
+  "modes": ["complex"]
+},
+{
+  "id": "dev_consult_5",
+  "slot": "deliver",
+  "text": "Recommend technical solutions for",
+  "roles": ["Development","Development Lead"],
+  "task_types": ["Consultation"],
+  "modes": ["simple","complex"]
+},
+{
+  "id": "dev_consult_6",
+  "slot": "deliver",
+  "text": "Support architectural decision-making for",
+  "roles": ["Development"],
+  "task_types": ["Consultation"],
+  "modes": ["simple","complex"]
+},
+{
+  "id": "dev_consult_7",
+  "slot": "deliver",
+  "text": "Architect",
+  "roles": ["Development Lead"],
+  "task_types": ["Consultation"],
+  "modes": ["complex"]
+},
+{
+  "id": "dev_consult_8",
+  "slot": "deliver",
+  "text": "Steer technical advisory for",
+  "roles": ["Development Lead"],
+  "task_types": ["Consultation"],
+  "modes": ["complex"]
+},
+{
+  "id": "dev_consult_9",
+  "slot": "deliver",
+  "text": "Oversee feasibility assessments for",
+  "roles": ["Development Lead"],
+  "task_types": ["Consultation"],
+  "modes": ["complex"]
+},
+{
+  "id": "dev_consult_10",
+  "slot": "deliver",
+  "text": "Drive engineering alignment for",
+  "roles": ["Development Lead"],
+  "task_types": ["Consultation"],
+  "modes": ["complex"]
+},{
+  "id": "design_project_1",
+  "slot": "deliver",
+  "text": "Design",
+  "roles": ["Design","Design Lead"],
+  "task_types": ["Project"],
+  "modes": ["simple"]
+},
+{
+  "id": "design_project_2",
+  "slot": "deliver",
+  "text": "Craft",
+  "roles": ["Design","Design Lead"],
+  "task_types": ["Project"],
+  "modes": ["simple"]
+},
+{
+  "id": "design_project_3",
+  "slot": "deliver",
+  "text": "Prototype",
+  "roles": ["Design","Design Lead"],
+  "task_types": ["Project"],
+  "modes": ["simple"]
+},
+{
+  "id": "design_project_4",
+  "slot": "deliver",
+  "text": "Refine",
+  "roles": ["Design","Design Lead"],
+  "task_types": ["Project"],
+  "modes": ["simple"]
+},
+{
+  "id": "design_project_5",
+  "slot": "deliver",
+  "text": "Visualize",
+  "roles": ["Design","Design Lead"],
+  "task_types": ["Project"],
+  "modes": ["simple"]
+},
 
-  {
-    "id": "content_consultation_simple_1",
-    "text": "Provide advisory support for",
-    "slot": "deliver",
-    "roles": ["Content", "Content Lead"],
-    "task_types": ["Consultation"],
-    "modes": ["simple"]
-  },
-  {
-    "id": "content_consultation_simple_2",
-    "text": "Deliver consultation for",
-    "slot": "deliver",
-    "roles": ["Content", "Content Lead"],
-    "task_types": ["Consultation"],
-    "modes": ["simple"]
-  },
-  {
-    "id": "content_consultation_complex_1",
-    "text": "Consult and recommend within",
-    "slot": "deliver",
-    "roles": ["Content", "Content Lead"],
-    "task_types": ["Consultation"],
-    "modes": ["complex"]
-  },
-  {
-    "id": "content_consultation_complex_2",
-    "text": "Lead the editorial consultation for",
-    "slot": "deliver",
-    "roles": ["Content", "Content Lead"],
-    "task_types": ["Consultation"],
-    "modes": ["complex"]
-  }
+{
+  "id": "design_project_6",
+  "slot": "deliver",
+  "text": "Lead the design execution for",
+  "roles": ["Design Lead"],
+  "task_types": ["Project"],
+  "modes": ["complex"]
+},
+{
+  "id": "design_project_7",
+  "slot": "deliver",
+  "text": "Oversee end-to-end experience design for",
+  "roles": ["Design Lead"],
+  "task_types": ["Project"],
+  "modes": ["complex"]
+},
+{
+  "id": "design_project_8",
+  "slot": "deliver",
+  "text": "Orchestrate cross-functional design delivery for",
+  "roles": ["Design Lead"],
+  "task_types": ["Project"],
+  "modes": ["complex"]
+},
+{
+  "id": "design_project_9",
+  "slot": "deliver",
+  "text": "Drive design-system alignment for",
+  "roles": ["Design Lead"],
+  "task_types": ["Project"],
+  "modes": ["complex"]
+},
+{
+  "id": "design_project_10",
+  "slot": "deliver",
+  "text": "Govern UX quality standards for",
+  "roles": ["Design Lead"],
+  "task_types": ["Project"],
+  "modes": ["complex"]
+},{
+  "id": "design_cr_1",
+  "slot": "deliver",
+  "text": "Adjust",
+  "roles": ["Design","Design Lead"],
+  "task_types": ["Change Request"],
+  "modes": ["simple"]
+},
+{
+  "id": "design_cr_2",
+  "slot": "deliver",
+  "text": "Update",
+  "roles": ["Design","Design Lead"],
+  "task_types": ["Change Request"],
+  "modes": ["simple"]
+},
+{
+  "id": "design_cr_3",
+  "slot": "deliver",
+  "text": "Align",
+  "roles": ["Design","Design Lead"],
+  "task_types": ["Change Request"],
+  "modes": ["simple"]
+},
+{
+  "id": "design_cr_4",
+  "slot": "deliver",
+  "text": "Simplify",
+  "roles": ["Design","Design Lead"],
+  "task_types": ["Change Request"],
+  "modes": ["simple"]
+},
+{
+  "id": "design_cr_5",
+  "slot": "deliver",
+  "text": "Harmonize",
+  "roles": ["Design","Design Lead"],
+  "task_types": ["Change Request"],
+  "modes": ["simple"]
+},
+
+{
+  "id": "design_cr_6",
+  "slot": "deliver",
+  "text": "Lead UX/UI refinements for",
+  "roles": ["Design Lead"],
+  "task_types": ["Change Request"],
+  "modes": ["complex"]
+},
+{
+  "id": "design_cr_7",
+  "slot": "deliver",
+  "text": "Oversee visual and interaction updates for",
+  "roles": ["Design Lead"],
+  "task_types": ["Change Request"],
+  "modes": ["complex"]
+},
+{
+  "id": "design_cr_8",
+  "slot": "deliver",
+  "text": "Direct component-level improvements for",
+  "roles": ["Design Lead"],
+  "task_types": ["Change Request"],
+  "modes": ["complex"]
+},
+{
+  "id": "design_cr_9",
+  "slot": "deliver",
+  "text": "Ensure design-system compliance for",
+  "roles": ["Design Lead"],
+  "task_types": ["Change Request"],
+  "modes": ["complex"]
+},
+{
+  "id": "design_cr_10",
+  "slot": "deliver",
+  "text": "Steer UX quality improvements for",
+  "roles": ["Design Lead"],
+  "task_types": ["Change Request"],
+  "modes": ["complex"]
+},{
+  "id": "design_consult_1",
+  "slot": "deliver",
+  "text": "Facilitate",
+  "roles": ["Design","Design Lead"],
+  "task_types": ["Consultation"],
+  "modes": ["simple"]
+},
+{
+  "id": "design_consult_2",
+  "slot": "deliver",
+  "text": "Review",
+  "roles": ["Design","Design Lead"],
+  "task_types": ["Consultation"],
+  "modes": ["simple"]
+},
+{
+  "id": "design_consult_3",
+  "slot": "deliver",
+  "text": "Evaluate",
+  "roles": ["Design","Design Lead"],
+  "task_types": ["Consultation"],
+  "modes": ["simple"]
+},
+{
+  "id": "design_consult_4",
+  "slot": "deliver",
+  "text": "Recommend",
+  "roles": ["Design","Design Lead"],
+  "task_types": ["Consultation"],
+  "modes": ["simple","complex"]
+},
+{
+  "id": "design_consult_5",
+  "slot": "deliver",
+  "text": "Advise on",
+  "roles": ["Design","Design Lead"],
+  "task_types": ["Consultation"],
+  "modes": ["complex"]
+},
+
+{
+  "id": "design_consult_6",
+  "slot": "deliver",
+  "text": "Lead UX advisory for",
+  "roles": ["Design Lead"],
+  "task_types": ["Consultation"],
+  "modes": ["complex"]
+},
+{
+  "id": "design_consult_7",
+  "slot": "deliver",
+  "text": "Steer design recommendations for",
+  "roles": ["Design Lead"],
+  "task_types": ["Consultation"],
+  "modes": ["complex"]
+},
+{
+  "id": "design_consult_8",
+  "slot": "deliver",
+  "text": "Drive UX alignment for",
+  "roles": ["Design Lead"],
+  "task_types": ["Consultation"],
+  "modes": ["complex"]
+},
+{
+  "id": "design_consult_9",
+  "slot": "deliver",
+  "text": "Oversee design advisory outcomes for",
+  "roles": ["Design Lead"],
+  "task_types": ["Consultation"],
+  "modes": ["complex"]
+},
+{
+  "id": "design_consult_10",
+  "slot": "deliver",
+  "text": "Ensure experience coherence for",
+  "roles": ["Design Lead"],
+  "task_types": ["Consultation"],
+  "modes": ["complex"]
+}
 ]

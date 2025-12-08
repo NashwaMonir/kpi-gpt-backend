@@ -112,7 +112,11 @@ export interface BulkPrepareTokenPayload {
 // API contracts
 
 export interface BulkInspectJsonRequest {
-  rows: KpiJsonRowIn[];
+  // Legacy/manual path: send JSON rows directly
+  rows?: KpiJsonRowIn[];
+
+  // GPT path: send raw CSV text for KPI_Input
+  excel_csv_text?: string;
 }
 
 export interface BulkInspectJsonResponse extends BulkInspectSummary {}

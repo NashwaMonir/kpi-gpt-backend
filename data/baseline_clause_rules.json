@@ -1,8 +1,20 @@
 {
   "simple": {
-    "default": "from the current organizational baseline"
+    "default": "from the current organizational baseline",
+    "variants": [
+      "from the current organizational baseline",
+      "relative to the current performance baseline",
+      "compared with today's measured baseline",
+      "against the current baseline for this area"
+    ]
   },
   "complex": {
-    "default": "compared with the current organizational baseline"
+    "default": "from the current organizational performance baseline",
+    "variants": [
+      "from the current organizational performance baseline",
+      "relative to the agreed performance baseline",
+      "compared with the defined measurement baseline",
+      "against the current performance baseline for this scope"
+    ]
   }
 }

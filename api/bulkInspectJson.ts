@@ -1,6 +1,7 @@
 // api/bulkInspectJson.ts
 
 import type { VercelRequest, VercelResponse } from '@vercel/node';
+import { parse } from 'csv-parse/sync';
 import {
   KpiJsonRowIn,
   ParsedRow,
@@ -14,6 +15,7 @@ import {
 
 function toStringSafe(value: unknown): string {
   if (value === null || value === undefined) return '';
+  if (typeof value === 'string') return value.trim();
   return String(value).trim();
 }
 
@@ -24,7 +26,41 @@ function normalizeMode(raw: string): 'simple' | 'complex' | 'both' {
   return 'both';
 }
 
-function normalizeAndValidateRows(rows: KpiJsonRowIn[]): {
+/**
+ * Robust CSV → KpiJsonRowIn[]
+ * Expects header row with:
+ * task_name, task_type, team_role, dead_line, strategic_benefit,
+ * output_metric, quality_metric, improvement_metric, mode, company
+ */
+export function parseCsvToKpiJsonRows(csvText: string): KpiJsonRowIn[] {
+  if (!csvText || csvText.trim().length === 0) {
+    return [];
+  }
+
+  const records = parse(csvText, {
+    columns: true,
+    skip_empty_lines: true,
+    trim: true
+  }) as Record<string, string | null | undefined>[];
+
+  return records.map((row, index) => ({
+    row_id: index + 1,
+    task_name: row.task_name ?? '',
+    task_type: row.task_type ?? '',
+    team_role: row.team_role ?? '',
+    dead_line: row.dead_line ?? '',
+    strategic_benefit: row.strategic_benefit ?? '',
+    output_metric: row.output_metric ?? '',
+    quality_metric: row.quality_metric ?? '',
+    improvement_metric: row.improvement_metric ?? '',
+    mode: row.mode ?? '',
+    company: row.company ?? ''
+  }));
+}
+
+export function normalizeAndValidateRows(
+  rows: KpiJsonRowIn[]
+): {
   parsedRows: ParsedRow[];
   row_count: number;
   invalid_row_count: number;
@@ -43,7 +79,6 @@ function normalizeAndValidateRows(rows: KpiJsonRowIn[]): {
   let invalid_count = 0;
 
   rows.forEach((raw, index) => {
-    // Mandatory fields for validity
     const team_role = toStringSafe(raw.team_role);
     const task_type = toStringSafe(raw.task_type);
     const task_name = toStringSafe(raw.task_name);
@@ -67,7 +102,8 @@ function normalizeAndValidateRows(rows: KpiJsonRowIn[]): {
       !!team_role &&
       !!task_type &&
       !!task_name &&
-      !!dead_line;
+      !!dead_line &&
+      !!strategic_benefit;
 
     if (!isValid) {
       invalid_count += 1;
@@ -89,7 +125,6 @@ function normalizeAndValidateRows(rows: KpiJsonRowIn[]): {
       invalidReason: isValid ? undefined : 'Missing mandatory fields'
     };
 
-    // Skip rows that are completely empty (no task_name, no team_role, etc.)
     const isCompletelyEmpty =
       !company &&
       !team_role &&
@@ -124,7 +159,7 @@ function normalizeAndValidateRows(rows: KpiJsonRowIn[]): {
   const needs_company_decision =
     company_case === 'multi_company_column' || company_case === 'no_company_data';
 
-  const benefit_company_signals: string[] = []; // extension point for NLP on strategic_benefit
+  const benefit_company_signals: string[] = []; // extension point
 
   return {
     parsedRows,
@@ -140,12 +175,10 @@ function normalizeAndValidateRows(rows: KpiJsonRowIn[]): {
   };
 }
 
-function buildOptions(
-  meta: {
-    company_case: CompanyCase;
-    unique_companies: string[];
-  }
-): BulkInspectOption[] {
+function buildOptions(meta: {
+  company_case: CompanyCase;
+  unique_companies: string[];
+}): BulkInspectOption[] {
   const opts: BulkInspectOption[] = [];
 
   if (meta.company_case === 'single_company_column') {
@@ -203,11 +236,27 @@ export default function handler(req: VercelRequest, res: VercelResponse) {
 
   const body = req.body as BulkInspectJsonRequest | undefined;
 
-  if (!body || !Array.isArray(body.rows) || body.rows.length === 0) {
+  let inputRows: KpiJsonRowIn[] = [];
+
+  if (body) {
+    if (
+      typeof body.excel_csv_text === 'string' &&
+      body.excel_csv_text.trim().length > 0
+    ) {
+      // CSV path (Custom GPT)
+      inputRows = parseCsvToKpiJsonRows(body.excel_csv_text);
+    } else if (Array.isArray(body.rows)) {
+      // Legacy JSON rows path
+      inputRows = body.rows;
+    }
+  }
+
+  if (!inputRows || inputRows.length === 0) {
     return res.status(400).json({
       error: true,
       code: 'NO_ROWS',
-      message: 'bulkInspectJson received zero rows. GPT did not send any parsed KPI data.'
+      message:
+        'bulkInspectJson received zero rows. Neither JSON rows nor CSV text contained data.'
     });
   }
 
@@ -222,7 +271,7 @@ export default function handler(req: VercelRequest, res: VercelResponse) {
     company_case,
     needs_company_decision,
     has_invalid_rows
-  } = normalizeAndValidateRows(body.rows);
+  } = normalizeAndValidateRows(inputRows);
 
   if (row_count === 0) {
     return res.status(400).json({
@@ -232,6 +281,7 @@ export default function handler(req: VercelRequest, res: VercelResponse) {
     });
   }
 
+  // summaryMeta must match RowsTokenPayload['summaryMeta'] exactly
   const summaryMeta: RowsTokenPayload['summaryMeta'] = {
     row_count,
     invalid_row_count,

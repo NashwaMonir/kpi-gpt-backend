@@ -1,18 +1,50 @@
 [
   {
-    "id": "tail_connector_comma",
-    "prefix": ", "
+    "id": "connector_and",
+    "prefix": ", and "
   },
   {
-    "id": "tail_connector_and",
-    "prefix": " and "
+    "id": "connector_while_also",
+    "prefix": ", while also "
   },
   {
-    "id": "tail_connector_comma_while",
-    "prefix": ", while "
+    "id": "connector_further",
+    "prefix": ", further "
   },
   {
-    "id": "tail_connector_comma_as_well_as",
-    "prefix": ", as well as "
+    "id": "connector_thereby",
+    "prefix": ", thereby "
+  },
+  {
+    "id": "connector_in_turn",
+    "prefix": ", in turn "
+  },
+  {
+    "id": "connector_with_focus_on",
+    "prefix": ", with a focus on "
+  },
+  {
+    "id": "connector_with_emphasis_on",
+    "prefix": ", with particular emphasis on "
+  },
+  {
+    "id": "connector_in_support_of",
+    "prefix": ", in support of "
+  },
+  {
+    "id": "connector_as_a_step_towards",
+    "prefix": ", as a step towards "
+  },
+  {
+    "id": "connector_to_help",
+    "prefix": ", to help "
+  },
+  {
+    "id": "connector_to_better",
+    "prefix": ", to better "
+  },
+  {
+    "id": "connector_to_strengthen",
+    "prefix": ", to strengthen "
   }
 ]

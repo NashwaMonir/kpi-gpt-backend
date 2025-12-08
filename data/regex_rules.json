@@ -1,32 +1,62 @@
 [
   {
-    "id": "fix_comma_before_period",
-    "pattern": ",\\s*\\.",
-    "replacement": ".",
-    "flags": "g"
-  },
-  {
-    "id": "normalize_percent_spacing",
-    "pattern": "(\\d)\\s*%",
-    "replacement": "$1 %",
-    "flags": "g"
-  },
-  {
     "id": "collapse_multiple_spaces",
-    "pattern": "\\s{2,}",
-    "replacement": " ",
-    "flags": "g"
+    "pattern": " {2,}",
+    "flags": "g",
+    "replacement": " "
   },
   {
-    "id": "trim_leading_space",
-    "pattern": "^\\s+",
-    "replacement": "",
-    "flags": "g"
+    "id": "space_before_comma",
+    "pattern": "\\s+,",
+    "flags": "g",
+    "replacement": ","
   },
   {
-    "id": "trim_trailing_space",
-    "pattern": "\\s+$",
-    "replacement": "",
-    "flags": "g"
+    "id": "ensure_space_after_comma",
+    "pattern": ",(\\S)",
+    "flags": "g",
+    "replacement": ", $1"
+  },
+  {
+    "id": "space_before_period",
+    "pattern": "\\s+\\.",
+    "flags": "g",
+    "replacement": "."
+  },
+  {
+    "id": "ensure_space_after_period_letter",
+    "pattern": "\\.(?=[A-Za-z])",
+    "flags": "g",
+    "replacement": ". "
+  },
+  {
+    "id": "fix_semicolon_spacing",
+    "pattern": "\\s*;\\s*",
+    "flags": "g",
+    "replacement": "; "
+  },
+  {
+    "id": "remove_space_before_percent",
+    "pattern": "(\\d)\\s+%",
+    "flags": "g",
+    "replacement": "$1%"
+  },
+  {
+    "id": "normalize_ge_sign_spacing",
+    "pattern": "\\s*(≥|<=|>=|≤)\\s*",
+    "flags": "g",
+    "replacement": " $1 "
+  },
+  {
+    "id": "remove_space_before_parenthesis",
+    "pattern": "\\s+\\(",
+    "flags": "g",
+    "replacement": " ("
+  },
+  {
+    "id": "fix_trailing_comma_before_period",
+    "pattern": ",\\.",
+    "flags": "g",
+    "replacement": "."
   }
 ]
