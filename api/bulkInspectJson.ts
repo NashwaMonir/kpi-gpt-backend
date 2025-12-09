@@ -32,6 +32,12 @@ function normalizeMode(raw: string): 'simple' | 'complex' | 'both' {
  * task_name, task_type, team_role, dead_line, strategic_benefit,
  * output_metric, quality_metric, improvement_metric, mode, company
  */
+/**
+ * Robust CSV → KpiJsonRowIn[]
+ * Expects a header row. Supports both:
+ * - dead_line
+ * - deadline  (mapped to dead_line)
+ */
 export function parseCsvToKpiJsonRows(csvText: string): KpiJsonRowIn[] {
   if (!csvText || csvText.trim().length === 0) {
     return [];
@@ -43,19 +49,56 @@ export function parseCsvToKpiJsonRows(csvText: string): KpiJsonRowIn[] {
     trim: true
   }) as Record<string, string | null | undefined>[];
 
-  return records.map((row, index) => ({
-    row_id: index + 1,
-    task_name: row.task_name ?? '',
-    task_type: row.task_type ?? '',
-    team_role: row.team_role ?? '',
-    dead_line: row.dead_line ?? '',
-    strategic_benefit: row.strategic_benefit ?? '',
-    output_metric: row.output_metric ?? '',
-    quality_metric: row.quality_metric ?? '',
-    improvement_metric: row.improvement_metric ?? '',
-    mode: row.mode ?? '',
-    company: row.company ?? ''
-  }));
+  const rows: KpiJsonRowIn[] = [];
+
+  const get = (
+    row: Record<string, string | null | undefined>,
+    ...keys: string[]
+  ): string => {
+    for (const key of keys) {
+      const v = row[key];
+      if (v !== undefined && v !== null && String(v).trim().length > 0) {
+        return String(v).trim();
+      }
+    }
+    return '';
+  };
+
+  records.forEach((row, index) => {
+    const r: Record<string, string | null | undefined> = row;
+
+    const kpiRow: KpiJsonRowIn = {
+      row_id: index + 1,
+      task_name: get(r, 'task_name', 'task name'),
+      task_type: get(r, 'task_type', 'task type'),
+      team_role: get(r, 'team_role', 'team role'),
+      // Accept both "dead_line" and "deadline" as header
+      dead_line: get(r, 'dead_line', 'deadline'),
+      strategic_benefit: get(r, 'strategic_benefit', 'strategic_benefit'),
+      output_metric: get(r, 'output_metric', 'output metric'),
+      quality_metric: get(r, 'quality_metric', 'quality metric'),
+      improvement_metric: get(r, 'improvement_metric', 'improvement metric'),
+      mode: get(r, 'mode'),
+      company: get(r, 'company')
+    };
+
+    const isCompletelyEmpty =
+      !kpiRow.company &&
+      !kpiRow.team_role &&
+      !kpiRow.task_type &&
+      !kpiRow.task_name &&
+      !kpiRow.dead_line &&
+      !kpiRow.strategic_benefit &&
+      !kpiRow.output_metric &&
+      !kpiRow.quality_metric &&
+      !kpiRow.improvement_metric;
+
+    if (!isCompletelyEmpty) {
+      rows.push(kpiRow);
+    }
+  });
+
+  return rows;
 }
 
 export function normalizeAndValidateRows(
