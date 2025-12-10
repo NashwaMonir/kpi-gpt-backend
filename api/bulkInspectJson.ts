@@ -19,24 +19,19 @@ function toStringSafe(value: unknown): string {
   return String(value).trim();
 }
 
-function normalizeMode(raw: string): 'simple' | 'complex' | 'both' {
-  const v = raw.toLowerCase();
-  if (v === 'simple') return 'simple';
-  if (v === 'complex') return 'complex';
-  return 'both';
-}
-
 /**
  * Robust CSV → KpiJsonRowIn[]
- * Expects header row with:
- * task_name, task_type, team_role, dead_line, strategic_benefit,
- * output_metric, quality_metric, improvement_metric, mode, company
- */
-/**
- * Robust CSV → KpiJsonRowIn[]
- * Expects a header row. Supports both:
- * - dead_line
- * - deadline  (mapped to dead_line)
+ *
+ * Expects a header row. Primary columns:
+ * - task_name
+ * - task_type
+ * - team_role
+ * - dead_line / deadline (both supported, mapped to dead_line)
+ * - strategic_benefit
+ * - output_metric
+ * - quality_metric
+ * - improvement_metric
+ * - company
  */
 export function parseCsvToKpiJsonRows(csvText: string): KpiJsonRowIn[] {
   if (!csvText || csvText.trim().length === 0) {
@@ -78,7 +73,6 @@ export function parseCsvToKpiJsonRows(csvText: string): KpiJsonRowIn[] {
       output_metric: get(r, 'output_metric', 'output metric'),
       quality_metric: get(r, 'quality_metric', 'quality metric'),
       improvement_metric: get(r, 'improvement_metric', 'improvement metric'),
-      mode: get(r, 'mode'),
       company: get(r, 'company')
     };
 
@@ -132,7 +126,6 @@ export function normalizeAndValidateRows(
     const output_metric = toStringSafe(raw.output_metric);
     const quality_metric = toStringSafe(raw.quality_metric);
     const improvement_metric = toStringSafe(raw.improvement_metric);
-    const modeStr = normalizeMode(toStringSafe(raw.mode) || 'both');
 
     if (company.length > 0) {
       has_company_column = true;
@@ -163,7 +156,6 @@ export function normalizeAndValidateRows(
       output_metric,
       quality_metric,
       improvement_metric,
-      mode: modeStr,
       isValid,
       invalidReason: isValid ? undefined : 'Missing mandatory fields'
     };

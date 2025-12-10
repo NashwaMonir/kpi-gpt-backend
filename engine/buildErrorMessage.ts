@@ -21,7 +21,7 @@ import { ErrorCodes, ERROR_COMMENTS } from './errorCodes';
 
 export interface FinalAssemblyResult {
   status: 'VALID' | 'NEEDS_REVIEW' | 'INVALID';
-  comments: string;
+comments: string[];
   summary_reason: string;
   errorCodes: ErrorCode[];
 
@@ -105,13 +105,13 @@ export function buildFinalMessage(
   // ---------------------------------------------------------------------------
   // 1. Status derivation (domain first, then metrics/mode)
   //    - Domain INVALID always wins
-  //    - Metrics / mode can only move VALID → NEEDS_REVIEW
+  //    - Metrics auto-suggest can only move VALID → NEEDS_REVIEW
   // ---------------------------------------------------------------------------
   let status: 'VALID' | 'NEEDS_REVIEW' | 'INVALID' = 'VALID';
 
   if (statusHint === 'INVALID' || hasBlockingErrors) {
     status = 'INVALID';
-  } else if (metricsNeedsReview || modeWasInvalid) {
+  } else if (metricsNeedsReview) {
     status = 'NEEDS_REVIEW';
   }
 
@@ -233,9 +233,9 @@ export function buildFinalMessage(
 
   // Normalize spaces and join into single-line comments
   const comments = commentsParts
-    .join(' ')
-    .replace(/\s+/g, ' ')
-    .trim();
+  .map((c) => c.replace(/\s+/g, ' ').trim())
+  .filter((c) => c.length > 0);
+
 
   // ---------------------------------------------------------------------------
   // 3. summary_reason hierarchy
@@ -261,7 +261,7 @@ export function buildFinalMessage(
   if (status === 'VALID') {
     return {
       status,
-      comments: 'All SMART criteria met.',
+      comments: ['All SMART criteria met.'],
       summary_reason,
       errorCodes: canonicalErrorCodes,
       input_row: normalizedRow,

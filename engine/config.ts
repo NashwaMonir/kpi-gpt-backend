@@ -29,22 +29,12 @@ export interface TenantConfig {
 export const DEFAULT_TENANT_CONFIG: TenantConfig = {
   name: 'default',
   domain: {
-    allowedTaskTypes: [
-      'Project',
-      'Change Request',
-      'Consultation'
-    ],
-    allowedTeamRoles: [
-      'Content',
-      'Content Lead',
-      'Design',
-      'Design Lead',
-      'Development',
-      'Development Lead'
-    ],
-    genericCompanyTokens: [
-      'the company', 'the organization'
-    ]
+    allowedTaskTypes: 
+    ['Project', 'Change Request', 'Consultation'],
+    allowedTeamRoles: 
+    ['Content', 'Content Lead', 'Design', 'Design Lead', 'Development', 'Development Lead'],
+    genericCompanyTokens: 
+    ['the company', 'the organization']
   },
   dangerous: {
     extraDangerousSubstrings: [],

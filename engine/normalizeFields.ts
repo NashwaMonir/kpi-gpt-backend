@@ -94,6 +94,15 @@ export interface NormalizedTeamRoleResult {
  *    and a "lead" flag from the presence of the word "lead".
  *  - Map families into canonical roles: Content / Content Lead / Design / Design Lead / Development / Development Lead.
  */
+function resolveCanonicalTeamRoleFromFamily(
+  family: TeamRoleFamily,
+  isLead: boolean
+): string | null {
+  const targetLower = isLead ? `${family} lead` : family;
+  const idx = ALLOWED_TEAM_ROLES_LOWER.indexOf(targetLower);
+  if (idx === -1) return null;
+  return ALLOWED_TEAM_ROLES[idx];
+}
 export function normalizeTeamRole(raw: unknown): NormalizedTeamRoleResult {
   const safe = toSafeTrimmedString(raw);
   if (!safe) {
@@ -143,7 +152,15 @@ export function normalizeTeamRole(raw: unknown): NormalizedTeamRoleResult {
 // ---------------------------------------------
   // 3) Detect "lead" inside role
   // ---------------------------------------------
-  const isLead = canonical.includes('lead');
+  const isLead = /\blead\b/.test(canonical);
+
+  if (!isAllowed && family) {
+    const canonicalFromFamily = resolveCanonicalTeamRoleFromFamily(family, isLead);
+    if (canonicalFromFamily) {
+      normalized = canonicalFromFamily;
+      isAllowed = true;
+    }
+  }
 
   return {
     normalized,
@@ -158,10 +175,18 @@ export function normalizeTeamRole(raw: unknown): NormalizedTeamRoleResult {
 // ------------------------------------------------------------
 
 /**
- * Normalize mode to one of: 'simple' | 'complex' | 'both'
- * - Empty → 'both' (no error)
- * - Valid value → itself
- * - Invalid → fallback to 'both' and record INVALID_MODE_VALUE (E306)
+ * Normalize mode to one of: 'simple' | 'complex' | 'both'.
+ *
+ * IMPORTANT:
+ * - Mode is treated as a *user hint only*.
+ * - The objective engine (objectiveEngine.ts) decides the effective mode
+ *   based on lead role, metrics_auto_suggested, strategic benefit, and
+ *   missing-metric safety rules.
+ *
+ * Behavior:
+ * - Empty → 'both' (no error; means "no preference").
+ * - Valid value → itself (still only a hint).
+ * - Invalid → fallback to 'both' and record INVALID_MODE_VALUE (E306).
  */
 export function normalizeMode(
   rawMode: unknown,

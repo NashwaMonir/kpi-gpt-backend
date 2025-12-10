@@ -11,7 +11,7 @@
 //  - Fallback       = ROLE_DEFAULT_METRICS (role-family defaults)
 
 import type { KpiRowIn } from './types';
-import { ROLE_DEFAULT_METRICS } from './constants';
+
 import { ErrorCodes, addErrorCode, type ErrorCode } from './errorCodes';
 import {
   resolveMatrixKey,
@@ -19,6 +19,23 @@ import {
   type MatrixKey
 } from './metricMatrixResolver';
 
+import role_default_metrics from '../data/role_default_metrics.json';
+
+type RoleDefaultKey =
+  | 'content'
+  | 'content_lead'
+  | 'design'
+  | 'design_lead'
+  | 'development'
+  | 'development_lead'
+  | 'generic';
+
+type RoleDefaultMetrics = {
+  output: string;
+  quality: string;
+  improvement: string;
+};
+const ROLE_DEFAULT_METRICS = role_default_metrics as Record<RoleDefaultKey, RoleDefaultMetrics>;
 export interface MetricResolutionResult {
   output_metric: string | null;
   quality_metric: string | null;
@@ -139,7 +156,7 @@ export function pickRoleDefaults(
     return ROLE_DEFAULT_METRICS.generic;
   }
 
-  const isLead = base.includes('lead');
+  const isLead = /\blead\b/.test(base);
 
   if (base.startsWith('content')) {
     return isLead ? ROLE_DEFAULT_METRICS.content_lead : ROLE_DEFAULT_METRICS.content;

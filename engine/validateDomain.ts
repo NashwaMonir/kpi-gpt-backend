@@ -1,5 +1,5 @@
 // engine/validateDomain.ts
-// Domain-level validation for KPI Engine v10.7.5 (Option C-FULL)
+// Domain-level validation for KPI Engine v10.8.
 //
 // Responsibilities (per row):
 //  - Normalize Task Type and Team Role (case-insensitive, canonical forms)
@@ -7,7 +7,7 @@
 //  - Identify invalid enum values (Task Type, Team Role)
 //  - Validate Company, Strategic Benefit, and metrics content (dangerous / low-semantic)
 //  - Validate Deadline format and calendar year
-//  - Normalize Mode with fallback and error code on invalid
+//  - Normalize Mode (user hint only) with fallback and error code on invalid
 //
 // This module DOES NOT:
 //  - Decide final status (VALID / NEEDS_REVIEW / INVALID)

@@ -1,4 +1,0 @@
-task_name,task_type,team_role,dead_line,strategic_benefit,output_metric,quality_metric,improvement_metric,mode
-Design System Tokens v2,Project,Design,2025-12-15,consistent brand experience,≥95% tokens coverage,≤2% visual defects,20% reduction in design delivery time,Both
-Checkout Refactor Sprint 3,Change Request,Development,2025-11-30,higher conversion,1.2% uplift conversion,≤0.3% error rate,20% reduction in page load time,Complex
-Editorial QA Process,Consultation,Content,,higher content quality,100% pages with QA checklist,≤3% QA rework,15% fewer style violations,Simple

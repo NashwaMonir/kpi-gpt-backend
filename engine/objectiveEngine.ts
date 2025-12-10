@@ -18,7 +18,7 @@ import benefit_transform from '../data/benefit_transform.json';
 import task_name_cleanup from '../data/task_name_cleanup.json';
 import baseline_clause_rules from '../data/baseline_clause_rules.json';
 import performance_targets from '../data/performance_targets.json';
-
+import { isStrategicBenefit } from './strategicBenefitRules';
 import type { PreparedRow, ObjectiveOutput } from './types';
 
 // -----------------------------
@@ -169,7 +169,14 @@ function buildBaselineClause(
   mode: 'simple' | 'complex',
   seed: number
 ): string {
-  if (!hasBaselineWorthyImprovement(improvementMetric)) return '';
+  const hasImprovement = !!improvementMetric && improvementMetric.trim().length > 0;
+  if (!hasImprovement) return '';
+
+  // For simple mode we keep the guard to avoid noisy baselines.
+  // For complex mode we always attach a baseline when an improvement metric exists.
+  if (mode === 'simple' && !hasBaselineWorthyImprovement(improvementMetric)) {
+    return '';
+  }
 
   // 1. Base clause selection (seeded variant, JSON-driven)
   const baseClause = pickBaselineVariant(mode, seed);
@@ -200,13 +207,23 @@ function buildMetricsClause(row: PreparedRow, mode: 'simple' | 'complex'): strin
   }
 
   let improvementText = row.improvement_metric || '';
-  const baselineClause = buildBaselineClause(improvementText, mode, row.variation_seed);
+  let baselineClause = '';
 
   if (improvementText) {
+    baselineClause = buildBaselineClause(improvementText, mode, row.variation_seed);
     if (baselineClause) {
       improvementText = `${improvementText} ${baselineClause}`;
     }
     metricParts.push(improvementText);
+  } else if (mode === 'complex' && metricParts.length) {
+    // Complex objectives must carry a baseline clause even if the improvement metric
+    // was not explicitly provided. In that case, derive the baseline from the
+    // existing metric context.
+    const syntheticImprovement = metricParts.join(' and ');
+    baselineClause = buildBaselineClause(syntheticImprovement, mode, row.variation_seed);
+    if (baselineClause) {
+      metricParts.push(`measured ${baselineClause}`);
+    }
   }
 
   if (!metricParts.length) return '';
@@ -333,6 +350,7 @@ function selectTailRule(row: PreparedRow): any | null {
 
   const rawBenefit = row.strategic_benefit || '';
   const hasBenefit = !!rawBenefit.trim();
+  const strategic = isStrategicBenefit(rawBenefit);
 
   let chosenBucket: any | undefined;
 
@@ -344,10 +362,12 @@ function selectTailRule(row: PreparedRow): any | null {
     const condHasCompany = conditions.has_company as boolean | undefined;
     const condIsGeneric = conditions.company_is_generic as boolean | undefined;
     const condHasBenefit = conditions.has_benefit as boolean | undefined;
+    const condIsStrategic = conditions.is_strategic as boolean | undefined;
 
     if (condHasCompany !== undefined && condHasCompany !== hasCompany) continue;
     if (condIsGeneric !== undefined && condIsGeneric !== isGeneric) continue;
     if (condHasBenefit !== undefined && condHasBenefit !== hasBenefit) continue;
+    if (condIsStrategic !== undefined && condIsStrategic !== strategic) continue;
 
     chosenBucket = bucket;
     break;
@@ -377,7 +397,17 @@ function selectTailRule(row: PreparedRow): any | null {
   return selected;
 }
 
-function buildTailClause(row: PreparedRow): string {
+function buildTailClause(row: PreparedRow, mode: 'simple' | 'complex'): string {
+  if (mode === 'simple') {
+    // For simple objectives, tails are optional. We only add a tail
+    // when there is a company or a meaningful benefit. Otherwise skip.
+    const rawCompany = (row.company || '').trim();
+    const benefitTextCheck = applyBenefitTransform(row.strategic_benefit || '');
+    if (!rawCompany && !benefitTextCheck) {
+      return '';
+    }
+  }
+
   const tailRule = selectTailRule(row);
   if (!tailRule) return '';
 
@@ -494,6 +524,52 @@ function applyVariationRules(
 }
 
 // -----------------------------
+// Helper types and functions for objective modes and strategic logic
+// -----------------------------
+
+type ObjectiveMode = 'simple' | 'complex';
+
+function isLeadRole(teamRole: string): boolean {
+  const lower = (teamRole || '').toLowerCase().trim();
+  // Normalized lead roles always contain the word "lead" as a separate token
+  return /\blead\b/.test(lower);
+}
+
+function hasAllMetrics(row: PreparedRow): boolean {
+  const out = (row.output_metric || '').trim();
+  const qual = (row.quality_metric || '').trim();
+  const imp = (row.improvement_metric || '').trim();
+  return !!out && !!qual && !!imp;
+}
+
+/**
+ * Decide the effective objective mode according to the v10.8 contract:
+ *
+ * - Lead roles  → always complex.
+ * - Any metrics auto-suggested (matrix or defaults) → complex.
+ * - Strategic / multi-squad benefit → complex.
+ * - Any metrics missing at PreparedRow stage (safety guard) → complex.
+ * - Otherwise → simple.
+ *
+ * Note: row.mode is treated as a user hint only and does not control behavior.
+ */
+function decideEffectiveMode(row: PreparedRow): ObjectiveMode {
+  const isLead = isLeadRole(row.team_role);
+  const metricsAuto = row.metrics_auto_suggested === true;
+  const allMetricsPresent = hasAllMetrics(row);
+  const metricsMissing = !allMetricsPresent;
+  const strategic = isStrategicBenefit(row.strategic_benefit);
+
+  const forceComplex =
+    isLead ||
+    metricsAuto ||
+    strategic ||
+    metricsMissing;
+
+  return forceComplex ? 'complex' : 'simple';
+}
+
+// -----------------------------
 // Main builders
 // -----------------------------
 
@@ -506,7 +582,7 @@ function buildObjectiveInternal(row: PreparedRow, mode: 'simple' | 'complex'): s
   const verbSlot = (pattern && (pattern as any).verb_slot) || 'deliver';
   const verb = selectVerb(row, verbSlot, mode);
   const metricsClause = buildMetricsClause(row, mode);
-  const tailClause = buildTailClause(row);
+  const tailClause = buildTailClause(row, mode);
 
   let template: string;
 
@@ -539,15 +615,18 @@ export function buildComplexObjective(row: PreparedRow): string {
 }
 
 export function buildObjectivesForRow(row: PreparedRow): ObjectiveOutput {
-  const simple =
-    row.mode === 'complex'
-      ? ''
-      : buildSimpleObjective(row);
+  const effectiveMode = decideEffectiveMode(row);
 
-  const complex =
-    row.mode === 'simple'
-      ? ''
-      : buildComplexObjective(row);
+  let simple = '';
+  let complex = '';
+
+  if (effectiveMode === 'simple') {
+    // Individual-contributor, fully user-specified metrics, non-strategic.
+    simple = buildSimpleObjective(row);
+  } else {
+    // Lead, strategic, and/or auto-suggested metrics → complex only.
+    complex = buildComplexObjective(row);
+  }
 
   return {
     row_id: row.row_id,

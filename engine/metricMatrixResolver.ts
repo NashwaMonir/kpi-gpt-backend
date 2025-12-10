@@ -156,14 +156,27 @@ export function resolveMatrixMetrics(
   row: KpiRowIn,
   variationSeed: number
 ): MatrixMetricSet | null {
-  const normRole = normalizeKey(
+  let normRole = normalizeKey(
     MATRIX.normalization.role_mapping,
     row.team_role ?? null
   );
-  const normTask = normalizeKey(
+  let normTask = normalizeKey(
     MATRIX.normalization.task_type_mapping,
     row.task_type ?? null
   );
+
+  // Fallback: if JSON normalization mapping does not cover this value,
+  // fall back to canonical family/task detection so matrix coverage
+  // degrades gracefully instead of failing hard.
+  if (!normRole) {
+    const fam = detectRoleFamily(row.team_role ?? null);
+    normRole = fam ?? null;
+  }
+
+  if (!normTask) {
+    const taskKey = detectTaskType(row.task_type ?? null);
+    normTask = taskKey ?? null;
+  }
 
   if (!normRole || !normTask) return null;
 

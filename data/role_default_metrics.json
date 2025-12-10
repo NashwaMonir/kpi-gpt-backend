@@ -1,0 +1,37 @@
+{
+  "content": {
+    "output": "Publish 95% of planned content on time",
+    "quality": "Keep content error rate below 2%",
+    "improvement": "Increase content engagement by 15%"
+  },
+  "content_lead": {
+    "output": "Ensure editorial roadmap delivery (100% on time)",
+    "quality": "Maintain cross-channel consistency and tone of voice",
+    "improvement": "Improve audience engagement by 20%"
+  },
+  "design": {
+    "output": "Maintain ≥95% adherence to the design system",
+    "quality": "Ensure WCAG AA accessibility compliance",
+    "improvement": "Increase task success rate by 15%"
+  },
+  "design_lead": {
+    "output": "Drive end-to-end design consistency across all products",
+    "quality": "Lead accessibility governance (WCAG AA+)",
+    "improvement": "Increase design system adoption by 25%"
+  },
+  "development": {
+    "output": "Reduce critical defects by 30%",
+    "quality": "Maintain 99.9% uptime",
+    "improvement": "Improve performance scores by 20%"
+  },
+  "development_lead": {
+    "output": "Ensure technical delivery excellence across squads",
+    "quality": "Maintain engineering quality thresholds across products",
+    "improvement": "Improve deployment success rate by 25%"
+  },
+  "generic": {
+    "output": "Deliver agreed scope within planned timeline",
+    "quality": "Meet acceptance criteria with ≤5% defect rate",
+    "improvement": "Improve customer satisfaction by 10%"
+  }
+}

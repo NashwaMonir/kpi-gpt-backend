@@ -1,26 +1,46 @@
 [
   {
-    "pattern": "^Increase\\s+(.+)$",
-    "replacement": "increasing $1"
-  },
-  {
-    "pattern": "^Improve\\s+(.+)$",
-    "replacement": "improving $1"
-  },
-  {
-    "pattern": "^Enhance\\s+(.+)$",
+    "pattern": "^(?:enhance|enhancing)\\s+(.+)$",
     "replacement": "enhancing $1"
   },
   {
-    "pattern": "^Support\\s+(.+)$",
-    "replacement": "supporting $1"
-  },
-  {
-    "pattern": "^increa[sz]e?\\s+(.+)$",
+    "pattern": "^(?:increase|increasing)\\s+(.+)$",
     "replacement": "increasing $1"
   },
   {
-    "pattern": "^increa[zs]e? company\\s+(.+)$",
-    "replacement": "increasing the company’s $1"
+    "pattern": "^(?:improve|improving)\\s+(.+)$",
+    "replacement": "improving $1"
+  },
+  {
+    "pattern": "^(?:optimize|optimizing)\\s+(.+)$",
+    "replacement": "optimizing $1"
+  },
+  {
+    "pattern": "^(?:streamline|streamlining)\\s+(.+)$",
+    "replacement": "streamlining $1"
+  },
+  {
+    "pattern": "^(?:strengthen|strengthening)\\s+(.+)$",
+    "replacement": "strengthening $1"
+  },
+  {
+    "pattern": "^(?:reduce|reducing)\\s+(.+)$",
+    "replacement": "reducing $1"
+  },
+  {
+    "pattern": "^(?:lower|lowering)\\s+(.+)$",
+    "replacement": "lowering $1"
+  },
+  {
+    "pattern": "^(?:maximize|maximizing)\\s+(.+)$",
+    "replacement": "maximizing $1"
+  },
+  {
+    "pattern": "^(?:minimize|minimizing)\\s+(.+)$",
+    "replacement": "minimizing $1"
+  },
+  {
+    "pattern": "\\s+",
+    "replacement": " "
   }
 ]

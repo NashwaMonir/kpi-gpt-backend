@@ -55,7 +55,11 @@ export default function handler(req: VercelRequest, res: VercelResponse) {
     });
   }
 
-  const engineRows: EnginePreparedRow[] = bulkRows.map((row) => {
+ // Split rows by validity:
+  const validBulkRows: BulkPreparedRow[] = bulkRows.filter((row) => row.isValid);
+  const invalidBulkRows: BulkPreparedRow[] = bulkRows.filter((row) => !row.isValid);
+
+  const engineRows: EnginePreparedRow[] = validBulkRows.map((row) => {
     const kpiRow: KpiRowIn = {
       row_id: row.row_id,
       company: row.company,
@@ -66,8 +70,7 @@ export default function handler(req: VercelRequest, res: VercelResponse) {
       strategic_benefit: row.strategic_benefit,
       output_metric: row.output_metric,
       quality_metric: row.quality_metric,
-      improvement_metric: row.improvement_metric,
-      mode: row.mode
+      improvement_metric: row.improvement_metric
     };
 
     const variation_seed = computeVariationSeed(kpiRow);
@@ -80,16 +83,17 @@ export default function handler(req: VercelRequest, res: VercelResponse) {
       dead_line: row.dead_line,
       strategic_benefit: row.strategic_benefit,
       company: row.company,
-      mode: row.mode,
       output_metric: row.output_metric,
       quality_metric: row.quality_metric,
       improvement_metric: row.improvement_metric,
+      metrics_auto_suggested: row.metrics_auto_suggested === true,
       variation_seed
     };
 
     return engineRow;
   });
 
+// Run objective engine ONLY on valid rows
   const objectiveOutputs = runObjectiveEngine(engineRows);
 
   const objectiveMap = new Map<number, { simple: string; complex: string }>();
@@ -100,20 +104,42 @@ export default function handler(req: VercelRequest, res: VercelResponse) {
     });
   }
 
+  // Build final result rows in original row order
   const resultRows: KpiResultRow[] = bulkRows.map((row) => {
-    const obj = objectiveMap.get(row.row_id);
+    const isValid = !!row.isValid;
+    const invalidReason = row.invalidReason ?? '';
 
-    const validation_status = row.isValid ? 'VALID' : 'INVALID';
-    const comments = row.invalidReason ?? '';
-    const summary_reason = row.invalidReason ?? '';
+    // Only attach objectives for VALID rows
+    const obj = isValid ? objectiveMap.get(row.row_id) : undefined;
+    const simple_objective = isValid ? (obj?.simple ?? '') : '';
+    const complex_objective = isValid ? (obj?.complex ?? '') : '';
+
+    // Derive final objective (simple or complex, depending on engine decision)
+    const objective = isValid ? (simple_objective || complex_objective || '') : '';
+
+    let validation_status: 'VALID' | 'NEEDS_REVIEW' | 'INVALID';
+    let comments = '';
+    let summary_reason = '';
+
+    if (!isValid) {
+      validation_status = 'INVALID';
+      comments = invalidReason;
+      summary_reason = invalidReason;
+    } else if (row.metrics_auto_suggested === true) {
+      validation_status = 'NEEDS_REVIEW';
+      comments =
+        'Objective metrics were auto-suggested based on the role matrix. Please review before approval.';
+      summary_reason = comments;
+    } else {
+      validation_status = 'VALID';
+    }
 
     return {
       task_name: row.task_name,
       task_type: row.task_type,
       team_role: row.team_role,
       dead_line: row.dead_line,
-      simple_objective: obj?.simple ?? '',
-      complex_objective: obj?.complex ?? '',
+      objective,
       validation_status,
       comments,
       summary_reason
@@ -126,7 +152,9 @@ export default function handler(req: VercelRequest, res: VercelResponse) {
   const invalid_count = resultRows.filter(
     (r) => r.validation_status === 'INVALID'
   ).length;
-  const needs_review_count = 0;
+  const needs_review_count = resultRows.filter(
+    (r) => r.validation_status === 'NEEDS_REVIEW'
+  ).length;
 
   const host = req.headers.host ?? null;
   const download_url = encodeRowsForDownload(resultRows, host);

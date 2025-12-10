@@ -151,6 +151,8 @@ export default function handler(req: VercelRequest, res: VercelResponse) {
 
       const metricsResult = resolveMetrics(normalized, variation_seed, errorCodes);
 
+      const metricsAutoSuggested = metricsResult.used_default_metrics === true;
+
       const final = buildFinalMessage(domainResult, metricsResult, errorCodes);
 
       const resolvedMetrics: ResolvedMetricsSnapshot = {
@@ -167,10 +169,11 @@ export default function handler(req: VercelRequest, res: VercelResponse) {
         dead_line: (normalized.dead_line ?? '').toString(),
         strategic_benefit: (normalized.strategic_benefit ?? '').toString(),
         company: (normalized.company ?? '').toString(),
-        mode: final.mode,
+
         output_metric: resolvedMetrics.output_metric ?? '',
         quality_metric: resolvedMetrics.quality_metric ?? '',
         improvement_metric: resolvedMetrics.improvement_metric ?? '',
+        metrics_auto_suggested: metricsAutoSuggested,
         variation_seed
       };
 
@@ -184,15 +187,23 @@ export default function handler(req: VercelRequest, res: VercelResponse) {
         complexObjective = '';
       }
 
+      const objective =
+        final.status === 'INVALID'
+          ? ''
+          : (simpleObjective || complexObjective || '');
+
+      const objective_mode = simpleObjective ? 'simple' : complexObjective ? 'complex' : '';
+
       const rowOut: KpiRowOut = {
         row_id: normalized.row_id,
-        simple_objective: simpleObjective,
-        complex_objective: complexObjective,
+        objective,
+        objective_mode,
         status: final.status,
         comments: final.comments,
         summary_reason: final.summary_reason,
         error_codes: final.errorCodes,
         resolved_metrics: resolvedMetrics,
+        metrics_auto_suggested: metricsAutoSuggested,
         variation_seed
       };
 

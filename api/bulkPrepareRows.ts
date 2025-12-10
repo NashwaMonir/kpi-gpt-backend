@@ -10,6 +10,7 @@ import {
   decodeRowsToken,
   encodePrepareToken
 } from '../engine/bulkTypes';
+import { normalizeTeamRole, normalizeTaskType } from '../engine/normalizeFields';
 
 function applyCompanyStrategy(
   row: ParsedRow,
@@ -85,9 +86,34 @@ export default function handler(req: VercelRequest, res: VercelResponse) {
       mismatched_strategy: body.mismatched_strategy
     });
 
+    // Normalize team_role and task_type using the same helpers as the single-row API.
+    const teamRoleResult = normalizeTeamRole(row.team_role);
+    const taskTypeResult = normalizeTaskType(row.task_type);
+
+    let isValid = row.isValid;
+    let invalidReason = row.invalidReason || undefined;
+
+    if (!teamRoleResult.isAllowed) {
+      isValid = false;
+      invalidReason = invalidReason
+        ? `${invalidReason}; Invalid Team Role`
+        : 'Invalid Team Role';
+    }
+
+    if (!taskTypeResult.isAllowed) {
+      isValid = false;
+      invalidReason = invalidReason
+        ? `${invalidReason}; Invalid Task Type`
+        : 'Invalid Task Type';
+    }
+
     const newRow: PreparedRow = {
       ...row,
-      company: finalCompany
+      company: finalCompany,
+      team_role: teamRoleResult.normalized,
+      task_type: taskTypeResult.normalized,
+      isValid,
+      invalidReason
     };
 
     if (invalid_handling === 'skip' && !newRow.isValid) {

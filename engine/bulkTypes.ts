@@ -24,7 +24,6 @@ export interface KpiJsonRowIn {
   output_metric?: string | null;
   quality_metric?: string | null;
   improvement_metric?: string | null;
-  mode?: string | null;
 }
 
 // Normalized / parsed row used by bulk engine
@@ -40,15 +39,21 @@ export interface ParsedRow {
   output_metric: string;
   quality_metric: string;
   improvement_metric: string;
-  mode: 'simple' | 'complex' | 'both';
 
   isValid: boolean;
   invalidReason?: string | null;
 }
 
 // After company strategies are applied
-export interface PreparedRow extends ParsedRow {}
-
+export interface PreparedRow extends ParsedRow {
+  /**
+   * True when any of the three metrics (output/quality/improvement)
+   * were auto-suggested by the engine rather than provided directly by the user.
+   * This is passed through to the objective engine to force complex mode
+   * where required by the contract.
+   */
+  metrics_auto_suggested?: boolean;
+}
 // Inspect summary and options
 
 export interface BulkInspectOption {
@@ -171,8 +176,11 @@ export interface KpiResultRow {
   task_type: string;
   team_role: string;
   dead_line: string;
-  simple_objective: string;
-  complex_objective: string;
+  /**
+   * Final, authoritative objective selected by the engine
+   * (simple or complex, depending on the contract rules).
+   */
+  objective: string;
   validation_status: string;
   comments: string;
   summary_reason: string;

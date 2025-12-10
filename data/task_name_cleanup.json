@@ -1,7 +1,20 @@
 {
-  "role_prefixes": ["Design", "Development", "Content"],
+  "role_prefixes": [
+    "Design",
+    "Design Lead",
+    "Development",
+    "Development Lead",
+    "Content",
+    "Content Lead"
+  ],
   "normalize_map": {
-    "home page": "Home Page",
-    "homepage": "Home Page"
+    "homepage": "Homepage",
+    "home page": "Homepage",
+    "seo": "SEO",
+    "api": "API",
+    "cms": "CMS",
+    "ui": "UI",
+    "ux": "UX",
+    "kpi": "KPI"
   }
 }

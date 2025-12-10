@@ -9,8 +9,11 @@ interface KpiResultRow {
   task_type: string;
   team_role: string;
   dead_line: string;
-  simple_objective: string;
-  complex_objective: string;
+  /**
+   * Final, authoritative objective selected by the engine
+   * (simple or complex, depending on the contract rules).
+   */
+  objective: string;
   validation_status: string;
   comments: string;
   summary_reason: string;
@@ -66,8 +69,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     { header: 'Task Type', key: 'task_type', width: 18 },
     { header: 'Team Role', key: 'team_role', width: 18 },
     { header: 'Deadline', key: 'dead_line', width: 15 },
-    { header: 'Simple Objective', key: 'simple_objective', width: 60 },
-    { header: 'Complex Objective', key: 'complex_objective', width: 80 },
+    { header: 'Objective', key: 'objective', width: 80 },
     { header: 'Validation Status', key: 'validation_status', width: 18 },
     { header: 'Comments', key: 'comments', width: 50 },
     { header: 'Summary Reason', key: 'summary_reason', width: 50 }
@@ -79,8 +81,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       task_type: row.task_type ?? '',
       team_role: row.team_role ?? '',
       dead_line: row.dead_line ?? '',
-      simple_objective: row.simple_objective ?? '',
-      complex_objective: row.complex_objective ?? '',
+      objective: row.objective ?? '',
       validation_status: row.validation_status ?? '',
       comments: row.comments ?? '',
       summary_reason: row.summary_reason ?? ''

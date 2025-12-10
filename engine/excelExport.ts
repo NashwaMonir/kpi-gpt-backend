@@ -18,8 +18,7 @@ export async function createKpiTemplateWorkbook(): Promise<ExcelJS.Workbook> {
     'strategic_benefit',
     'output_metric',
     'quality_metric',
-    'improvement_metric',
-    'mode'
+    'improvement_metric'
   ];
 
   sheet.addRow(headers);
@@ -52,8 +51,7 @@ export async function createKpiResultWorkbook(
     'task_type',
     'team_role',
     'dead_line',
-    'simple_objective',
-    'complex_objective',
+    'objective',
     'validation_status',
     'comments',
     'summary_reason'
@@ -68,8 +66,7 @@ export async function createKpiResultWorkbook(
       row.task_type ?? '',
       row.team_role ?? '',
       row.dead_line ?? '',
-      row.simple_objective ?? '',
-      row.complex_objective ?? '',
+      row.objective ?? '',
       row.validation_status ?? '',
       row.comments ?? '',
       row.summary_reason ?? ''
