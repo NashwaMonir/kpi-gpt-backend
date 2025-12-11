@@ -177,22 +177,18 @@ export default function handler(req: VercelRequest, res: VercelResponse) {
         variation_seed
       };
 
-      const objectiveOutput = buildObjectivesForRow(preparedRow);
+      let objective = '';
+      let objective_mode: '' | 'simple' | 'complex' = '';
 
-      let simpleObjective = (objectiveOutput.simple_objective ?? '').toString();
-      let complexObjective = (objectiveOutput.complex_objective ?? '').toString();
+      if (final.status !== 'INVALID') {
+        const objectiveOutput = buildObjectivesForRow(preparedRow);
 
-      if (final.status === 'INVALID') {
-        simpleObjective = '';
-        complexObjective = '';
+        const simpleObjective = (objectiveOutput.simple_objective ?? '').toString().trim();
+        const complexObjective = (objectiveOutput.complex_objective ?? '').toString().trim();
+
+        objective = simpleObjective || complexObjective || '';
+        objective_mode = simpleObjective ? 'simple' : complexObjective ? 'complex' : '';
       }
-
-      const objective =
-        final.status === 'INVALID'
-          ? ''
-          : (simpleObjective || complexObjective || '');
-
-      const objective_mode = simpleObjective ? 'simple' : complexObjective ? 'complex' : '';
 
       const rowOut: KpiRowOut = {
         row_id: normalized.row_id,

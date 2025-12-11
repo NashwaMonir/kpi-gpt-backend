@@ -109,7 +109,9 @@ export function buildFinalMessage(
   // ---------------------------------------------------------------------------
   let status: 'VALID' | 'NEEDS_REVIEW' | 'INVALID' = 'VALID';
 
-  if (statusHint === 'INVALID' || hasBlockingErrors) {
+  const hasDangerousText = canonicalErrorCodes.includes(ErrorCodes.DANGEROUS_TEXT);
+
+  if (statusHint === 'INVALID' || hasBlockingErrors || hasDangerousText) {
     status = 'INVALID';
   } else if (metricsNeedsReview) {
     status = 'NEEDS_REVIEW';
@@ -171,6 +173,13 @@ export function buildFinalMessage(
     ...(dangerousMetrics ?? [])
   ];
   const uniqueDangerousFields = Array.from(new Set(allDangerousFields));
+
+  const hasDangerousTextComment = canonicalErrorCodes.includes(ErrorCodes.DANGEROUS_TEXT);
+  if (hasDangerousTextComment) {
+    commentsParts.push(
+      'Objective text includes unacceptable or dangerous wording (for example ignoring security guidelines or policies). Please rewrite this text in line with company policy and security standards.'
+    );
+  }
 
   if (uniqueDangerousFields.length > 0) {
     commentsParts.push(

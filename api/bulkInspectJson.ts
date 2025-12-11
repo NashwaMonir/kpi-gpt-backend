@@ -69,7 +69,7 @@ export function parseCsvToKpiJsonRows(csvText: string): KpiJsonRowIn[] {
       team_role: get(r, 'team_role', 'team role'),
       // Accept both "dead_line" and "deadline" as header
       dead_line: get(r, 'dead_line', 'deadline'),
-      strategic_benefit: get(r, 'strategic_benefit', 'strategic_benefit'),
+      strategic_benefit: get(r, 'strategic_benefit', 'strategic benefit'),
       output_metric: get(r, 'output_metric', 'output metric'),
       quality_metric: get(r, 'quality_metric', 'quality metric'),
       improvement_metric: get(r, 'improvement_metric', 'improvement metric'),
@@ -265,98 +265,108 @@ function buildPrompt(meta: {
 }
 
 export default function handler(req: VercelRequest, res: VercelResponse) {
-  if (req.method !== 'POST') {
-    return res.status(405).json({ error: 'Method not allowed' });
-  }
-
-  const body = req.body as BulkInspectJsonRequest | undefined;
-
-  let inputRows: KpiJsonRowIn[] = [];
-
-  if (body) {
-    if (
-      typeof body.excel_csv_text === 'string' &&
-      body.excel_csv_text.trim().length > 0
-    ) {
-      // CSV path (Custom GPT)
-      inputRows = parseCsvToKpiJsonRows(body.excel_csv_text);
-    } else if (Array.isArray(body.rows)) {
-      // Legacy JSON rows path
-      inputRows = body.rows;
+  try {
+    if (req.method !== 'POST') {
+      return res.status(405).json({ error: 'Method not allowed' });
     }
-  }
 
-  if (!inputRows || inputRows.length === 0) {
-    return res.status(400).json({
+    const body = req.body as BulkInspectJsonRequest | undefined;
+
+    let inputRows: KpiJsonRowIn[] = [];
+
+    if (body) {
+      if (
+        typeof body.excel_csv_text === 'string' &&
+        body.excel_csv_text.trim().length > 0
+      ) {
+        // CSV path (Custom GPT)
+        inputRows = parseCsvToKpiJsonRows(body.excel_csv_text);
+      } else if (Array.isArray(body.rows)) {
+        // Legacy JSON rows path
+        inputRows = body.rows;
+      }
+    }
+
+    if (!inputRows || inputRows.length === 0) {
+      return res.status(400).json({
+        error: true,
+        code: 'NO_ROWS',
+        message:
+          'bulkInspectJson received zero rows. Neither JSON rows nor CSV text contained data.'
+      });
+    }
+
+    const {
+      parsedRows,
+      row_count,
+      invalid_row_count,
+      has_company_column,
+      unique_companies,
+      missing_company_count,
+      benefit_company_signals,
+      company_case,
+      needs_company_decision,
+      has_invalid_rows
+    } = normalizeAndValidateRows(inputRows);
+
+    if (row_count === 0) {
+      return res.status(400).json({
+        error: true,
+        code: 'ONLY_EMPTY_ROWS',
+        message: 'bulkInspectJson: all rows were empty after normalization.'
+      });
+    }
+
+    // summaryMeta must match RowsTokenPayload['summaryMeta'] exactly
+    const summaryMeta: RowsTokenPayload['summaryMeta'] = {
+      row_count,
+      invalid_row_count,
+      has_company_column,
+      unique_companies,
+      missing_company_count,
+      benefit_company_signals,
+      company_case,
+      needs_company_decision,
+      has_invalid_rows
+    };
+
+    const rowsPayload: RowsTokenPayload = {
+      parsedRows,
+      summaryMeta
+    };
+
+    const rows_token = encodeRowsToken(rowsPayload);
+    const ui_prompt = buildPrompt({
+      row_count,
+      company_case,
+      unique_companies
+    });
+    const options = buildOptions({ company_case, unique_companies });
+
+    const response: BulkInspectJsonResponse = {
+      rows_token,
+      row_count,
+      invalid_row_count,
+      has_company_column,
+      unique_companies,
+      missing_company_count,
+      benefit_company_signals,
+      company_case,
+      needs_company_decision,
+      has_invalid_rows,
+      state: 'INSPECTED',
+      ui_prompt,
+      options
+    };
+
+    return res.status(200).json(response);
+  } catch (err) {
+    console.error('[bulkInspectJson] Unhandled error', err);
+
+    return res.status(500).json({
       error: true,
-      code: 'NO_ROWS',
-      message:
-        'bulkInspectJson received zero rows. Neither JSON rows nor CSV text contained data.'
+      code: 'E902_BULK_INSPECT_INTERNAL',
+      message: 'Bulk inspect failed due to an internal error. Please contact the KPI administrator.'
     });
   }
-
-  const {
-    parsedRows,
-    row_count,
-    invalid_row_count,
-    has_company_column,
-    unique_companies,
-    missing_company_count,
-    benefit_company_signals,
-    company_case,
-    needs_company_decision,
-    has_invalid_rows
-  } = normalizeAndValidateRows(inputRows);
-
-  if (row_count === 0) {
-    return res.status(400).json({
-      error: true,
-      code: 'ONLY_EMPTY_ROWS',
-      message: 'bulkInspectJson: all rows were empty after normalization.'
-    });
-  }
-
-  // summaryMeta must match RowsTokenPayload['summaryMeta'] exactly
-  const summaryMeta: RowsTokenPayload['summaryMeta'] = {
-    row_count,
-    invalid_row_count,
-    has_company_column,
-    unique_companies,
-    missing_company_count,
-    benefit_company_signals,
-    company_case,
-    needs_company_decision,
-    has_invalid_rows
-  };
-
-  const rowsPayload: RowsTokenPayload = {
-    parsedRows,
-    summaryMeta
-  };
-
-  const rows_token = encodeRowsToken(rowsPayload);
-  const ui_prompt = buildPrompt({
-    row_count,
-    company_case,
-    unique_companies
-  });
-  const options = buildOptions({ company_case, unique_companies });
-
-  const response: BulkInspectJsonResponse = {
-    rows_token,
-    row_count,
-    invalid_row_count,
-    has_company_column,
-    unique_companies,
-    missing_company_count,
-    benefit_company_signals,
-    company_case,
-    needs_company_decision,
-    has_invalid_rows,
-    state: 'INSPECTED',
-    ui_prompt,
-    options
-  };
-
-  return res.status(200).json(response);
 }
