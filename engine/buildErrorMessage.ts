@@ -19,6 +19,50 @@ import type { MetricResolutionResult } from './metricsAutoSuggest';
 import type { ErrorCode } from './errorCodes';
 import { ErrorCodes, ERROR_COMMENTS } from './errorCodes';
 
+export interface BuildErrorMessageParams {
+  status: 'VALID' | 'NEEDS_REVIEW' | 'INVALID';
+  error_codes: ErrorCode[];
+  metrics_auto_suggested: boolean;
+  missing_fields: string[];
+  deadline_validation?: {
+    valid: boolean;
+    wrongYear?: boolean;
+  };
+}
+
+export interface BuildErrorMessageResult {
+  comments: string;
+  summary_reason: string;
+}
+
+
+function buildErrorMessage(params: BuildErrorMessageParams): BuildErrorMessageResult {
+  const { status, metrics_auto_suggested } = params;
+
+  if (status === 'INVALID') {
+    return {
+      comments: 'Objectives not generated due to validation errors.',
+      summary_reason: 'Objectives not generated due to validation errors.'
+    };
+  }
+
+  if (status === 'NEEDS_REVIEW' && metrics_auto_suggested) {
+    return {
+      comments: 'Metrics were system-recommended based on the role matrix. Please review for approval.',
+      summary_reason: 'Metrics were system-recommended based on the role matrix. Please review for approval.'
+    };
+  }
+
+  return {
+    comments: 'All SMART criteria met.',
+    summary_reason: ''
+  };
+}
+
+export { buildErrorMessage };
+export default buildErrorMessage;
+
+
 export interface FinalAssemblyResult {
   status: 'VALID' | 'NEEDS_REVIEW' | 'INVALID';
   comments: string;
@@ -105,13 +149,15 @@ export function buildFinalMessage(
   // ---------------------------------------------------------------------------
   // 1. Status derivation (domain first, then metrics/mode)
   //    - Domain INVALID always wins
-  //    - Metrics / mode can only move VALID → NEEDS_REVIEW
+  //    - Metrics auto-suggest can only move VALID → NEEDS_REVIEW
   // ---------------------------------------------------------------------------
   let status: 'VALID' | 'NEEDS_REVIEW' | 'INVALID' = 'VALID';
 
-  if (statusHint === 'INVALID' || hasBlockingErrors) {
+  const hasDangerousText = canonicalErrorCodes.includes(ErrorCodes.DANGEROUS_TEXT);
+
+  if (statusHint === 'INVALID' || hasBlockingErrors || hasDangerousText) {
     status = 'INVALID';
-  } else if (metricsNeedsReview || modeWasInvalid) {
+  } else if (metricsNeedsReview) {
     status = 'NEEDS_REVIEW';
   }
 
@@ -172,6 +218,13 @@ export function buildFinalMessage(
   ];
   const uniqueDangerousFields = Array.from(new Set(allDangerousFields));
 
+  const hasDangerousTextComment = canonicalErrorCodes.includes(ErrorCodes.DANGEROUS_TEXT);
+  if (hasDangerousTextComment) {
+    commentsParts.push(
+      'Objective text includes unacceptable or dangerous wording (for example ignoring security guidelines or policies). Please rewrite this text in line with company policy and security standards.'
+    );
+  }
+
   if (uniqueDangerousFields.length > 0) {
     commentsParts.push(
       `Invalid text format for: ${uniqueDangerousFields.join(', ')}.`
@@ -217,25 +270,27 @@ export function buildFinalMessage(
 
     if (autoSuggested.length === 3) {
       commentsParts.push(
-        'Metrics auto-suggested (Output / Quality / Improvement).'
+        'Metrics were system-recommended (Output / Quality / Improvement). Please review for approval.'
       );
     } else if (autoSuggested.length > 0) {
       commentsParts.push(
-        `Metrics auto-suggested for: ${autoSuggested.join(', ')}.`
+        `Metrics were system-recommended for: ${autoSuggested.join(', ')}. Please review for approval.`
       );
     } else {
       // Fallback generic note if we cannot infer exact fields
       commentsParts.push(
-        'Metrics auto-suggested based on the role matrix.'
+        'Metrics were system-recommended based on the role matrix. Please review for approval.'
       );
     }
   }
 
-  // Normalize spaces and join into single-line comments
+  // Normalize spaces and join into a single-line comments string
   const comments = commentsParts
+    .map((c) => c.replace(/\s+/g, ' ').trim())
+    .filter((c) => c.length > 0)
     .join(' ')
-    .replace(/\s+/g, ' ')
     .trim();
+
 
   // ---------------------------------------------------------------------------
   // 3. summary_reason hierarchy
@@ -250,7 +305,7 @@ export function buildFinalMessage(
     summary_reason = 'Objectives not generated due to validation errors.';
   } else if (status === 'NEEDS_REVIEW') {
     summary_reason =
-      'Objective metrics were auto-suggested based on the role matrix. Please review before approval.';
+      'Metrics were system-recommended based on the role matrix. Please review for approval.';
   } else {
     summary_reason = '';
   }
@@ -279,7 +334,9 @@ export function buildFinalMessage(
   // ---------------------------------------------------------------------------
   return {
     status,
-    comments,
+    comments: comments || (status === 'NEEDS_REVIEW'
+      ? 'Metrics were system-recommended based on the role matrix. Please review for approval.'
+      : 'Objectives not generated due to validation errors.'),
     summary_reason,
     errorCodes: canonicalErrorCodes,
     input_row: normalizedRow,

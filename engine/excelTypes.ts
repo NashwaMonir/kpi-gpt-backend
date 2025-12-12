@@ -13,7 +13,6 @@ export interface KpiTemplateRow {
   output_metric: string;
   quality_metric: string;
   improvement_metric: string;
-  mode: string;
 }
 
 // Shape of each row that will go into KPI_Output.xlsx
@@ -24,10 +23,12 @@ export interface KpiResultExportRow {
   team_role: string;
   dead_line: string;
 
-  simple_objective: string;
-  complex_objective: string;
+  /**
+   * Final, authoritative objective selected by the engine
+   * (simple or complex, depending on the contract rules).
+   */
+  objective: string;
 
   validation_status: ValidationStatus;
   comments: string;
-  summary_reason: string;
 }

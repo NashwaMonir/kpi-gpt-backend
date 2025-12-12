@@ -1,5 +1,35 @@
 [
   {
+    "id": "remove_duplicate_by",
+    "pattern": "by by ",
+    "flags": "gi",
+    "replacement": "by "
+  },
+  {
+    "id": "remove_duplicate_to",
+    "pattern": "to to ",
+    "flags": "gi",
+    "replacement": "to "
+  },
+  {
+    "id": "remove_duplicate_and",
+    "pattern": "and and ",
+    "flags": "gi",
+    "replacement": "and "
+  },
+  {
+    "id": "fix_space_comma",
+    "pattern": " ,",
+    "flags": "g",
+    "replacement": ","
+  },
+  {
+    "id": "remove_duplicate_aligned_with",
+    "pattern": "\\s+aligned with\\s+aligned with",
+    "flags": "gi",
+    "replacement": " aligned with"
+  },
+  {
     "id": "simplify_in_order_to",
     "pattern": "\\bin order to\\b",
     "flags": "gi",

@@ -100,14 +100,22 @@ if (HTML_TAG_REGEX.test(trimmed)) {
     return { isDangerous: true, isLowSemantic: false };
   }
 
-  // 1.7 Extra HTML/JS injection helpers (backticks, template, HTML attack surface) → E401
-    const lower = trimmed.toLowerCase();
+  // 1.7 Extra HTML/JS injection helpers and explicit policy/security-violating phrases → E401
+  const lower = trimmed.toLowerCase();
   if (
+    // HTML/JS surface indicators
     trimmed.includes('`') ||          // backticks (JS template literals)
     trimmed.includes('${') ||         // template injection markers
     lower.includes('<img') ||
     lower.includes('<iframe') ||
-    lower.includes('</script')
+    lower.includes('</script') ||
+    // Explicit dangerous instruction / policy-violating phrases
+    lower.includes('by any means necessary') ||
+    (lower.includes('ignoring') && lower.includes('security')) ||
+    (lower.includes('ignoring') && lower.includes('guidelines')) ||
+    (lower.includes('ignoring') && lower.includes('policy')) ||
+    lower.includes('ignore security controls') ||
+    lower.includes('ignore security guidelines')
   ) {
     addErrorCode(errorCodes, ErrorCodes.DANGEROUS_TEXT);
     return { isDangerous: true, isLowSemantic: false };

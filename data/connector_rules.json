@@ -1,8 +1,16 @@
 [
   {
-    "id": "connector_and",
-    "prefix": ", and "
-  },
+      "id": "tail_default_comma",
+      "prefix": ", "
+    },
+    {
+      "id": "tail_while_aligned",
+      "prefix": ", while "
+    },
+    {
+      "id": "tail_and_aligned",
+      "prefix": ", and "
+    },
   {
     "id": "connector_while_also",
     "prefix": ", while also "

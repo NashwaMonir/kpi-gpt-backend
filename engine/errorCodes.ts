@@ -9,6 +9,11 @@
 //  E500–E599 → Metrics auto-suggest (NEEDS_REVIEW only)
 //  E600–E699 → JSON / structural issues (transport and type-level)
 
+// NOTE (v10.8):
+// - E2xx / E3xx / E4xx codes always result in INVALID.
+// - E5xx codes (metrics auto-suggest) always result in NEEDS_REVIEW, never INVALID.
+// - Error codes are additive; final status is derived by the engine, not by presence of a single code.
+
 export const ErrorCodes = {
   // 2xx – Missing mandatory fields (07_Domain_Validation_Spec §3)
   MISSING_TASK_NAME: 'E201',
@@ -96,10 +101,10 @@ export const ERROR_COMMENTS: Record<ErrorCode, string> = {
 
   [ErrorCodes.INVALID_TASK_TYPE]: 'Invalid value(s) for: Task Type.',
   [ErrorCodes.INVALID_TEAM_ROLE]: 'Invalid value(s) for: Team Role.',
-  [ErrorCodes.DEADLINE_WRONG_YEAR]: 'Deadline outside valid calendar year.',
+  [ErrorCodes.DEADLINE_WRONG_YEAR]: 'Deadline outside the allowed calendar year.',
   [ErrorCodes.DEADLINE_INVALID_FORMAT]: 'Invalid deadline format.',
   [ErrorCodes.DEADLINE_TEXTUAL_NONDATE]: 'Deadline contains non-parsable or textual content.',
-  [ErrorCodes.INVALID_MODE_VALUE]: 'Mode fallback applied: defaulting to "both".',
+  [ErrorCodes.INVALID_MODE_VALUE]: 'Invalid mode value detected; backend fallback applied.',
 
   [ErrorCodes.DANGEROUS_TEXT]: 'Invalid text format for field (dangerous content).',
   [ErrorCodes.LOW_SIGNAL_TEXT]: 'Invalid text format for field (low semantic signal).',
@@ -125,3 +130,5 @@ export function addErrorCode(list: ErrorCode[], code: ErrorCode): void {
     list.push(code);
   }
 }
+
+export type ValidationStatus = 'VALID' | 'NEEDS_REVIEW' | 'INVALID';

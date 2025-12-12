@@ -1,6 +1,6 @@
 {
-  "default_baseline": "current organizational baseline",
-  "improvement_baseline": "operational improvement baseline",
-  "quality_baseline": "quality measurement baseline",
-  "output_baseline": "output performance baseline"
+  "quality_baseline": "the current quality and defect baseline",
+  "output_baseline": "the current delivery and throughput baseline",
+  "improvement_baseline": "the current performance, efficiency, and satisfaction baseline",
+  "default_baseline": "the current organizational baseline"
 }

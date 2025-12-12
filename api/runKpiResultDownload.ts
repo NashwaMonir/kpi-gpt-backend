@@ -9,11 +9,20 @@ interface KpiResultRow {
   task_type: string;
   team_role: string;
   dead_line: string;
-  simple_objective: string;
-  complex_objective: string;
-  validation_status: string;
+  /**
+   * Final, authoritative objective selected by the engine
+   * (simple or complex, depending on the contract rules).
+   */
+  objective: string;
+  validation_status: 'VALID' | 'NEEDS_REVIEW' | 'INVALID';
   comments: string;
-  summary_reason: string;
+}
+
+function normalizeStatus(v: unknown): 'VALID' | 'NEEDS_REVIEW' | 'INVALID' {
+  const s = String(v ?? '').trim().toUpperCase();
+  if (s === 'VALID') return 'VALID';
+  if (s === 'NEEDS_REVIEW' || s === 'NEEDS REVIEW') return 'NEEDS_REVIEW';
+  return 'INVALID';
 }
 
 function decodeRowsFromQuery(dataParam: string | string[] | undefined): KpiResultRow[] {
@@ -34,7 +43,15 @@ function decodeRowsFromQuery(dataParam: string | string[] | undefined): KpiResul
   try {
     const parsed = JSON.parse(json);
     if (Array.isArray(parsed)) {
-      return parsed as KpiResultRow[];
+      return (parsed as any[]).map((r) => ({
+        task_name: String(r?.task_name ?? ''),
+        task_type: String(r?.task_type ?? ''),
+        team_role: String(r?.team_role ?? ''),
+        dead_line: String(r?.dead_line ?? ''),
+        objective: String(r?.objective ?? ''),
+        validation_status: normalizeStatus(r?.validation_status),
+        comments: String(r?.comments ?? '')
+      })) as KpiResultRow[];
     }
     return [];
   } catch {
@@ -66,11 +83,9 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     { header: 'Task Type', key: 'task_type', width: 18 },
     { header: 'Team Role', key: 'team_role', width: 18 },
     { header: 'Deadline', key: 'dead_line', width: 15 },
-    { header: 'Simple Objective', key: 'simple_objective', width: 60 },
-    { header: 'Complex Objective', key: 'complex_objective', width: 80 },
+    { header: 'Objective', key: 'objective', width: 80 },
     { header: 'Validation Status', key: 'validation_status', width: 18 },
-    { header: 'Comments', key: 'comments', width: 50 },
-    { header: 'Summary Reason', key: 'summary_reason', width: 50 }
+    { header: 'Comments', key: 'comments', width: 50 }
   ];
 
   for (const row of rows) {
@@ -79,11 +94,9 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       task_type: row.task_type ?? '',
       team_role: row.team_role ?? '',
       dead_line: row.dead_line ?? '',
-      simple_objective: row.simple_objective ?? '',
-      complex_objective: row.complex_objective ?? '',
+      objective: row.objective ?? '',
       validation_status: row.validation_status ?? '',
-      comments: row.comments ?? '',
-      summary_reason: row.summary_reason ?? ''
+      comments: row.comments ?? ''
     });
   }
 

@@ -1,215 +1,324 @@
 {
-  "buckets": {
-    "named_with_benefit": {
-      "id": "named_with_benefit",
-      "description": "Company is explicitly named (non-generic) and a strategic benefit is provided.",
-      "conditions": {
-        "has_company": true,
-        "company_is_generic": false,
-        "has_benefit": true
-      },
-      "variants": [
-        {
-          "id": "nwb_1",
-          "template": " aligned with {company}'s strategic goal to {benefit}",
-          "notes": "Standard enterprise wording; neutral and cross-industry."
-        },
-        {
-          "id": "nwb_2",
-          "template": " in support of {company}'s priority to {benefit}",
-          "notes": "Emphasises support, suitable for transformation or change programmes."
-        },
-        {
-          "id": "nwb_3",
-          "template": " contributing to {company}'s ambition to {benefit}",
-          "notes": "Softer, ambition-focused framing; good for long-term programmes."
-        },
-        {
-          "id": "nwb_4",
-          "template": " enabling {company} to better {benefit}",
-          "notes": "Outcome-focused, useful when benefit is clearly action-verb based."
-        },
-        {
-          "id": "nwb_5",
-          "template": " strengthening {company}'s ability to {benefit}",
-          "notes": "Good for capability-building initiatives (platforms, tooling, ways of working)."
-        }
-      ]
-    },
-
-    "named_no_benefit": {
-      "id": "named_no_benefit",
-      "description": "Company is explicitly named (non-generic) but no strategic benefit text is provided.",
-      "conditions": {
-        "has_company": true,
-        "company_is_generic": false,
-        "has_benefit": false
-      },
-      "variants": [
-        {
-          "id": "nnb_1",
-          "template": " aligned with {company}'s strategic priorities",
-          "notes": "Default when only the company name is known."
-        },
-        {
-          "id": "nnb_2",
-          "template": " in support of {company}'s digital and business objectives",
-          "notes": "Safe wording for most digital, product, or service initiatives."
-        },
-        {
-          "id": "nnb_3",
-          "template": " contributing to {company}'s long-term growth agenda",
-          "notes": "Useful when initiatives are clearly growth-oriented but no detail is provided."
-        },
-        {
-          "id": "nnb_4",
-          "template": " supporting {company}'s overall strategic roadmap",
-          "notes": "Generic but enterprise-sounding; avoids guessing concrete benefits."
-        }
-      ]
-    },
-
-    "generic_with_benefit": {
-      "id": "generic_with_benefit",
-      "description": "No specific company name, but a strategic benefit is provided. Uses generic labels like “the organization”.",
-      "conditions": {
-        "has_company": false,
-        "company_is_generic": true,
-        "has_benefit": true
-      },
-      "variants": [
-        {
-          "id": "gwb_1",
-          "template": " aligned with the organization's strategic goal to {benefit}",
-          "notes": "Primary generic pattern for benefit-driven objectives."
-        },
-        {
-          "id": "gwb_2",
-          "template": " in support of the company's ambition to {benefit}",
-          "notes": "Balanced between generic “company” wording and outcome focus."
-        },
-        {
-          "id": "gwb_3",
-          "template": " contributing to the business objective to {benefit}",
-          "notes": "Good when benefit text already sounds like a business objective."
-        },
-        {
-          "id": "gwb_4",
-          "template": " helping the organization to better {benefit}",
-          "notes": "Softer, outcome-oriented framing, useful for customer experience work."
-        },
-        {
-          "id": "gwb_5",
-          "template": " strengthening the organization's ability to {benefit}",
-          "notes": "Capability-building focus without naming the company."
-        }
-      ]
-    },
-
-    "generic_no_benefit": {
-      "id": "generic_no_benefit",
-      "description": "No specific company name and no benefit text. Purely generic strategic alignment tails.",
-      "conditions": {
-        "has_company": false,
-        "company_is_generic": true,
-        "has_benefit": false
-      },
-      "variants": [
-        {
-          "id": "gnb_1",
-          "template": " aligned with the organization's strategic priorities",
-          "notes": "Default generic tail when no benefit is provided."
-        },
-        {
-          "id": "gnb_2",
-          "template": " in support of the organization's digital and business objectives",
-          "notes": "Safe phrase for any digital or transformation initiative."
-        },
-        {
-          "id": "gnb_3",
-          "template": " contributing to the company's long-term growth agenda",
-          "notes": "Long-horizon framing when details are limited."
-        },
-        {
-          "id": "gnb_4",
-          "template": " supporting the business roadmap and portfolio goals",
-          "notes": "Neutral wording that fits portfolio and roadmap contexts."
-        }
-      ]
-    },
-
-    "named_generic_company": {
-      "id": "named_generic_company",
-      "description": "Company text looks generic or placeholder (e.g., “ACME”, “Company ABC”) and a benefit is present. Treat name as optional flavour.",
-      "conditions": {
-        "has_company": true,
-        "company_is_generic": true,
-        "has_benefit": true
-      },
-      "variants": [
-        {
-          "id": "ngc_1",
-          "template": " aligned with the organization's strategic goal to {benefit}",
-          "notes": "Ignores the generic label and focuses on benefit."
-        },
-        {
-          "id": "ngc_2",
-          "template": " supporting the company's ambition to {benefit}",
-          "notes": "Keeps “company” wording but does not lean on the fake name."
-        },
-        {
-          "id": "ngc_3",
-          "template": " contributing to the business objective to {benefit}",
-          "notes": "Suitable when benefit is clear and structured as an objective."
-        }
-      ]
-    },
-
-    "named_generic_no_benefit": {
-      "id": "named_generic_no_benefit",
-      "description": "Company text looks generic or placeholder and no benefit is provided.",
-      "conditions": {
-        "has_company": true,
-        "company_is_generic": true,
-        "has_benefit": false
-      },
-      "variants": [
-        {
-          "id": "ngnb_1",
-          "template": " aligned with the organization's strategic priorities",
-          "notes": "Completely generic; hides the placeholder company name."
-        },
-        {
-          "id": "ngnb_2",
-          "template": " supporting the company's overall strategic direction",
-          "notes": "Generic enough for most use cases when benefit is missing."
-        }
+  "behavior": {
+    "selection_order": [
+      "strategic_named",
+      "strategic_generic",
+      "named_company",
+      "generic_company",
+      "benefit_only",
+      "fallback"
+    ],
+    "fallback_bucket": "fallback",
+    "generic_detection": {
+      "treat_as_generic_if_matches_regex": [
+        "^generic$",
+        "^n/a$",
+        "^not set$",
+        "organization",
+        "enterprise",
+        "company",
+        "corporation",
+        "group"
       ]
     }
   },
-
-  "behavior": {
-    "selection_order": [
-      "named_with_benefit",
-      "named_no_benefit",
-      "named_generic_company",
-      "named_generic_no_benefit",
-      "generic_with_benefit",
-      "generic_no_benefit"
-    ],
-    "generic_company_labels": [
-      "the organization",
-      "the company",
-      "the business"
-    ],
-    "generic_detection": {
-      "treat_as_generic_if_matches_regex": [
-        "^(acme|example|sample|demo|test)\\b",
-        "company\\s+(abc|xyz)$",
-        "organisation\\s+(abc|xyz)$"
-      ],
-      "treat_as_generic_if_missing_suffix": true
+  "buckets": {
+    "strategic_named": {
+      "id": "strategic_named",
+      "conditions": {
+        "has_company": true,
+        "company_is_generic": false,
+        "has_benefit": true,
+        "is_strategic": true
+      },
+      "variants": [
+        {
+          "id": "strategic_named_1",
+          "template": "supporting {company}'s strategic goal of {benefit}"
+        },
+        {
+          "id": "strategic_named_2",
+          "template": "to advance {company}'s strategic priorities around {benefit}"
+        },
+        {
+          "id": "strategic_named_3",
+          "template": "in alignment with {company}'s enterprise strategy for {benefit}"
+        },
+        {
+          "id": "strategic_named_cx_1",
+          "category": "digital_cx",
+          "template": "supporting {company}'s strategic goal of elevating digital customer experience and self-service adoption"
+        },
+        {
+          "id": "strategic_named_reliability_1",
+          "category": "reliability",
+          "template": "supporting {company}'s strategic goal of improving platform reliability and service continuity"
+        },
+        {
+          "id": "strategic_named_security_1",
+          "category": "security",
+          "template": "supporting {company}'s strategic goal of strengthening security, privacy, and regulatory compliance"
+        },
+        {
+          "id": "strategic_named_seo_1",
+          "category": "seo",
+          "template": "supporting {company}'s strategic goal of accelerating organic acquisition and digital presence"
+        },
+        {
+          "id": "strategic_named_delivery_1",
+          "category": "delivery_efficiency",
+          "template": "supporting {company}'s strategic goal of improving delivery efficiency and reducing cost of change"
+        },
+        {
+          "id": "strategic_named_governance_1",
+          "category": "governance",
+          "template": "supporting {company}'s strategic goal of strengthening governance and cross-functional alignment"
+        }
+      ]
     },
-    "fallback_bucket": "generic_no_benefit"
+    "strategic_generic": {
+      "id": "strategic_generic",
+      "conditions": {
+        "has_company": true,
+        "company_is_generic": true,
+        "has_benefit": true,
+        "is_strategic": true
+      },
+      "variants": [
+        {
+          "id": "strategic_generic_1",
+          "template": "supporting the organization's strategic goal of {benefit}"
+        },
+        {
+          "id": "strategic_generic_2",
+          "template": "to advance the organization's strategic priorities around {benefit}"
+        },
+        {
+          "id": "strategic_generic_cx_1",
+          "category": "digital_cx",
+          "template": "supporting the organization's strategic goal of elevating digital customer experience and self-service adoption"
+        },
+        {
+          "id": "strategic_generic_reliability_1",
+          "category": "reliability",
+          "template": "supporting the organization's strategic goal of improving platform reliability and service continuity"
+        },
+        {
+          "id": "strategic_generic_security_1",
+          "category": "security",
+          "template": "supporting the organization's strategic goal of strengthening security, privacy, and regulatory compliance"
+        },
+        {
+          "id": "strategic_generic_seo_1",
+          "category": "seo",
+          "template": "supporting the organization's strategic goal of accelerating organic acquisition and digital presence"
+        },
+        {
+          "id": "strategic_generic_delivery_1",
+          "category": "delivery_efficiency",
+          "template": "supporting the organization's strategic goal of improving delivery efficiency and reducing cost of change"
+        },
+        {
+          "id": "strategic_generic_governance_1",
+          "category": "governance",
+          "template": "supporting the organization's strategic goal of strengthening governance and cross-functional alignment"
+        }
+      ]
+    },
+    "named_company": {
+      "id": "named_company",
+      "conditions": {
+        "has_company": true,
+        "company_is_generic": false,
+        "has_benefit": true
+      },
+      "variants": [
+        {
+          "id": "named_company_1",
+          "template": "supporting {company}'s digital transformation and {benefit}"
+        },
+        {
+          "id": "named_company_2",
+          "template": "to strengthen {company}'s enterprise performance through {benefit}"
+        },
+        {
+          "id": "named_company_3",
+          "template": "in support of {company}'s long-term objectives, including {benefit}"
+        },
+        {
+          "id": "named_company_cx_1",
+          "category": "digital_cx",
+          "template": "enabling improved digital customer experience and increased self-service adoption across {company}"
+        },
+        {
+          "id": "named_company_reliability_1",
+          "category": "reliability",
+          "template": "enhancing platform stability, uptime, and service continuity across {company}'s digital assets"
+        },
+        {
+          "id": "named_company_security_1",
+          "category": "security",
+          "template": "strengthening security posture, privacy controls, and compliance across {company}'s delivery lifecycle"
+        },
+        {
+          "id": "named_company_seo_1",
+          "category": "seo",
+          "template": "improving organic acquisition and discoverability across {company}'s digital channels"
+        },
+        {
+          "id": "named_company_delivery_1",
+          "category": "delivery_efficiency",
+          "template": "increasing delivery throughput and reducing rework and cycle time across {company}'s product teams"
+        },
+        {
+          "id": "named_company_governance_1",
+          "category": "governance",
+          "template": "strengthening governance, standards adherence, and cross-functional execution across {company}"
+        }
+      ]
+    },
+    "generic_company": {
+      "id": "generic_company",
+      "conditions": {
+        "has_company": true,
+        "company_is_generic": true,
+        "has_benefit": true
+      },
+      "variants": [
+        {
+          "id": "generic_company_1",
+          "template": "supporting the organization's digital transformation and {benefit}"
+        },
+        {
+          "id": "generic_company_2",
+          "template": "to strengthen the organization's enterprise performance through {benefit}"
+        },
+        {
+          "id": "generic_company_3",
+          "template": "in support of the organization's long-term objectives, including {benefit}"
+        },
+        {
+          "id": "generic_company_cx_1",
+          "category": "digital_cx",
+          "template": "enabling improved digital customer experience and increased self-service adoption across the organization"
+        },
+        {
+          "id": "generic_company_reliability_1",
+          "category": "reliability",
+          "template": "enhancing platform stability, uptime, and service continuity across the organization's digital assets"
+        },
+        {
+          "id": "generic_company_security_1",
+          "category": "security",
+          "template": "strengthening security posture, privacy controls, and compliance across the organization's delivery lifecycle"
+        },
+        {
+          "id": "generic_company_seo_1",
+          "category": "seo",
+          "template": "improving organic acquisition and discoverability across the organization's digital channels"
+        },
+        {
+          "id": "generic_company_delivery_1",
+          "category": "delivery_efficiency",
+          "template": "increasing delivery throughput and reducing rework and cycle time across the organization's product teams"
+        },
+        {
+          "id": "generic_company_governance_1",
+          "category": "governance",
+          "template": "strengthening governance, standards adherence, and cross-functional execution across the organization"
+        }
+      ]
+    },
+    "benefit_only": {
+      "id": "benefit_only",
+      "conditions": {
+        "has_company": false,
+        "has_benefit": true
+      },
+      "variants": [
+        {
+          "id": "benefit_only_1",
+          "template": "supporting the organization's strategic focus on {benefit}"
+        },
+        {
+          "id": "benefit_only_2",
+          "template": "to drive measurable impact related to {benefit}"
+        },
+        {
+          "id": "benefit_only_cx_1",
+          "category": "digital_cx",
+          "template": "supporting measurable improvement in digital customer experience and self-service adoption"
+        },
+        {
+          "id": "benefit_only_reliability_1",
+          "category": "reliability",
+          "template": "supporting measurable improvement in reliability, uptime, and service continuity"
+        },
+        {
+          "id": "benefit_only_security_1",
+          "category": "security",
+          "template": "supporting measurable improvement in security, privacy, and compliance posture"
+        },
+        {
+          "id": "benefit_only_seo_1",
+          "category": "seo",
+          "template": "supporting measurable improvement in organic acquisition and digital presence"
+        },
+        {
+          "id": "benefit_only_delivery_1",
+          "category": "delivery_efficiency",
+          "template": "supporting measurable improvement in delivery efficiency and cycle-time reduction"
+        },
+        {
+          "id": "benefit_only_governance_1",
+          "category": "governance",
+          "template": "supporting measurable improvement in governance, standards adherence, and cross-team alignment"
+        }
+      ]
+    },
+    "fallback": {
+      "id": "fallback",
+      "conditions": {},
+      "variants": [
+        {
+          "id": "fallback_1",
+          "template": "supporting the organization's long-term performance and resilience"
+        },
+        {
+          "id": "fallback_2",
+          "template": "to strengthen enterprise-wide performance and risk management"
+        },
+        {
+          "id": "fallback_cx_1",
+          "category": "digital_cx",
+          "template": "supporting improved digital customer experience and increased self-service adoption"
+        },
+        {
+          "id": "fallback_reliability_1",
+          "category": "reliability",
+          "template": "supporting improved reliability, uptime, and service continuity"
+        },
+        {
+          "id": "fallback_security_1",
+          "category": "security",
+          "template": "supporting improved security, privacy, and compliance posture"
+        },
+        {
+          "id": "fallback_seo_1",
+          "category": "seo",
+          "template": "supporting improved organic acquisition and digital presence"
+        },
+        {
+          "id": "fallback_delivery_1",
+          "category": "delivery_efficiency",
+          "template": "supporting improved delivery efficiency and reduced cost of change"
+        },
+        {
+          "id": "fallback_governance_1",
+          "category": "governance",
+          "template": "supporting improved governance and cross-functional alignment"
+        }
+      ]
+    }
   }
 }

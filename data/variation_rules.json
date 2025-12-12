@@ -1,5 +1,21 @@
 [
   {
+      "slot_id": "ic_risk_clause",
+      "variants": [
+        "while managing operational risks and cross-team dependencies",
+        "while mitigating delivery risks and coordinating dependencies with related squads",
+        "while addressing cross-functional risks, dependencies, and change impacts"
+      ]
+    },
+    {
+      "slot_id": "lead_risk_clause",
+      "variants": [
+        "while enforcing governance standards, managing risks, and coordinating stakeholders",
+        "while driving risk mitigation, compliance alignment, and cross-team dependency resolution",
+        "while overseeing governance, risk management, and cross-functional alignment"
+      ]
+    },
+  {
     "slot_id": "improvement_link",
     "variants": [
       "and",

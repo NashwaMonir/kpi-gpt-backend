@@ -1,20 +1,25 @@
 {
   "name": "kpi-gpt-backend",
   "version": "1.0.0",
-  "main": "index.js",
   "license": "MIT",
+  "private": true,
   "dependencies": {
-    "@vercel/node": "^3.0.0",
     "busboy": "^1.6.0",
     "csv-parse": "^6.1.0",
     "exceljs": "^4.4.0",
-    "next": "^16.0.7",
-    "openai": "^6.10.0",
-    "xlsx": "^0.18.5"
+    "openai": "^6.10.0"
   },
   "devDependencies": {
     "@types/busboy": "^1.5.4",
     "@types/node": "^24.10.1",
-    "@types/xlsx": "^0.0.35"
+    "@vercel/node": "^3.0.0",
+    "tsx": "^4.21.0",
+    "typescript": "^5.9.3"
+  },
+  "scripts": {
+    "dev": "echo \"No dev script configured.\"",
+    "build": "echo \"Vercel builds serverless functions automatically\"",
+    "typecheck": "tsc --noEmit",
+    "start": "echo \"Use Vercel CLI locally (run: npx vercel dev)\""
   }
 }
