@@ -16,6 +16,7 @@ import type { PreparedRow as EnginePreparedRow, KpiRowIn, Mode } from '../engine
 
 import { computeVariationSeed } from '../engine/variationSeed';
 import { runObjectiveEngine } from '../engine/objectiveEngine';
+import { resolveMetrics } from '../engine/metricsAutoSuggest';
 
 import { ErrorCodes, addErrorCode } from '../engine/errorCodes';
 import type { ErrorCode } from '../engine/errorCodes';
@@ -244,6 +245,25 @@ export default function handler(req: VercelRequest, res: VercelResponse) {
         improvement_metric: (row as any).improvement_metric
       });
 
+      // Resolve metrics exactly like /api/kpi (matrix + role defaults) when any metric is missing.
+      // This is required for single vs bulk objective parity.
+      const rowForResolution: KpiRowIn = {
+        row_id: row.row_id,
+        company: row.company,
+        team_role: row.team_role,
+        task_type: row.task_type,
+        task_name: row.task_name,
+        dead_line: row.dead_line,
+        strategic_benefit: (row as any).strategic_benefit,
+        output_metric: toSafeTrimmedString((row as any).output_metric),
+        quality_metric: toSafeTrimmedString((row as any).quality_metric),
+        improvement_metric: toSafeTrimmedString((row as any).improvement_metric)
+      };
+
+      // We do not need to mutate the row-level error codes here because assessRow already
+      // adds canonical E501/E502 for metrics-missing. This call is only to obtain the filled metrics.
+      const resolved = resolveMetrics(rowForResolution, variation_seed, [] as any);
+
       const engineRow: EnginePreparedRow = {
         row_id: row.row_id,
         team_role: row.team_role,
@@ -252,10 +272,14 @@ export default function handler(req: VercelRequest, res: VercelResponse) {
         dead_line: row.dead_line,
         strategic_benefit: (row as any).strategic_benefit,
         company: row.company,
-        output_metric: (row as any).output_metric,
-        quality_metric: (row as any).quality_metric,
-        improvement_metric: (row as any).improvement_metric,
-        metrics_auto_suggested: a.metrics_auto_suggested,
+
+        // Use resolved metrics so bulk objective includes the same auto-suggested metric text as single.
+        output_metric: resolved.output_metric ?? '',
+        quality_metric: resolved.quality_metric ?? '',
+        improvement_metric: resolved.improvement_metric ?? '',
+
+        // Contract: whenever defaults are used, metrics_auto_suggested must be true.
+        metrics_auto_suggested: !!resolved.used_default_metrics,
         variation_seed
       };
 
