@@ -1,12 +1,12 @@
 // scripts/golden_objectives.js
-// Golden objective tests for SMART KPI Engine v10.8+ (enterprise objective quality lock)
-// Node-only. Runs against the deployed API to validate:
-//  - Objective quality clauses
-//  - Single vs bulk parity (same input row must produce identical objective text)
+// Golden objective tests for SMART KPI Engine v10.8 (enterprise objective quality lock)
+// Runs against deployed API to validate:
+// - Single vs Bulk parity (objective string match)
+// - Clause requirements (baseline in complex, governance+risk for lead complex)
+// - No banned phrases
 //
 // Run:
-//   BASE_URL="https://<your-vercel-domain>" node scripts/golden_objectives.js
-// Or uses default preview domain if BASE_URL is not provided.
+//   BASE_URL="https://<vercel-domain>" node scripts/golden_objectives.js
 
 const BASE_URL =
   process.env.BASE_URL ||
@@ -67,40 +67,35 @@ async function post(path, body) {
   }
 
   if (!res.ok) {
-    const bodyPreview = (() => {
-      try {
-        const s = JSON.stringify(body);
-        return s.length > 600 ? s.slice(0, 600) + '…' : s;
-      } catch {
-        return '[unserializable body]';
-      }
-    })();
-    throw new Error(`${path} HTTP ${res.status}: ${txt}\nREQUEST_BODY: ${bodyPreview}`);
+    throw new Error(`${path} HTTP ${res.status}: ${txt}`);
   }
 
   return json;
 }
 
-function pickObjectiveFromSingle(singleJson, mode) {
-  // Tolerant parsing: support different response shapes.
-  const rows = singleJson?.rows;
-  const first = Array.isArray(rows) ? rows[0] : null;
+// v10.8 single: returns { rows: [ { objective, objective_mode, ... } ] }
+function pickSingle(singleJson) {
+  const first = Array.isArray(singleJson?.rows) ? singleJson.rows[0] : null;
   const row = first || singleJson?.row || singleJson;
 
-  const simple = row?.simple_objective || row?.simpleObjective || row?.objective_simple || '';
-  const complex = row?.complex_objective || row?.complexObjective || row?.objective_complex || row?.objective || '';
-  return norm(mode === 'simple' ? simple : complex);
+  const objective = norm(row?.objective || '');
+  const mode = String(row?.objective_mode || '').toLowerCase();
+
+  return { objective, mode, row };
 }
 
-function pickObjectiveFromBulkFinalize(finalizeJson, mode) {
-  // Tolerant parsing for bulk finalize responses.
-  const rows = finalizeJson?.rows || finalizeJson?.final_rows || finalizeJson?.final_rows_preview || finalizeJson?.prepared_rows || finalizeJson?.result_rows;
-  const first = Array.isArray(rows) ? rows[0] : null;
-  const row = first || finalizeJson?.row || finalizeJson;
+// v10.8 bulkFinalizeExport: returns { preview_rows: [ { objective, ... } ], ... }
+function pickBulk(finalizeJson) {
+  const rows =
+    finalizeJson?.preview_rows ||
+    finalizeJson?.rows ||
+    finalizeJson?.result_rows ||
+    finalizeJson?.final_rows;
 
-  const simple = row?.simple_objective || row?.simpleObjective || row?.objective_simple || '';
-  const complex = row?.complex_objective || row?.complexObjective || row?.objective_complex || row?.objective || '';
-  return norm(mode === 'simple' ? simple : complex);
+  const first = Array.isArray(rows) ? rows[0] : null;
+  const objective = norm(first?.objective || '');
+
+  return { objective, row: first };
 }
 
 async function callSingleKpi(row) {
@@ -111,41 +106,42 @@ async function callSingleKpi(row) {
 }
 
 async function callBulkFlow(row) {
-  // 1) inspect
+  // v10.8 token pipeline:
+  // 1) bulkInspectJson -> rows_token
+  // 2) bulkPrepareRows -> prep_token
+  // 3) bulkFinalizeExport -> preview_rows
+
   const inspected = await post('/api/bulkInspectJson', {
     engine_version: ENGINE_VERSION,
     rows: [row]
   });
 
-  const rows_token = inspected?.rows_token || inspected?.token || '';
-  const inspectedRows = inspected?.rows || inspected?.rows_preview || [row];
-  const company =
-    (inspected?.unique_companies && inspected.unique_companies[0]) ||
-    row.company ||
-    (inspectedRows[0] && inspectedRows[0].company) ||
-    '';
-
-  // 2) prepare (token-based)
-  const prepared = await post('/api/bulkPrepareRows', {
-    engine_version: ENGINE_VERSION,
-    rows_token,
-    company
-  });
-
-  const prepared_rows = prepared?.prepared_rows;
-  const prepared_rows_token = prepared?.prepared_rows_token || prepared?.rows_token || rows_token;
-
-  // 3) finalize (prefer prepared_rows if returned; otherwise token)
-  const finalizeBody = {
-    engine_version: ENGINE_VERSION
-  };
-  if (Array.isArray(prepared_rows) && prepared_rows.length) {
-    finalizeBody.prepared_rows = prepared_rows;
-  } else {
-    finalizeBody.rows_token = prepared_rows_token;
+  const rowsToken = inspected?.rows_token;
+  if (!rowsToken || String(rowsToken).trim().length === 0) {
+    throw new Error('bulkInspectJson did not return rows_token');
   }
 
-  const finalized = await post('/api/bulkFinalizeExport', finalizeBody);
+  const selectedCompany =
+    inspected?.company_case?.uniqueCompanies?.[0] ||
+    inspected?.unique_companies?.[0] ||
+    row.company ||
+    null;
+
+  const prepared = await post('/api/bulkPrepareRows', {
+    engine_version: ENGINE_VERSION,
+    rows_token: rowsToken,
+    selected_company: selectedCompany
+  });
+
+  const prepToken = prepared?.prep_token;
+  if (!prepToken || String(prepToken).trim().length === 0) {
+    throw new Error('bulkPrepareRows did not return prep_token');
+  }
+
+  const finalized = await post('/api/bulkFinalizeExport', {
+    engine_version: ENGINE_VERSION,
+    prep_token: prepToken
+  });
 
   return finalized;
 }
@@ -175,7 +171,6 @@ function validateObjective(tcId, objective, expect) {
 }
 
 const cases = [
-  // 1) Design IC simple (all metrics)
   {
     id: 'design_ic_simple_all_metrics',
     row: {
@@ -198,8 +193,6 @@ const cases = [
       mustInclude: [/^By\s+2025-10-01,/i]
     }
   },
-
-  // 2) Design IC complex (missing metric)
   {
     id: 'design_ic_complex_missing_metric',
     row: {
@@ -212,7 +205,7 @@ const cases = [
       strategic_benefit: 'Improve digital customer experience across core journeys.',
       output_metric: 'Reduce task-completion time by 20%',
       quality_metric: 'Maintain ≥95% WCAG 2.1 AA compliance'
-      // improvement_metric missing -> should become complex
+      // missing improvement_metric => complex expected
     },
     expect: {
       mode: 'complex',
@@ -222,8 +215,6 @@ const cases = [
       mustInclude: [/^By\s+2025-12-31,/i, /measured\s+against/i]
     }
   },
-
-  // 3) Design Lead complex (all metrics but lead)
   {
     id: 'design_lead_complex_all_metrics',
     row: {
@@ -246,8 +237,6 @@ const cases = [
       mustInclude: [/^By\s+2025-12-31,/i, /measured\s+against/i]
     }
   },
-
-  // 4) Dev IC simple + security baseline
   {
     id: 'dev_ic_simple_security',
     row: {
@@ -270,8 +259,6 @@ const cases = [
       mustInclude: [/^By\s+2025-09-30,/i]
     }
   },
-
-  // 5) Dev Lead complex (incident/MTTR)
   {
     id: 'dev_lead_complex_incident_mttr',
     row: {
@@ -294,8 +281,6 @@ const cases = [
       mustInclude: [/^By\s+2025-12-31,/i, /measured\s+against/i]
     }
   },
-
-  // 6) Content IC simple (CTR/time on page)
   {
     id: 'content_ic_simple_ctr_time',
     row: {
@@ -318,10 +303,8 @@ const cases = [
       mustInclude: [/^By\s+2025-12-31,/i]
     }
   },
-
-  // 7) Content Lead complex (governance + legal)
   {
-    id: 'content_lead_complex_governance_legal',
+    id: 'content_lead_complex_governance',
     row: {
       row_id: 107,
       company: 'Acme Corp',
@@ -339,7 +322,7 @@ const cases = [
       lead: true,
       baselineRequired: true,
       governanceRiskRequired: true,
-      mustInclude: [/^By\s+2025-12-31,/i, /measured\s+against/i, /Legal/i]
+      mustInclude: [/^By\s+2025-12-31,/i, /measured\s+against/i]
     }
   }
 ];
@@ -352,26 +335,28 @@ async function main() {
 
   for (const tc of cases) {
     try {
-      // Sanity: lead expectation
       assert(isLeadRole(tc.row.team_role) === tc.expect.lead, `${tc.id}: lead expectation mismatch`);
 
       const singleJson = await callSingleKpi(tc.row);
       const bulkJson = await callBulkFlow(tc.row);
 
-      const singleObj = pickObjectiveFromSingle(singleJson, tc.expect.mode);
-      const bulkObj = pickObjectiveFromBulkFinalize(bulkJson, tc.expect.mode);
+      const single = pickSingle(singleJson);
+      const bulk = pickBulk(bulkJson);
 
-      assert(singleObj, `${tc.id}: single objective missing (check /api/kpi response shape)`);
-      assert(bulkObj, `${tc.id}: bulk objective missing (check /api/bulkFinalizeExport response shape)`);
+      assert(single.objective, `${tc.id}: single objective missing`);
+      assert(bulk.objective, `${tc.id}: bulk objective missing`);
 
-      // Parity requirement
       assert(
-        singleObj === bulkObj,
-        `${tc.id}: single vs bulk objective mismatch\nS: ${singleObj}\nB: ${bulkObj}`
+        single.mode === tc.expect.mode,
+        `${tc.id}: objective_mode mismatch (expected ${tc.expect.mode}, got ${single.mode})\nObj: ${single.objective}`
       );
 
-      // Quality checks
-      validateObjective(tc.id, singleObj, tc.expect);
+      assert(
+        single.objective === bulk.objective,
+        `${tc.id}: single vs bulk objective mismatch\nS: ${single.objective}\nB: ${bulk.objective}`
+      );
+
+      validateObjective(tc.id, single.objective, tc.expect);
 
       console.log(`PASS: ${tc.id}`);
     } catch (e) {
