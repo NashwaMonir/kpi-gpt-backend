@@ -142,7 +142,7 @@ export interface KpiRowOut {
   /**
    * Detailed comments from the validator / engine.
       * Multiple human-readable notes, ordered by category and importance.   */
-  comments: string[];
+  comments: string;
 
   /**
    * High-level summary reason (single string) for the status,

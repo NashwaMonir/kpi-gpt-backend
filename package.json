@@ -18,6 +18,7 @@
   "scripts": {
     "dev": "echo \"No dev script configured.\"",
     "build": "echo \"Vercel builds serverless functions automatically\"",
+    "typecheck": "tsc --noEmit",
     "start": "echo \"Use Vercel CLI locally (run: npx vercel dev)\""
   }
 }
