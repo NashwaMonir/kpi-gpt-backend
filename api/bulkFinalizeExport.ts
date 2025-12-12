@@ -12,10 +12,15 @@ import {
   KpiResultRow
 } from '../engine/bulkTypes';
 
-import type { PreparedRow as EnginePreparedRow, KpiRowIn } from '../engine/types';
+import type { PreparedRow as EnginePreparedRow, KpiRowIn, Mode } from '../engine/types';
 
 import { computeVariationSeed } from '../engine/variationSeed';
 import { runObjectiveEngine } from '../engine/objectiveEngine';
+
+import { ErrorCodes, addErrorCode } from '../engine/errorCodes';
+import { normalizeTaskType, normalizeTeamRole, normalizeMode, toSafeTrimmedString } from '../engine/normalizeFields';
+import { validateDeadline } from '../engine/validateDeadline';
+import { isDangerousBenefitText, evaluateMetricsDangerous } from '../engine/validateDangerous';
 
 export default function handler(req: VercelRequest, res: VercelResponse) {
   if (req.method !== 'POST') {
@@ -55,45 +60,218 @@ export default function handler(req: VercelRequest, res: VercelResponse) {
     });
   }
 
- // Split rows by validity:
-  const validBulkRows: BulkPreparedRow[] = bulkRows.filter((row) => row.isValid);
-  const invalidBulkRows: BulkPreparedRow[] = bulkRows.filter((row) => !row.isValid);
+  // --- Bulk row assessment and engine row preparation ---
 
-  const engineRows: EnginePreparedRow[] = validBulkRows.map((row) => {
-    const kpiRow: KpiRowIn = {
-      row_id: row.row_id,
-      company: row.company,
-      team_role: row.team_role,
-      task_type: row.task_type,
-      task_name: row.task_name,
-      dead_line: row.dead_line,
-      strategic_benefit: row.strategic_benefit,
-      output_metric: row.output_metric,
-      quality_metric: row.quality_metric,
-      improvement_metric: row.improvement_metric
+  type RowAssessment = {
+    status: 'VALID' | 'NEEDS_REVIEW' | 'INVALID';
+    comments: string;
+    summary_reason: string;
+    metrics_auto_suggested: boolean;
+    error_codes: string[];
+    mode: Mode;
+  };
+
+  function assessRow(row: BulkPreparedRow): RowAssessment {
+    const errorCodes: string[] = [];
+
+    const team_role = toSafeTrimmedString(row.team_role);
+    const task_type = toSafeTrimmedString(row.task_type);
+    const task_name = toSafeTrimmedString(row.task_name);
+    const dead_line = toSafeTrimmedString(row.dead_line);
+    const strategic_benefit = toSafeTrimmedString((row as any).strategic_benefit);
+
+    const output_metric = toSafeTrimmedString((row as any).output_metric);
+    const quality_metric = toSafeTrimmedString((row as any).quality_metric);
+    const improvement_metric = toSafeTrimmedString((row as any).improvement_metric);
+
+    // 1) Missing mandatory fields (bulk minimum)
+    const missing: string[] = [];
+    if (!task_name) {
+      addErrorCode(errorCodes as any, ErrorCodes.MISSING_TASK_NAME as any);
+      missing.push('Task Name');
+    }
+    if (!task_type) {
+      addErrorCode(errorCodes as any, ErrorCodes.MISSING_TASK_TYPE as any);
+      missing.push('Task Type');
+    }
+    if (!team_role) {
+      addErrorCode(errorCodes as any, ErrorCodes.MISSING_TEAM_ROLE as any);
+      missing.push('Team Role');
+    }
+    if (!dead_line) {
+      addErrorCode(errorCodes as any, ErrorCodes.MISSING_DEADLINE as any);
+      missing.push('Deadline');
+    }
+    if (!strategic_benefit) {
+      addErrorCode(errorCodes as any, ErrorCodes.MISSING_STRATEGIC_BENEFIT as any);
+      missing.push('Strategic Benefit');
+    }
+
+    // 2) Normalize + validate enums
+    const taskTypeNorm = normalizeTaskType(task_type);
+    if (task_type && !taskTypeNorm.isAllowed) {
+      addErrorCode(errorCodes as any, ErrorCodes.INVALID_TASK_TYPE as any);
+    }
+
+    const roleNorm = normalizeTeamRole(team_role);
+    if (team_role && !roleNorm.isAllowed) {
+      addErrorCode(errorCodes as any, ErrorCodes.INVALID_TEAM_ROLE as any);
+    }
+
+    // 3) Deadline validation (format + engine-year)
+    const deadline = validateDeadline(dead_line, errorCodes as any);
+
+    // 4) Dangerous / low-signal benefit
+    if (strategic_benefit && isDangerousBenefitText(strategic_benefit, errorCodes as any)) {
+      // isDangerousBenefitText adds E401/E402 category error codes
+    }
+
+    // 5) Dangerous / low-signal metrics (only for non-empty metrics)
+    evaluateMetricsDangerous(output_metric, quality_metric, improvement_metric, errorCodes as any);
+
+    // 6) Mode normalization
+    const modeNorm = normalizeMode((row as any).mode, errorCodes as any);
+
+    // 7) Metrics auto-suggest semantics (bulk contract):
+    // If any metric is missing, bulk must surface NEEDS_REVIEW.
+    const metricsMissing = !output_metric || !quality_metric || !improvement_metric;
+    if (metricsMissing) {
+      // Preserve canonical E501/E502 mapping.
+      if (!output_metric && !quality_metric && !improvement_metric) {
+        addErrorCode(errorCodes as any, ErrorCodes.METRICS_AUTOSUGGEST_ALL as any);
+      } else {
+        addErrorCode(errorCodes as any, ErrorCodes.METRICS_AUTOSUGGEST_PARTIAL as any);
+      }
+    }
+
+    // 8) Status derivation
+    // INVALID if: missing mandatory, invalid enums, dangerous/low-signal, or invalid deadline/wrong-year
+    const hasBlocking =
+      missing.length > 0 ||
+      errorCodes.includes(ErrorCodes.INVALID_TASK_TYPE) ||
+      errorCodes.includes(ErrorCodes.INVALID_TEAM_ROLE) ||
+      errorCodes.includes(ErrorCodes.DANGEROUS_TEXT) ||
+      errorCodes.includes(ErrorCodes.LOW_SIGNAL_TEXT) ||
+      (!deadline.valid) ||
+      (deadline.valid && deadline.wrongYear);
+
+    let status: 'VALID' | 'NEEDS_REVIEW' | 'INVALID' = 'VALID';
+    if (hasBlocking) status = 'INVALID';
+    else if (metricsMissing || modeNorm.wasInvalid) status = 'NEEDS_REVIEW';
+
+    // 9) Comments + summary_reason (HR-grade, deterministic)
+    const parts: string[] = [];
+
+    if (missing.length > 0) {
+      parts.push(`Missing mandatory field(s): ${missing.join(', ')}.`);
+    }
+
+    if (errorCodes.includes(ErrorCodes.INVALID_TASK_TYPE) || errorCodes.includes(ErrorCodes.INVALID_TEAM_ROLE)) {
+      const invalids: string[] = [];
+      if (errorCodes.includes(ErrorCodes.INVALID_TASK_TYPE)) invalids.push('Task Type');
+      if (errorCodes.includes(ErrorCodes.INVALID_TEAM_ROLE)) invalids.push('Team Role');
+      if (invalids.length) parts.push(`Invalid value(s) for: ${invalids.join(', ')}.`);
+    }
+
+    if (errorCodes.includes(ErrorCodes.DANGEROUS_TEXT) || errorCodes.includes(ErrorCodes.LOW_SIGNAL_TEXT)) {
+      parts.push('Invalid text format detected in one or more fields.');
+    }
+
+    if (!deadline.valid) {
+      if (errorCodes.includes(ErrorCodes.DEADLINE_TEXTUAL_NONDATE)) {
+        parts.push('Deadline contains non-parsable or textual content.');
+      } else if (errorCodes.includes(ErrorCodes.DEADLINE_INVALID_FORMAT)) {
+        parts.push('Invalid deadline format.');
+      }
+    } else if (deadline.wrongYear) {
+      parts.push('Deadline outside valid calendar year.');
+    }
+
+    if (modeNorm.wasInvalid || errorCodes.includes(ErrorCodes.INVALID_MODE_VALUE)) {
+      parts.push('Mode fallback applied: defaulting to "both".');
+    }
+
+    const metrics_auto_suggested = metricsMissing;
+    if (status !== 'INVALID' && metrics_auto_suggested) {
+      if (!output_metric && !quality_metric && !improvement_metric) {
+        parts.push('Metrics auto-suggested (Output / Quality / Improvement).');
+      } else {
+        const missingNames: string[] = [];
+        if (!output_metric) missingNames.push('Output');
+        if (!quality_metric) missingNames.push('Quality');
+        if (!improvement_metric) missingNames.push('Improvement');
+        parts.push(`Metrics auto-suggested for: ${missingNames.join(', ')}.`);
+      }
+    }
+
+    const comments = status === 'VALID' ? 'All SMART criteria met.' : parts.join(' ').replace(/\s+/g, ' ').trim();
+
+    let summary_reason = '';
+    if (status === 'INVALID') {
+      summary_reason = 'Objectives not generated due to validation errors.';
+    } else if (status === 'NEEDS_REVIEW') {
+      summary_reason = 'Objective metrics were auto-suggested based on the role matrix. Please review before approval.';
+    }
+
+    return {
+      status,
+      comments,
+      summary_reason,
+      metrics_auto_suggested,
+      error_codes: Array.from(new Set(errorCodes)).sort(),
+      mode: modeNorm.mode
     };
+  }
 
-    const variation_seed = computeVariationSeed(kpiRow);
+  // Assess all rows using engine-aligned rules
+  const assessments = new Map<number, RowAssessment>();
+  for (const row of bulkRows) {
+    assessments.set(row.row_id, assessRow(row));
+  }
 
-    const engineRow: EnginePreparedRow = {
-      row_id: row.row_id,
-      team_role: row.team_role,
-      task_type: row.task_type,
-      task_name: row.task_name,
-      dead_line: row.dead_line,
-      strategic_benefit: row.strategic_benefit,
-      company: row.company,
-      output_metric: row.output_metric,
-      quality_metric: row.quality_metric,
-      improvement_metric: row.improvement_metric,
-      metrics_auto_suggested: row.metrics_auto_suggested === true,
-      variation_seed
-    };
+  // Build engine rows for rows that can generate objectives (VALID + NEEDS_REVIEW)
+  const engineRows: EnginePreparedRow[] = bulkRows
+    .filter((r) => {
+      const a = assessments.get(r.row_id);
+      return a?.status !== 'INVALID';
+    })
+    .map((row) => {
+      const a = assessments.get(row.row_id)!;
 
-    return engineRow;
-  });
+      const kpiRow: KpiRowIn = {
+        row_id: row.row_id,
+        company: row.company,
+        team_role: row.team_role,
+        task_type: row.task_type,
+        task_name: row.task_name,
+        dead_line: row.dead_line,
+        strategic_benefit: (row as any).strategic_benefit,
+        output_metric: (row as any).output_metric,
+        quality_metric: (row as any).quality_metric,
+        improvement_metric: (row as any).improvement_metric,
+        mode: a.mode
+      };
 
-// Run objective engine ONLY on valid rows
+      const variation_seed = computeVariationSeed(kpiRow);
+
+      const engineRow: EnginePreparedRow = {
+        row_id: row.row_id,
+        team_role: row.team_role,
+        task_type: row.task_type,
+        task_name: row.task_name,
+        dead_line: row.dead_line,
+        strategic_benefit: (row as any).strategic_benefit,
+        company: row.company,
+        output_metric: (row as any).output_metric,
+        quality_metric: (row as any).quality_metric,
+        improvement_metric: (row as any).improvement_metric,
+        metrics_auto_suggested: a.metrics_auto_suggested,
+        variation_seed
+      };
+
+      return engineRow;
+    });
+
   const objectiveOutputs = runObjectiveEngine(engineRows);
 
   const objectiveMap = new Map<number, { simple: string; complex: string }>();
@@ -106,33 +284,15 @@ export default function handler(req: VercelRequest, res: VercelResponse) {
 
   // Build final result rows in original row order
   const resultRows: KpiResultRow[] = bulkRows.map((row) => {
-    const isValid = !!row.isValid;
-    const invalidReason = row.invalidReason ?? '';
+    const a = assessments.get(row.row_id) ?? assessRow(row);
 
-    // Only attach objectives for VALID rows
-    const obj = isValid ? objectiveMap.get(row.row_id) : undefined;
-    const simple_objective = isValid ? (obj?.simple ?? '') : '';
-    const complex_objective = isValid ? (obj?.complex ?? '') : '';
+    // Only attach objectives for VALID/NEEDS_REVIEW rows
+    const obj = a.status === 'INVALID' ? undefined : objectiveMap.get(row.row_id);
+    const simple_objective = a.status === 'INVALID' ? '' : (obj?.simple ?? '');
+    const complex_objective = a.status === 'INVALID' ? '' : (obj?.complex ?? '');
 
-    // Derive final objective (simple or complex, depending on engine decision)
-    const objective = isValid ? (simple_objective || complex_objective || '') : '';
-
-    let validation_status: 'VALID' | 'NEEDS_REVIEW' | 'INVALID';
-    let comments = '';
-    let summary_reason = '';
-
-    if (!isValid) {
-      validation_status = 'INVALID';
-      comments = invalidReason;
-      summary_reason = invalidReason;
-    } else if (row.metrics_auto_suggested === true) {
-      validation_status = 'NEEDS_REVIEW';
-      comments =
-        'Objective metrics were auto-suggested based on the role matrix. Please review before approval.';
-      summary_reason = comments;
-    } else {
-      validation_status = 'VALID';
-    }
+    // Derive final objective (simple or complex, depending on mode)
+    const objective = a.status === 'INVALID' ? '' : (simple_objective || complex_objective || '');
 
     return {
       task_name: row.task_name,
@@ -140,9 +300,9 @@ export default function handler(req: VercelRequest, res: VercelResponse) {
       team_role: row.team_role,
       dead_line: row.dead_line,
       objective,
-      validation_status,
-      comments,
-      summary_reason
+      validation_status: a.status,
+      comments: a.comments,
+      summary_reason: a.summary_reason
     };
   });
 

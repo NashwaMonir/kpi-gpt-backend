@@ -4,3 +4,11 @@ KPI_*.xlsx
 ~$KPI_Input_Lite_test.xlsx
 .vercel
 .env*.local
+# local test artifacts
+sanity_check.sh
+bulk_set*.csv
+bulk_result_*.xlsx
+
+# local experiments
+engine/kpiEngine.ts
+engine/smartValidator.ts

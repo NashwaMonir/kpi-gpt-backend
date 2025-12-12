@@ -46,6 +46,15 @@ function applyCompanyStrategy(
   return company;
 }
 
+/**
+ * IMPORTANT (v10.8): bulkPrepareRows is a *normalization and company-strategy* step.
+ * - It may normalize Task Type / Team Role into canonical labels.
+ * - It does NOT perform full engine validation (deadline year/format, dangerous text,
+ *   metrics auto-suggest, or final status derivation).
+ * - Full validation and final VALID/NEEDS_REVIEW/INVALID status is enforced in bulkFinalizeExport.
+ *
+ * To keep bulk exports audit-safe and consistent with /api/kpi, invalid rows are preserved by default.
+ */
 export default function handler(req: VercelRequest, res: VercelResponse) {
   if (req.method !== 'POST') {
     return res.status(405).json({ error: 'Method not allowed' });
@@ -74,7 +83,8 @@ export default function handler(req: VercelRequest, res: VercelResponse) {
 
   const { parsedRows, summaryMeta } = decoded;
 
-  const invalid_handling = body.invalid_handling ?? 'skip';
+  // Default to keeping rows so bulkFinalizeExport can emit deterministic INVALID/NEEDS_REVIEW outcomes.
+  const invalid_handling = body.invalid_handling ?? 'keep';
 
   const preparedRows: PreparedRow[] = [];
 
@@ -93,14 +103,14 @@ export default function handler(req: VercelRequest, res: VercelResponse) {
     let isValid = row.isValid;
     let invalidReason = row.invalidReason || undefined;
 
-    if (!teamRoleResult.isAllowed) {
+    if (row.team_role && !teamRoleResult.isAllowed) {
       isValid = false;
       invalidReason = invalidReason
         ? `${invalidReason}; Invalid Team Role`
         : 'Invalid Team Role';
     }
 
-    if (!taskTypeResult.isAllowed) {
+    if (row.task_type && !taskTypeResult.isAllowed) {
       isValid = false;
       invalidReason = invalidReason
         ? `${invalidReason}; Invalid Task Type`
@@ -137,7 +147,7 @@ export default function handler(req: VercelRequest, res: VercelResponse) {
     benefit_company_signals: summaryMeta.benefit_company_signals,
     company_case: summaryMeta.company_case,
     needs_company_decision: summaryMeta.needs_company_decision,
-    has_invalid_rows: summaryMeta.has_invalid_rows,
+    has_invalid_rows: invalid_row_count > 0,
     state: 'READY_FOR_OBJECTIVES'
   };
 
@@ -148,7 +158,7 @@ export default function handler(req: VercelRequest, res: VercelResponse) {
 
   const prep_token = encodePrepareToken(prepPayload);
 
-  const ui_summary = `${row_count} row(s) ready for objective generation.`;
+  const ui_summary = `${row_count} row(s) ready for export (full validation runs during export).`;
 
   const response: BulkPrepareRowsResponse = {
     prep_token,

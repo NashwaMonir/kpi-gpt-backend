@@ -31,5 +31,4 @@ export interface KpiResultExportRow {
 
   validation_status: ValidationStatus;
   comments: string;
-  summary_reason: string;
 }

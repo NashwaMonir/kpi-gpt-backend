@@ -40,17 +40,28 @@ export interface ParsedRow {
   quality_metric: string;
   improvement_metric: string;
 
+  /**
+   * Indicates the row is *minimally complete* (required fields present).
+   * This does NOT mean engine-valid.
+   * Full validation (deadline rules, enums, dangerous text, metrics logic)
+   * is enforced later in bulkFinalizeExport.
+   */
   isValid: boolean;
+  /**
+   * Reason for minimal incompleteness only (e.g. missing required fields).
+   * Not an engine-level validation error.
+   */
   invalidReason?: string | null;
 }
 
 // After company strategies are applied
 export interface PreparedRow extends ParsedRow {
   /**
-   * True when any of the three metrics (output/quality/improvement)
-   * were auto-suggested by the engine rather than provided directly by the user.
-   * This is passed through to the objective engine to force complex mode
-   * where required by the contract.
+   * True when one or more metrics (output / quality / improvement)
+   * were auto-suggested by the engine during export.
+   *
+   * NOTE (v10.8): This flag is authoritative only in bulkFinalizeExport.
+   * Earlier bulk steps may leave it undefined.
    */
   metrics_auto_suggested?: boolean;
 }
@@ -133,7 +144,14 @@ export interface BulkPrepareRowsRequest {
   generic_mode?: boolean;
   apply_to_missing?: boolean;
   mismatched_strategy?: 'keep' | 'overwrite';
-  invalid_handling?: 'skip' | 'include';
+  /**
+   * Controls whether minimally incomplete rows are kept or skipped
+   * during preparation.
+   *
+   * NOTE (v10.8 default): rows are kept so final export can emit
+   * deterministic INVALID / NEEDS_REVIEW statuses.
+   */
+  invalid_handling?: 'skip' | 'keep';
 }
 
 export interface BulkPrepareRowsResponse {
@@ -155,8 +173,11 @@ export interface BulkFinalizeExportRequest {
 
 export interface BulkFinalizeExportResponse {
   download_url: string;
+  /** Number of rows finalized as VALID */
   valid_count: number;
+  /** Number of rows finalized as NEEDS_REVIEW */
   needs_review_count: number;
+  /** Number of rows finalized as INVALID */
   invalid_count: number;
   ui_message: string;
 }
@@ -181,7 +202,7 @@ export interface KpiResultRow {
    * (simple or complex, depending on the contract rules).
    */
   objective: string;
-  validation_status: string;
+  validation_status: 'VALID' | 'NEEDS_REVIEW' | 'INVALID';
   comments: string;
   summary_reason: string;
 }

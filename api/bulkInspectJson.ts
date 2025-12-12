@@ -33,6 +33,12 @@ function toStringSafe(value: unknown): string {
  * - improvement_metric
  * - company
  */
+/**
+ * IMPORTANT (v10.8): bulkInspectJson only performs *minimum completeness* checks.
+ * It does NOT run full domain validation (deadline year/format, dangerous text,
+ * enum allow-lists, metrics auto-suggest). Those are enforced in bulkFinalizeExport
+ * using engine-aligned rules.
+ */
 export function parseCsvToKpiJsonRows(csvText: string): KpiJsonRowIn[] {
   if (!csvText || csvText.trim().length === 0) {
     return [];
@@ -134,12 +140,15 @@ export function normalizeAndValidateRows(
       missing_company_count += 1;
     }
 
-    const isValid =
-      !!team_role &&
-      !!task_type &&
-      !!task_name &&
-      !!dead_line &&
-      !!strategic_benefit;
+    // "isValid" here means "minimally complete" (NOT engine-valid)
+    const missingFields: string[] = [];
+    if (!task_name) missingFields.push('Task Name');
+    if (!task_type) missingFields.push('Task Type');
+    if (!team_role) missingFields.push('Team Role');
+    if (!dead_line) missingFields.push('Deadline');
+    if (!strategic_benefit) missingFields.push('Strategic Benefit');
+
+    const isValid = missingFields.length === 0;
 
     if (!isValid) {
       invalid_count += 1;
@@ -157,7 +166,9 @@ export function normalizeAndValidateRows(
       quality_metric,
       improvement_metric,
       isValid,
-      invalidReason: isValid ? undefined : 'Missing mandatory fields'
+      invalidReason: isValid
+        ? undefined
+        : `Missing required field(s): ${missingFields.join(', ')}`
     };
 
     const isCompletelyEmpty =
@@ -219,25 +230,25 @@ function buildOptions(meta: {
   if (meta.company_case === 'single_company_column') {
     opts.push({
       code: 'use_sheet_company',
-      label: 'Use the company from the data for all rows.'
+      label: 'Use the company from the data for all rows. (validation will run during export)'
     });
     opts.push({
       code: 'generic_mode',
-      label: 'Ignore company and generate generic objectives.'
+      label: 'Ignore company and generate generic objectives. (validation will run during export)'
     });
   } else if (meta.company_case === 'multi_company_column') {
     opts.push({
       code: 'keep_existing_companies',
-      label: 'Keep the company in each row as-is.'
+      label: 'Keep the company in each row as-is. (validation will run during export)'
     });
     opts.push({
       code: 'generic_mode',
-      label: 'Ignore company and generate generic objectives.'
+      label: 'Ignore company and generate generic objectives. (validation will run during export)'
     });
   } else {
     opts.push({
       code: 'generic_mode',
-      label: 'No company info detected. Generate generic objectives.'
+      label: 'No company info detected. Generate generic objectives. (validation will run during export)'
     });
   }
 
@@ -252,16 +263,16 @@ function buildPrompt(meta: {
   const { row_count, company_case, unique_companies } = meta;
 
   if (company_case === 'single_company_column' && unique_companies.length === 1) {
-    return `Detected ${row_count} row(s). All rows use company "${unique_companies[0]}". Choose how to proceed.`;
+    return `Detected ${row_count} row(s). All rows use company "${unique_companies[0]}". Choose how to proceed. (Note: full validation occurs during export.)`;
   }
 
   if (company_case === 'multi_company_column') {
     return `Detected ${row_count} row(s) with multiple companies (${unique_companies.join(
       ', '
-    )}). Choose how to proceed.`;
+    )}). Choose how to proceed. (Note: full validation occurs during export.)`;
   }
 
-  return `Detected ${row_count} row(s). No reliable company column detected. Choose how to proceed.`;
+  return `Detected ${row_count} row(s). No reliable company column detected. Choose how to proceed. (Note: full validation occurs during export.)`;
 }
 
 export default function handler(req: VercelRequest, res: VercelResponse) {

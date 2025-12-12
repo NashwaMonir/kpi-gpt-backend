@@ -53,8 +53,7 @@ export async function createKpiResultWorkbook(
     'dead_line',
     'objective',
     'validation_status',
-    'comments',
-    'summary_reason'
+    'comments'
   ];
 
   sheet.addRow(headers);
@@ -68,8 +67,7 @@ export async function createKpiResultWorkbook(
       row.dead_line ?? '',
       row.objective ?? '',
       row.validation_status ?? '',
-      row.comments ?? '',
-      row.summary_reason ?? ''
+      row.comments ?? ''
     ]);
   }
 

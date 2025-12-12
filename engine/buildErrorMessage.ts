@@ -21,7 +21,7 @@ import { ErrorCodes, ERROR_COMMENTS } from './errorCodes';
 
 export interface FinalAssemblyResult {
   status: 'VALID' | 'NEEDS_REVIEW' | 'INVALID';
-comments: string[];
+  comments: string;
   summary_reason: string;
   errorCodes: ErrorCode[];
 
@@ -240,10 +240,12 @@ export function buildFinalMessage(
     }
   }
 
-  // Normalize spaces and join into single-line comments
+  // Normalize spaces and join into a single-line comments string
   const comments = commentsParts
-  .map((c) => c.replace(/\s+/g, ' ').trim())
-  .filter((c) => c.length > 0);
+    .map((c) => c.replace(/\s+/g, ' ').trim())
+    .filter((c) => c.length > 0)
+    .join(' ')
+    .trim();
 
 
   // ---------------------------------------------------------------------------
@@ -270,7 +272,7 @@ export function buildFinalMessage(
   if (status === 'VALID') {
     return {
       status,
-      comments: ['All SMART criteria met.'],
+      comments: 'All SMART criteria met.',
       summary_reason,
       errorCodes: canonicalErrorCodes,
       input_row: normalizedRow,
@@ -288,7 +290,9 @@ export function buildFinalMessage(
   // ---------------------------------------------------------------------------
   return {
     status,
-    comments,
+    comments: comments || (status === 'NEEDS_REVIEW'
+      ? 'Objective metrics were auto-suggested based on the role matrix. Please review before approval.'
+      : 'Objectives not generated due to validation errors.'),
     summary_reason,
     errorCodes: canonicalErrorCodes,
     input_row: normalizedRow,
