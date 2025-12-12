@@ -46,5 +46,41 @@
     "pattern": "\\bwith\\s+with\\b",
     "flags": "gi",
     "replacement": "with "
+  },
+  {
+    "id": "fix_strengthen_supporting",
+    "pattern": "\\bstrengthen\\s+supporting\\b",
+    "flags": "gi",
+    "replacement": "supporting"
+  },
+  {
+    "id": "fix_strengthen_support",
+    "pattern": "\\bstrengthen\\s+support\\b",
+    "flags": "gi",
+    "replacement": "support"
+  },
+  {
+    "id": "dedupe_supporting_enhancing",
+    "pattern": "\\bsupporting\\s+([^,.]{0,120}?)\\s+and\\s+enhancing\\s+\\1\\b",
+    "flags": "gi",
+    "replacement": "supporting $1"
+  },
+  {
+    "id": "dedupe_supporting_and_enhancing",
+    "pattern": "\\bsupporting\\s+([^,.]{0,120}?)\\s+and\\s+enhancing\\s+",
+    "flags": "gi",
+    "replacement": "supporting $1, "
+  },
+  {
+    "id": "dedupe_aligned_with_aligned_with",
+    "pattern": "\\baligned\\s+with\\s+([^,.]{0,120}?)\\s+aligned\\s+with\\b",
+    "flags": "gi",
+    "replacement": "aligned with $1"
+  },
+  {
+    "id": "collapse_double_while",
+    "pattern": "\\bwhile\\b\\s+([^,.]{0,160}?)\\s+\\bwhile\\b",
+    "flags": "gi",
+    "replacement": "while $1 and"
   }
 ]

@@ -43,6 +43,36 @@
         {
           "id": "strategic_named_3",
           "template": "in alignment with {company}'s enterprise strategy for {benefit}"
+        },
+        {
+          "id": "strategic_named_cx_1",
+          "category": "digital_cx",
+          "template": "supporting {company}'s strategic goal of elevating digital customer experience and self-service adoption"
+        },
+        {
+          "id": "strategic_named_reliability_1",
+          "category": "reliability",
+          "template": "supporting {company}'s strategic goal of improving platform reliability and service continuity"
+        },
+        {
+          "id": "strategic_named_security_1",
+          "category": "security",
+          "template": "supporting {company}'s strategic goal of strengthening security, privacy, and regulatory compliance"
+        },
+        {
+          "id": "strategic_named_seo_1",
+          "category": "seo",
+          "template": "supporting {company}'s strategic goal of accelerating organic acquisition and digital presence"
+        },
+        {
+          "id": "strategic_named_delivery_1",
+          "category": "delivery_efficiency",
+          "template": "supporting {company}'s strategic goal of improving delivery efficiency and reducing cost of change"
+        },
+        {
+          "id": "strategic_named_governance_1",
+          "category": "governance",
+          "template": "supporting {company}'s strategic goal of strengthening governance and cross-functional alignment"
         }
       ]
     },
@@ -62,6 +92,36 @@
         {
           "id": "strategic_generic_2",
           "template": "to advance the organization's strategic priorities around {benefit}"
+        },
+        {
+          "id": "strategic_generic_cx_1",
+          "category": "digital_cx",
+          "template": "supporting the organization's strategic goal of elevating digital customer experience and self-service adoption"
+        },
+        {
+          "id": "strategic_generic_reliability_1",
+          "category": "reliability",
+          "template": "supporting the organization's strategic goal of improving platform reliability and service continuity"
+        },
+        {
+          "id": "strategic_generic_security_1",
+          "category": "security",
+          "template": "supporting the organization's strategic goal of strengthening security, privacy, and regulatory compliance"
+        },
+        {
+          "id": "strategic_generic_seo_1",
+          "category": "seo",
+          "template": "supporting the organization's strategic goal of accelerating organic acquisition and digital presence"
+        },
+        {
+          "id": "strategic_generic_delivery_1",
+          "category": "delivery_efficiency",
+          "template": "supporting the organization's strategic goal of improving delivery efficiency and reducing cost of change"
+        },
+        {
+          "id": "strategic_generic_governance_1",
+          "category": "governance",
+          "template": "supporting the organization's strategic goal of strengthening governance and cross-functional alignment"
         }
       ]
     },
@@ -84,6 +144,36 @@
         {
           "id": "named_company_3",
           "template": "in support of {company}'s long-term objectives, including {benefit}"
+        },
+        {
+          "id": "named_company_cx_1",
+          "category": "digital_cx",
+          "template": "enabling improved digital customer experience and increased self-service adoption across {company}"
+        },
+        {
+          "id": "named_company_reliability_1",
+          "category": "reliability",
+          "template": "enhancing platform stability, uptime, and service continuity across {company}'s digital assets"
+        },
+        {
+          "id": "named_company_security_1",
+          "category": "security",
+          "template": "strengthening security posture, privacy controls, and compliance across {company}'s delivery lifecycle"
+        },
+        {
+          "id": "named_company_seo_1",
+          "category": "seo",
+          "template": "improving organic acquisition and discoverability across {company}'s digital channels"
+        },
+        {
+          "id": "named_company_delivery_1",
+          "category": "delivery_efficiency",
+          "template": "increasing delivery throughput and reducing rework and cycle time across {company}'s product teams"
+        },
+        {
+          "id": "named_company_governance_1",
+          "category": "governance",
+          "template": "strengthening governance, standards adherence, and cross-functional execution across {company}"
         }
       ]
     },
@@ -106,6 +196,36 @@
         {
           "id": "generic_company_3",
           "template": "in support of the organization's long-term objectives, including {benefit}"
+        },
+        {
+          "id": "generic_company_cx_1",
+          "category": "digital_cx",
+          "template": "enabling improved digital customer experience and increased self-service adoption across the organization"
+        },
+        {
+          "id": "generic_company_reliability_1",
+          "category": "reliability",
+          "template": "enhancing platform stability, uptime, and service continuity across the organization's digital assets"
+        },
+        {
+          "id": "generic_company_security_1",
+          "category": "security",
+          "template": "strengthening security posture, privacy controls, and compliance across the organization's delivery lifecycle"
+        },
+        {
+          "id": "generic_company_seo_1",
+          "category": "seo",
+          "template": "improving organic acquisition and discoverability across the organization's digital channels"
+        },
+        {
+          "id": "generic_company_delivery_1",
+          "category": "delivery_efficiency",
+          "template": "increasing delivery throughput and reducing rework and cycle time across the organization's product teams"
+        },
+        {
+          "id": "generic_company_governance_1",
+          "category": "governance",
+          "template": "strengthening governance, standards adherence, and cross-functional execution across the organization"
         }
       ]
     },
@@ -123,6 +243,36 @@
         {
           "id": "benefit_only_2",
           "template": "to drive measurable impact related to {benefit}"
+        },
+        {
+          "id": "benefit_only_cx_1",
+          "category": "digital_cx",
+          "template": "supporting measurable improvement in digital customer experience and self-service adoption"
+        },
+        {
+          "id": "benefit_only_reliability_1",
+          "category": "reliability",
+          "template": "supporting measurable improvement in reliability, uptime, and service continuity"
+        },
+        {
+          "id": "benefit_only_security_1",
+          "category": "security",
+          "template": "supporting measurable improvement in security, privacy, and compliance posture"
+        },
+        {
+          "id": "benefit_only_seo_1",
+          "category": "seo",
+          "template": "supporting measurable improvement in organic acquisition and digital presence"
+        },
+        {
+          "id": "benefit_only_delivery_1",
+          "category": "delivery_efficiency",
+          "template": "supporting measurable improvement in delivery efficiency and cycle-time reduction"
+        },
+        {
+          "id": "benefit_only_governance_1",
+          "category": "governance",
+          "template": "supporting measurable improvement in governance, standards adherence, and cross-team alignment"
         }
       ]
     },
@@ -137,6 +287,36 @@
         {
           "id": "fallback_2",
           "template": "to strengthen enterprise-wide performance and risk management"
+        },
+        {
+          "id": "fallback_cx_1",
+          "category": "digital_cx",
+          "template": "supporting improved digital customer experience and increased self-service adoption"
+        },
+        {
+          "id": "fallback_reliability_1",
+          "category": "reliability",
+          "template": "supporting improved reliability, uptime, and service continuity"
+        },
+        {
+          "id": "fallback_security_1",
+          "category": "security",
+          "template": "supporting improved security, privacy, and compliance posture"
+        },
+        {
+          "id": "fallback_seo_1",
+          "category": "seo",
+          "template": "supporting improved organic acquisition and digital presence"
+        },
+        {
+          "id": "fallback_delivery_1",
+          "category": "delivery_efficiency",
+          "template": "supporting improved delivery efficiency and reduced cost of change"
+        },
+        {
+          "id": "fallback_governance_1",
+          "category": "governance",
+          "template": "supporting improved governance and cross-functional alignment"
         }
       ]
     }

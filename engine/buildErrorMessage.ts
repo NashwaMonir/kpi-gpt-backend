@@ -19,6 +19,50 @@ import type { MetricResolutionResult } from './metricsAutoSuggest';
 import type { ErrorCode } from './errorCodes';
 import { ErrorCodes, ERROR_COMMENTS } from './errorCodes';
 
+export interface BuildErrorMessageParams {
+  status: 'VALID' | 'NEEDS_REVIEW' | 'INVALID';
+  error_codes: ErrorCode[];
+  metrics_auto_suggested: boolean;
+  missing_fields: string[];
+  deadline_validation?: {
+    valid: boolean;
+    wrongYear?: boolean;
+  };
+}
+
+export interface BuildErrorMessageResult {
+  comments: string;
+  summary_reason: string;
+}
+
+
+function buildErrorMessage(params: BuildErrorMessageParams): BuildErrorMessageResult {
+  const { status, metrics_auto_suggested } = params;
+
+  if (status === 'INVALID') {
+    return {
+      comments: 'Objectives not generated due to validation errors.',
+      summary_reason: 'Objectives not generated due to validation errors.'
+    };
+  }
+
+  if (status === 'NEEDS_REVIEW' && metrics_auto_suggested) {
+    return {
+      comments: 'Metrics were system-recommended based on the role matrix. Please review for approval.',
+      summary_reason: 'Metrics were system-recommended based on the role matrix. Please review for approval.'
+    };
+  }
+
+  return {
+    comments: 'All SMART criteria met.',
+    summary_reason: ''
+  };
+}
+
+export { buildErrorMessage };
+export default buildErrorMessage;
+
+
 export interface FinalAssemblyResult {
   status: 'VALID' | 'NEEDS_REVIEW' | 'INVALID';
   comments: string;
@@ -226,16 +270,16 @@ export function buildFinalMessage(
 
     if (autoSuggested.length === 3) {
       commentsParts.push(
-        'Metrics auto-suggested (Output / Quality / Improvement).'
+        'Metrics were system-recommended (Output / Quality / Improvement). Please review for approval.'
       );
     } else if (autoSuggested.length > 0) {
       commentsParts.push(
-        `Metrics auto-suggested for: ${autoSuggested.join(', ')}.`
+        `Metrics were system-recommended for: ${autoSuggested.join(', ')}. Please review for approval.`
       );
     } else {
       // Fallback generic note if we cannot infer exact fields
       commentsParts.push(
-        'Metrics auto-suggested based on the role matrix.'
+        'Metrics were system-recommended based on the role matrix. Please review for approval.'
       );
     }
   }
@@ -261,7 +305,7 @@ export function buildFinalMessage(
     summary_reason = 'Objectives not generated due to validation errors.';
   } else if (status === 'NEEDS_REVIEW') {
     summary_reason =
-      'Objective metrics were auto-suggested based on the role matrix. Please review before approval.';
+      'Metrics were system-recommended based on the role matrix. Please review for approval.';
   } else {
     summary_reason = '';
   }
@@ -291,7 +335,7 @@ export function buildFinalMessage(
   return {
     status,
     comments: comments || (status === 'NEEDS_REVIEW'
-      ? 'Objective metrics were auto-suggested based on the role matrix. Please review before approval.'
+      ? 'Metrics were system-recommended based on the role matrix. Please review for approval.'
       : 'Objectives not generated due to validation errors.'),
     summary_reason,
     errorCodes: canonicalErrorCodes,

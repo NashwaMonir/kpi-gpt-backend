@@ -745,4 +745,208 @@
   "task_types": ["Consultation"],
   "modes": ["complex"]
 }
+,
+  {
+    "id": "enterprise_design_ic_project_1",
+    "slot": "ic_improve",
+    "text": "Improve",
+    "roles": ["Design"],
+    "task_types": ["Project"],
+    "modes": ["simple", "complex"]
+  },
+  {
+    "id": "enterprise_design_ic_project_2",
+    "slot": "ic_improve",
+    "text": "Optimize",
+    "roles": ["Design"],
+    "task_types": ["Project"],
+    "modes": ["simple", "complex"]
+  },
+  {
+    "id": "enterprise_design_ic_cr_1",
+    "slot": "ic_improve",
+    "text": "Refine",
+    "roles": ["Design"],
+    "task_types": ["Change Request"],
+    "modes": ["simple", "complex"]
+  },
+  {
+    "id": "enterprise_design_ic_cr_2",
+    "slot": "ic_improve",
+    "text": "Harmonize",
+    "roles": ["Design"],
+    "task_types": ["Change Request"],
+    "modes": ["simple", "complex"]
+  },
+  {
+    "id": "enterprise_design_ic_consult_1",
+    "slot": "ic_improve",
+    "text": "Assess",
+    "roles": ["Design"],
+    "task_types": ["Consultation"],
+    "modes": ["simple", "complex"]
+  },
+  {
+    "id": "enterprise_design_ic_consult_2",
+    "slot": "ic_improve",
+    "text": "Recommend",
+    "roles": ["Design"],
+    "task_types": ["Consultation"],
+    "modes": ["simple", "complex"]
+  },
+
+  {
+    "id": "enterprise_development_ic_project_1",
+    "slot": "ic_optimize",
+    "text": "Optimize",
+    "roles": ["Development"],
+    "task_types": ["Project"],
+    "modes": ["simple", "complex"]
+  },
+  {
+    "id": "enterprise_development_ic_project_2",
+    "slot": "ic_optimize",
+    "text": "Implement",
+    "roles": ["Development"],
+    "task_types": ["Project"],
+    "modes": ["simple", "complex"]
+  },
+  {
+    "id": "enterprise_development_ic_cr_1",
+    "slot": "ic_optimize",
+    "text": "Refactor",
+    "roles": ["Development"],
+    "task_types": ["Change Request"],
+    "modes": ["simple", "complex"]
+  },
+  {
+    "id": "enterprise_development_ic_cr_2",
+    "slot": "ic_optimize",
+    "text": "Harden",
+    "roles": ["Development"],
+    "task_types": ["Change Request"],
+    "modes": ["simple", "complex"]
+  },
+  {
+    "id": "enterprise_development_ic_consult_1",
+    "slot": "ic_optimize",
+    "text": "Assess",
+    "roles": ["Development"],
+    "task_types": ["Consultation"],
+    "modes": ["simple", "complex"]
+  },
+  {
+    "id": "enterprise_development_ic_consult_2",
+    "slot": "ic_optimize",
+    "text": "Recommend",
+    "roles": ["Development"],
+    "task_types": ["Consultation"],
+    "modes": ["simple", "complex"]
+  },
+
+  {
+    "id": "enterprise_content_ic_project_1",
+    "slot": "ic_improve",
+    "text": "Improve",
+    "roles": ["Content"],
+    "task_types": ["Project"],
+    "modes": ["simple", "complex"]
+  },
+  {
+    "id": "enterprise_content_ic_project_2",
+    "slot": "ic_improve",
+    "text": "Increase",
+    "roles": ["Content"],
+    "task_types": ["Project"],
+    "modes": ["simple", "complex"]
+  },
+  {
+    "id": "enterprise_content_ic_cr_1",
+    "slot": "ic_improve",
+    "text": "Update",
+    "roles": ["Content"],
+    "task_types": ["Change Request"],
+    "modes": ["simple", "complex"]
+  },
+  {
+    "id": "enterprise_content_ic_cr_2",
+    "slot": "ic_improve",
+    "text": "Refine",
+    "roles": ["Content"],
+    "task_types": ["Change Request"],
+    "modes": ["simple", "complex"]
+  },
+  {
+    "id": "enterprise_content_ic_consult_1",
+    "slot": "ic_improve",
+    "text": "Advise on",
+    "roles": ["Content"],
+    "task_types": ["Consultation"],
+    "modes": ["simple", "complex"]
+  },
+  {
+    "id": "enterprise_content_ic_consult_2",
+    "slot": "ic_improve",
+    "text": "Recommend",
+    "roles": ["Content"],
+    "task_types": ["Consultation"],
+    "modes": ["simple", "complex"]
+  },
+
+  {
+    "id": "enterprise_lead_govern_project_1",
+    "slot": "lead_govern",
+    "text": "Implement",
+    "roles": ["Design Lead", "Development Lead", "Content Lead"],
+    "task_types": ["Project"],
+    "modes": ["complex"]
+  },
+  {
+    "id": "enterprise_lead_govern_project_2",
+    "slot": "lead_govern",
+    "text": "Institutionalize",
+    "roles": ["Design Lead", "Development Lead", "Content Lead"],
+    "task_types": ["Project"],
+    "modes": ["complex"]
+  },
+  {
+    "id": "enterprise_lead_govern_project_3",
+    "slot": "lead_govern",
+    "text": "Establish",
+    "roles": ["Design Lead", "Development Lead", "Content Lead"],
+    "task_types": ["Project"],
+    "modes": ["complex"]
+  },
+  {
+    "id": "enterprise_lead_govern_cr_1",
+    "slot": "lead_govern",
+    "text": "Govern",
+    "roles": ["Design Lead", "Development Lead", "Content Lead"],
+    "task_types": ["Change Request"],
+    "modes": ["complex"]
+  },
+  {
+    "id": "enterprise_lead_govern_cr_2",
+    "slot": "lead_govern",
+    "text": "Enforce",
+    "roles": ["Design Lead", "Development Lead", "Content Lead"],
+    "task_types": ["Change Request"],
+    "modes": ["complex"]
+  },
+  {
+    "id": "enterprise_lead_govern_consult_1",
+    "slot": "lead_govern",
+    "text": "Lead",
+    "roles": ["Design Lead", "Development Lead", "Content Lead"],
+    "task_types": ["Consultation"],
+    "modes": ["complex"]
+  },
+  {
+    "id": "enterprise_lead_govern_consult_2",
+    "slot": "lead_govern",
+    "text": "Enable",
+    "roles": ["Design Lead", "Development Lead", "Content Lead"],
+    "task_types": ["Consultation"],
+    "modes": ["complex"]
+  }
 ]

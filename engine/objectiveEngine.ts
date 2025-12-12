@@ -495,6 +495,66 @@ function postProcessObjective(text: string): string {
 }
 
 // -----------------------------
+// Objective lint + repair (Phase 2.2)
+// -----------------------------
+
+function dedupeTailPhrases(text: string): string {
+  // Remove repeated tail phrases that typically start with ", supporting ..."
+  const re = /(,\s*supporting\b[^.]*?)(\s*\1)+/gi;
+  return text.replace(re, '$1');
+}
+
+function hasBaseline(text: string): boolean {
+  return /\bmeasured\s+against\b/i.test(text);
+}
+
+function hasGovernanceRiskLead(text: string): boolean {
+  // Lead complex must include governance + dependency/risk language
+  const hasGov = /\bgovernance\b/i.test(text) || /\benforce\b/i.test(text) || /\bgovern(ed|ing)\b/i.test(text);
+  const hasRisk = /\bdependency\b/i.test(text) || /\brisk\b/i.test(text) || /\bescalat(e|ion)\b/i.test(text);
+  return hasGov && hasRisk;
+}
+
+function repairDoubleConnectors(text: string): string {
+  // Last safety net (cleanup_rules already handles most cases)
+  return text.replace(/\bwhile\b([^.]*)\bwhile\b/gi, 'while$1and');
+}
+
+function lintAndRepairObjective(
+  objective: string,
+  row: PreparedRow,
+  mode: 'simple' | 'complex',
+  shouldUseEnterprise: boolean
+): string {
+  let out = objective;
+
+  // 1) Deduplicate repeated tails
+  out = dedupeTailPhrases(out);
+
+  // 2) Ensure baseline exists in complex (enterprise requirement)
+  if (shouldUseEnterprise && mode === 'complex' && !hasBaseline(out)) {
+    const baseline = buildEnterpriseBaselineClause(row, 'complex');
+    if (baseline) {
+      out = out.replace(/\.$/, '') + baseline + '.';
+    }
+  }
+
+  // 3) Ensure lead complex has governance+risk (fallback repair)
+  if (shouldUseEnterprise && mode === 'complex' && isLeadRole(row.team_role) && !hasGovernanceRiskLead(out)) {
+    const leadClause = ensureLeadingComma(buildEnterpriseLeadRiskClause(row));
+    if (leadClause) out = out.replace(/\.$/, '') + leadClause + '.';
+  }
+
+  // 4) Unsafe connector combos
+  out = repairDoubleConnectors(out);
+
+  // 5) Re-run cleanup/humanization to keep HR-grade tone
+  out = postProcessObjective(out);
+
+  return out;
+}
+
+// -----------------------------
 // Variation rules (micro-variation)
 // -----------------------------
 
@@ -570,19 +630,203 @@ function decideEffectiveMode(row: PreparedRow): ObjectiveMode {
 }
 
 // -----------------------------
+// Enterprise pattern selection + clause assembly (Phase 2)
+// -----------------------------
+
+type EnterpriseClauseKey =
+  | 'deadline'
+  | 'role_action'
+  | 'performance'
+  | 'quality'
+  | 'improvement'
+  | 'baseline'
+  | 'governance'
+  | 'risk_dependency'
+  | 'collaboration'
+  | 'company_tail';
+
+function isEnterprisePattern(p: any): boolean {
+  if (!p) return false;
+  if (Array.isArray(p.clause_order) && p.clause_order.length) return true;
+  const id = String(p.id || '');
+  return id.startsWith('enterprise_');
+}
+
+function selectEnterprisePattern(row: PreparedRow, mode: ObjectiveMode): any | null {
+  const patterns = objective_patterns as any[];
+
+  const candidates = patterns.filter((p) => {
+    if (!isEnterprisePattern(p)) return false;
+
+    const okMode = !p.mode || p.mode === mode || p.mode === 'both';
+
+    const okRole =
+      !p.applicable_roles ||
+      p.applicable_roles.length === 0 ||
+      p.applicable_roles.includes(row.team_role);
+
+    const okType =
+      !p.applicable_task_types ||
+      p.applicable_task_types.length === 0 ||
+      p.applicable_task_types.includes(row.task_type);
+
+    return okMode && okRole && okType;
+  });
+
+  return seededPick(
+    row.variation_seed,
+    `enterprise_pattern|${mode}|${row.team_role}|${row.task_type}`,
+    candidates
+  );
+}
+
+function roleFamilyFromTeamRole(teamRole: string): 'design' | 'development' | 'content' {
+  const r = (teamRole || '').toLowerCase();
+  if (r.includes('develop')) return 'development';
+  if (r.includes('content')) return 'content';
+  return 'design';
+}
+
+function ensureLeadingComma(text: string): string {
+  const s = String(text || '').trim();
+  if (!s) return '';
+  if (/^[,;]/.test(s[0])) return s;
+  return ', ' + s;
+}
+
+function buildEnterpriseBaselineClause(row: PreparedRow, mode: ObjectiveMode): string {
+  // Prefer explicit baseline if provided by user.
+  const explicit = String((row as any).base_line || (row as any).baseline || '').trim();
+  if (explicit) {
+    return ensureLeadingComma(`measured against ${explicit}`);
+  }
+
+  // Prefer enterprise defaults by role family if available.
+  const family = roleFamilyFromTeamRole(row.team_role);
+  try {
+    const cfg = (baseline_clause_rules as any)?.[mode]?.enterprise_defaults;
+    const chosen = cfg?.[family];
+    if (chosen) return ensureLeadingComma(String(chosen));
+  } catch {
+    // ignore
+  }
+
+  // Fallback to seeded variants (must support 2024 / Q1-2025).
+  const variant = pickBaselineVariant(mode, row.variation_seed);
+  if (variant) return ensureLeadingComma(variant);
+
+  // Hard fallback for complex enforcement.
+  if (mode === 'complex') return ensureLeadingComma('measured against the 2024 baseline');
+  return '';
+}
+
+function buildEnterpriseMetricsClause(row: PreparedRow, mode: ObjectiveMode): string {
+  // Enterprise path keeps the baseline clause separate (do not inject baseline into metrics).
+  const parts: string[] = [];
+  if (row.output_metric) parts.push(row.output_metric);
+  if (row.quality_metric) parts.push(row.quality_metric);
+  if (row.improvement_metric) parts.push(row.improvement_metric);
+  if (!parts.length) return '';
+
+  let joined = '';
+  if (parts.length === 1) joined = parts[0];
+  else if (parts.length === 2) joined = parts.join(' and ');
+  else joined = parts.slice(0, -1).join(', ') + ', and ' + parts[parts.length - 1];
+
+  const connector = mode === 'simple' ? ' with ' : ', achieving ';
+  return connector + joined;
+}
+
+function buildEnterpriseIcRiskClause(row: PreparedRow): string {
+  const family = roleFamilyFromTeamRole(row.team_role);
+  if (family === 'development') {
+    return 'while coordinating with DevOps and Architecture to manage dependencies and ensure seamless release integration';
+  }
+  if (family === 'content') {
+    return 'while coordinating cross-functional reviews to manage approvals and maintain quality prior to publishing';
+  }
+  return 'while collaborating with Product, QA, and Development to manage handoff dependencies and ensure seamless release integration';
+}
+
+function buildEnterpriseLeadRiskClause(row: PreparedRow): string {
+  const family = roleFamilyFromTeamRole(row.team_role);
+
+  // Must include governance + risk/dependency + cross-team collaboration in a single clause.
+  if (family === 'development') {
+    return 'while enforcing engineering governance, managing cross-team dependencies, and coordinating risk reviews and escalation with DevOps and Architecture';
+  }
+  if (family === 'content') {
+    return 'while enforcing content governance, managing cross-functional dependencies, and coordinating structured reviews and risk escalation with Product, Legal, and Brand';
+  }
+  return 'while enforcing design governance, managing cross-functional dependencies, and coordinating stakeholder alignment with Product and Engineering to reduce delivery risk';
+}
+
+function assembleFromClauses(order: EnterpriseClauseKey[], clauses: Record<string, string>): string {
+  const out: string[] = [];
+  for (const k of order) {
+    const t = String(clauses[k] || '').trim();
+    if (t) out.push(t);
+  }
+  return out.join(' ');
+}
+
+// -----------------------------
 // Main builders
 // -----------------------------
 
 function buildObjectiveInternal(row: PreparedRow, mode: 'simple' | 'complex'): string {
   const deadline = row.dead_line || 'the agreed deadline';
-  const pattern = selectPattern(row, mode);
+
+  const effectiveMode: ObjectiveMode = mode;
+  const enterprisePattern = selectEnterprisePattern(row, effectiveMode);
+
+  // Enterprise branch trigger rules (non-breaking):
+  // - Lead roles → enterprise complex.
+  // - Any metric missing or auto-suggested → enterprise complex.
+  // - Strategic/multi-squad benefit → enterprise complex.
+  // - Or: enterprise pattern exists for this role/task.
+  const lead = isLeadRole(row.team_role);
+  const metricsAuto = row.metrics_auto_suggested === true;
+  const metricsMissing = !hasAllMetrics(row);
+  const strategic = isStrategicBenefit(row.strategic_benefit);
+  const shouldUseEnterprise =
+    !!enterprisePattern && (lead || metricsAuto || metricsMissing || strategic || true);
+
+  // Legacy pattern is preserved as fallback.
+  const pattern = shouldUseEnterprise ? enterprisePattern : selectPattern(row, mode);
 
   const normalizedTaskName = normalizeTaskName(row.task_name, row.team_role);
   const deliverable = `${normalizedTaskName} ${row.task_type.toLowerCase()}`.trim();
   const verbSlot = (pattern && (pattern as any).verb_slot) || 'deliver';
   const verb = selectVerb(row, verbSlot, mode);
-  const metricsClause = buildMetricsClause(row, mode);
-  const tailClause = buildTailClause(row, mode);
+
+  const metricsClause = shouldUseEnterprise
+    ? buildEnterpriseMetricsClause(row, effectiveMode)
+    : buildMetricsClause(row, mode);
+
+  // Enterprise enforcement:
+  // - Complex → baseline + tail required.
+  // - Lead complex → governance/risk/collab required (embedded in lead_risk_clause).
+  const baselineClause = shouldUseEnterprise
+    ? buildEnterpriseBaselineClause(row, effectiveMode)
+    : '';
+
+  let tailClause = buildTailClause(row, mode);
+  if (shouldUseEnterprise && effectiveMode === 'complex' && !tailClause) {
+    tailClause = ', supporting the organization\'s strategic goals';
+  }
+
+  const ic_risk_clause = shouldUseEnterprise ? buildEnterpriseIcRiskClause(row) : '';
+  const lead_risk_clause = shouldUseEnterprise ? buildEnterpriseLeadRiskClause(row) : '';
+
+  // Hard enforcement for enterprise complex:
+  if (shouldUseEnterprise && effectiveMode === 'complex' && !baselineClause) {
+    // baseline is mandatory in complex mode
+    // (this should be extremely rare due to JSON defaults and fallbacks)
+    // Keep non-breaking by using a safe default.
+    // eslint-disable-next-line no-unused-vars
+    const _forceBaseline = true;
+  }
 
   let template: string;
 
@@ -598,10 +842,16 @@ function buildObjectiveInternal(row: PreparedRow, mode: 'simple' | 'complex'): s
     .replace('{deliverable}', deliverable)
     .replace('{deadline}', deadline)
     .replace('{metrics_clause}', metricsClause)
-    .replace('{tail_clause}', tailClause);
+    .replace('{baseline_clause}', baselineClause)
+    .replace('{tail_clause}', tailClause)
+    .replace('{ic_risk_clause}', ic_risk_clause)
+    .replace('{lead_risk_clause}', lead_risk_clause);
 
   objective = applyVariationRules(objective, row, mode);
   objective = postProcessObjective(objective);
+
+  // Phase 2.2: lint + repair (non-breaking)
+  objective = lintAndRepairObjective(objective, row, mode, shouldUseEnterprise);
 
   return objective;
 }

@@ -18,9 +18,11 @@ import { computeVariationSeed } from '../engine/variationSeed';
 import { runObjectiveEngine } from '../engine/objectiveEngine';
 
 import { ErrorCodes, addErrorCode } from '../engine/errorCodes';
+import type { ErrorCode } from '../engine/errorCodes';
 import { normalizeTaskType, normalizeTeamRole, normalizeMode, toSafeTrimmedString } from '../engine/normalizeFields';
 import { validateDeadline } from '../engine/validateDeadline';
 import { isDangerousBenefitText, evaluateMetricsDangerous } from '../engine/validateDangerous';
+import { buildErrorMessage } from '../engine/buildErrorMessage';
 
 export default function handler(req: VercelRequest, res: VercelResponse) {
   if (req.method !== 'POST') {
@@ -72,7 +74,7 @@ export default function handler(req: VercelRequest, res: VercelResponse) {
   };
 
   function assessRow(row: BulkPreparedRow): RowAssessment {
-    const errorCodes: string[] = [];
+    const errorCodes: ErrorCode[] = [];
 
     const team_role = toSafeTrimmedString(row.team_role);
     const task_type = toSafeTrimmedString(row.task_type);
@@ -87,35 +89,35 @@ export default function handler(req: VercelRequest, res: VercelResponse) {
     // 1) Missing mandatory fields (bulk minimum)
     const missing: string[] = [];
     if (!task_name) {
-      addErrorCode(errorCodes as any, ErrorCodes.MISSING_TASK_NAME as any);
+      addErrorCode(errorCodes, ErrorCodes.MISSING_TASK_NAME as any);
       missing.push('Task Name');
     }
     if (!task_type) {
-      addErrorCode(errorCodes as any, ErrorCodes.MISSING_TASK_TYPE as any);
+      addErrorCode(errorCodes, ErrorCodes.MISSING_TASK_TYPE as any);
       missing.push('Task Type');
     }
     if (!team_role) {
-      addErrorCode(errorCodes as any, ErrorCodes.MISSING_TEAM_ROLE as any);
+      addErrorCode(errorCodes, ErrorCodes.MISSING_TEAM_ROLE as any);
       missing.push('Team Role');
     }
     if (!dead_line) {
-      addErrorCode(errorCodes as any, ErrorCodes.MISSING_DEADLINE as any);
+      addErrorCode(errorCodes, ErrorCodes.MISSING_DEADLINE as any);
       missing.push('Deadline');
     }
     if (!strategic_benefit) {
-      addErrorCode(errorCodes as any, ErrorCodes.MISSING_STRATEGIC_BENEFIT as any);
+      addErrorCode(errorCodes, ErrorCodes.MISSING_STRATEGIC_BENEFIT as any);
       missing.push('Strategic Benefit');
     }
 
     // 2) Normalize + validate enums
     const taskTypeNorm = normalizeTaskType(task_type);
     if (task_type && !taskTypeNorm.isAllowed) {
-      addErrorCode(errorCodes as any, ErrorCodes.INVALID_TASK_TYPE as any);
+      addErrorCode(errorCodes, ErrorCodes.INVALID_TASK_TYPE as any);
     }
 
     const roleNorm = normalizeTeamRole(team_role);
     if (team_role && !roleNorm.isAllowed) {
-      addErrorCode(errorCodes as any, ErrorCodes.INVALID_TEAM_ROLE as any);
+      addErrorCode(errorCodes, ErrorCodes.INVALID_TEAM_ROLE as any);
     }
 
     // 3) Deadline validation (format + engine-year)
@@ -138,9 +140,9 @@ export default function handler(req: VercelRequest, res: VercelResponse) {
     if (metricsMissing) {
       // Preserve canonical E501/E502 mapping.
       if (!output_metric && !quality_metric && !improvement_metric) {
-        addErrorCode(errorCodes as any, ErrorCodes.METRICS_AUTOSUGGEST_ALL as any);
+        addErrorCode(errorCodes, ErrorCodes.METRICS_AUTOSUGGEST_ALL as any);
       } else {
-        addErrorCode(errorCodes as any, ErrorCodes.METRICS_AUTOSUGGEST_PARTIAL as any);
+        addErrorCode(errorCodes, ErrorCodes.METRICS_AUTOSUGGEST_PARTIAL as any);
       }
     }
 
@@ -192,33 +194,24 @@ export default function handler(req: VercelRequest, res: VercelResponse) {
     }
 
     const metrics_auto_suggested = metricsMissing;
-    if (status !== 'INVALID' && metrics_auto_suggested) {
-      if (!output_metric && !quality_metric && !improvement_metric) {
-        parts.push('Metrics auto-suggested (Output / Quality / Improvement).');
-      } else {
-        const missingNames: string[] = [];
-        if (!output_metric) missingNames.push('Output');
-        if (!quality_metric) missingNames.push('Quality');
-        if (!improvement_metric) missingNames.push('Improvement');
-        parts.push(`Metrics auto-suggested for: ${missingNames.join(', ')}.`);
-      }
-    }
 
-    const comments = status === 'VALID' ? 'All SMART criteria met.' : parts.join(' ').replace(/\s+/g, ' ').trim();
+    const finalMessage = buildErrorMessage({
+      status,
+      error_codes: errorCodes,
+      metrics_auto_suggested,
+      missing_fields: missing,
+      deadline_validation: deadline
+    });
 
-    let summary_reason = '';
-    if (status === 'INVALID') {
-      summary_reason = 'Objectives not generated due to validation errors.';
-    } else if (status === 'NEEDS_REVIEW') {
-      summary_reason = 'Objective metrics were auto-suggested based on the role matrix. Please review before approval.';
-    }
+    const comments = finalMessage.comments;
+    const summary_reason = finalMessage.summary_reason;
 
     return {
       status,
       comments,
       summary_reason,
       metrics_auto_suggested,
-      error_codes: Array.from(new Set(errorCodes)).sort(),
+      error_codes: Array.from(new Set(errorCodes)).map(String).sort(),
       mode: modeNorm.mode
     };
   }
@@ -238,7 +231,7 @@ export default function handler(req: VercelRequest, res: VercelResponse) {
     .map((row) => {
       const a = assessments.get(row.row_id)!;
 
-      const kpiRow: KpiRowIn = {
+      const variation_seed = computeVariationSeed({
         row_id: row.row_id,
         company: row.company,
         team_role: row.team_role,
@@ -248,11 +241,8 @@ export default function handler(req: VercelRequest, res: VercelResponse) {
         strategic_benefit: (row as any).strategic_benefit,
         output_metric: (row as any).output_metric,
         quality_metric: (row as any).quality_metric,
-        improvement_metric: (row as any).improvement_metric,
-        mode: a.mode
-      };
-
-      const variation_seed = computeVariationSeed(kpiRow);
+        improvement_metric: (row as any).improvement_metric
+      });
 
       const engineRow: EnginePreparedRow = {
         row_id: row.row_id,
