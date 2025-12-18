@@ -10,5 +10,3 @@ bulk_set*.csv
 bulk_result_*.xlsx
 
 # local experiments
-engine/kpiEngine.ts
-engine/smartValidator.ts
