@@ -1,6 +1,6 @@
 // engine/types.ts
 // Shared TypeScript interfaces for the KPI Engine (v10.8)
-import type { ErrorCode } from '../engine/errorCodes';
+import type { ErrorCode } from './errorCodes';
 
 /**
  * Effective objective mode used by the engine.
@@ -59,6 +59,7 @@ export interface KpiRowIn {
 
 /**
  * PreparedRow – normalized + resolved row passed into objectiveEngine.
+ * Canonical engine-row shape (single + bulk must converge on this type).
  * - All strings are normalized (never null/undefined).
  * - Metrics are final text values after validation / auto-suggest.
  * - metrics_auto_suggested is always a concrete boolean.
@@ -132,8 +133,9 @@ export interface KpiRowOut {
   /**
    * Effective mode used to generate the final objective.
    * - "simple" or "complex" for VALID / NEEDS_REVIEW rows.
-   * - For INVALID rows, objective is empty and objective_mode may be an empty string,
-   *   or clients should simply ignore objective/objective_mode when status === 'INVALID'.
+   * - When status === 'INVALID':
+   *   - objective MUST be ""
+   *   - objective_mode MUST be "" (empty string)
    */
   objective_mode: ObjectiveMode | '';
 
@@ -141,14 +143,15 @@ export interface KpiRowOut {
 
   /**
    * Detailed comments from the validator / engine.
-      * Multiple human-readable notes, ordered by category and importance.   */
+   * Single HR-grade string in v10.8 Lite.
+   */
   comments: string;
 
   /**
-   * High-level summary reason (single string) for the status,
-   * suitable for UI surfaces and GPT explanations.
+   * Deprecated in v10.8 Lite.
+   * Kept optional for backward compatibility with older exports/clients.
    */
-  summary_reason: string;
+  summary_reason?: string;
 
   /**
    * Machine-readable error codes (Exxx) describing validation issues

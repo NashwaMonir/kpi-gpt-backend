@@ -10,7 +10,39 @@ import {
   decodeRowsToken,
   encodePrepareToken
 } from '../engine/bulkTypes';
-import { normalizeTeamRole, normalizeTaskType } from '../engine/normalizeFields';
+import { normalizeDeadline, normalizeTeamRole, normalizeTaskType } from '../engine/normalizeFields';
+
+// v10.8: deterministic variation seed (must include ISO deadline for parity)
+function hashString(str: string): number {
+  let hash = 2166136261;
+  for (let i = 0; i < str.length; i++) {
+    hash ^= str.charCodeAt(i);
+    hash = Math.imul(hash, 16777619);
+  }
+  return hash >>> 0;
+}
+
+function computeVariationSeed(input: {
+  team_role: string;
+  task_type: string;
+  task_name: string;
+  dead_line: string;
+  company?: string;
+  strategic_benefit?: string;
+  row_id?: string;
+}): number {
+  const key = [
+    input.row_id || '',
+    input.team_role || '',
+    input.task_type || '',
+    input.task_name || '',
+    input.dead_line || '',
+    (input.company || '').trim(),
+    (input.strategic_benefit || '').trim()
+  ].join('|');
+
+  return hashString(key);
+}
 
 function applyCompanyStrategy(
   row: ParsedRow,
@@ -100,6 +132,16 @@ export default function handler(req: VercelRequest, res: VercelResponse) {
     const teamRoleResult = normalizeTeamRole(row.team_role);
     const taskTypeResult = normalizeTaskType(row.task_type);
 
+    // v10.8 lock: persist canonical deadline shape into the prep token.
+    // - Always normalize via the same normalizer as single-row flow.
+    // - Overwrite dead_line with ISO before the engine sees it.
+    // - Keep trimmed raw only when invalid (diagnostics/export only).
+    const rawDeadline = String((row as any).dead_line_iso ?? (row as any).dead_line_normalized ?? row.dead_line ?? '').trim();
+    const nDeadline = normalizeDeadline(rawDeadline);
+    const dead_line = (nDeadline.isValid && nDeadline.normalized)
+      ? nDeadline.normalized
+      : rawDeadline;
+
     let isValid = row.isValid;
     let invalidReason = row.invalidReason || undefined;
 
@@ -119,9 +161,24 @@ export default function handler(req: VercelRequest, res: VercelResponse) {
 
     const newRow: PreparedRow = {
       ...row,
+      dead_line,
+      // Keep these as optional helpers for downstream tools and diagnostics.
+      ...(nDeadline.isValid && nDeadline.normalized
+        ? { dead_line_iso: nDeadline.normalized, dead_line_normalized: nDeadline.normalized }
+        : {}),
       company: finalCompany,
       team_role: teamRoleResult.normalized,
       task_type: taskTypeResult.normalized,
+      // v10.8 parity: recompute variation_seed after ISO deadline normalization.
+      variation_seed: computeVariationSeed({
+        row_id: (row as any).row_id,
+        team_role: teamRoleResult.normalized,
+        task_type: taskTypeResult.normalized,
+        task_name: String(row.task_name || ''),
+        dead_line,
+        company: finalCompany,
+        strategic_benefit: String(row.strategic_benefit || '')
+      }),
       isValid,
       invalidReason
     };

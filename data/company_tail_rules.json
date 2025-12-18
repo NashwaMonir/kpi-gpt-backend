@@ -14,11 +14,12 @@
         "^generic$",
         "^n/a$",
         "^not set$",
-        "organization",
-        "enterprise",
-        "company",
-        "corporation",
-        "group"
+        "^organization$",
+        "^the organization$",
+        "^enterprise$",
+        "^company$",
+        "^corporation$",
+        "^group$"
       ]
     }
   },
@@ -34,14 +35,17 @@
       "variants": [
         {
           "id": "strategic_named_1",
+          "category": "general",
           "template": "supporting {company}'s strategic goal of {benefit}"
         },
         {
           "id": "strategic_named_2",
+          "category": "general",
           "template": "to advance {company}'s strategic priorities around {benefit}"
         },
         {
           "id": "strategic_named_3",
+          "category": "general",
           "template": "in alignment with {company}'s enterprise strategy for {benefit}"
         },
         {
@@ -87,10 +91,12 @@
       "variants": [
         {
           "id": "strategic_generic_1",
+          "category": "general",
           "template": "supporting the organization's strategic goal of {benefit}"
         },
         {
           "id": "strategic_generic_2",
+          "category": "general",
           "template": "to advance the organization's strategic priorities around {benefit}"
         },
         {
@@ -135,14 +141,17 @@
       "variants": [
         {
           "id": "named_company_1",
+          "category": "general",
           "template": "supporting {company}'s digital transformation and {benefit}"
         },
         {
           "id": "named_company_2",
+          "category": "general",
           "template": "to strengthen {company}'s enterprise performance through {benefit}"
         },
         {
           "id": "named_company_3",
+          "category": "general",
           "template": "in support of {company}'s long-term objectives, including {benefit}"
         },
         {
@@ -187,14 +196,17 @@
       "variants": [
         {
           "id": "generic_company_1",
+          "category": "general",
           "template": "supporting the organization's digital transformation and {benefit}"
         },
         {
           "id": "generic_company_2",
+          "category": "general",
           "template": "to strengthen the organization's enterprise performance through {benefit}"
         },
         {
           "id": "generic_company_3",
+          "category": "general",
           "template": "in support of the organization's long-term objectives, including {benefit}"
         },
         {
@@ -238,10 +250,12 @@
       "variants": [
         {
           "id": "benefit_only_1",
+          "category": "general",
           "template": "supporting the organization's strategic focus on {benefit}"
         },
         {
           "id": "benefit_only_2",
+          "category": "general",
           "template": "to drive measurable impact related to {benefit}"
         },
         {
@@ -282,10 +296,12 @@
       "variants": [
         {
           "id": "fallback_1",
+          "category": "general",
           "template": "supporting the organization's long-term performance and resilience"
         },
         {
           "id": "fallback_2",
+          "category": "general",
           "template": "to strengthen enterprise-wide performance and risk management"
         },
         {

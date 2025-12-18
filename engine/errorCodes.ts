@@ -72,7 +72,7 @@ export const ErrorCodeDescriptions: Record<ErrorCode, string> = {
   [ErrorCodes.DEADLINE_WRONG_YEAR]: 'Deadline year is outside the current calendar year.',
   [ErrorCodes.DEADLINE_INVALID_FORMAT]: 'Deadline is not in a supported date format.',
   [ErrorCodes.DEADLINE_TEXTUAL_NONDATE]: 'Deadline contains non-parsable or textual content.',
-  [ErrorCodes.INVALID_MODE_VALUE]: 'Mode value is not supported and was normalized to "both".',
+  [ErrorCodes.INVALID_MODE_VALUE]: 'Mode input is ignored; objective mode is engine-owned under v10.8.',
 
   [ErrorCodes.DANGEROUS_TEXT]: 'Field contains dangerous or injection-like content.',
   [ErrorCodes.LOW_SIGNAL_TEXT]: 'Field contains low-signal or non-business text.',
@@ -104,7 +104,7 @@ export const ERROR_COMMENTS: Record<ErrorCode, string> = {
   [ErrorCodes.DEADLINE_WRONG_YEAR]: 'Deadline outside the allowed calendar year.',
   [ErrorCodes.DEADLINE_INVALID_FORMAT]: 'Invalid deadline format.',
   [ErrorCodes.DEADLINE_TEXTUAL_NONDATE]: 'Deadline contains non-parsable or textual content.',
-  [ErrorCodes.INVALID_MODE_VALUE]: 'Invalid mode value detected; backend fallback applied.',
+  [ErrorCodes.INVALID_MODE_VALUE]: 'Mode input is ignored; objective mode is engine-owned under v10.8.',
 
   [ErrorCodes.DANGEROUS_TEXT]: 'Invalid text format for field (dangerous content).',
   [ErrorCodes.LOW_SIGNAL_TEXT]: 'Invalid text format for field (low semantic signal).',

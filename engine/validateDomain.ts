@@ -33,7 +33,8 @@ import {
   toSafeTrimmedString,
   normalizeTaskType,
   normalizeTeamRole,
-  normalizeMode
+  normalizeMode,
+  normalizeDeadline
 } from './normalizeFields';
 import {
   checkDangerousText,
@@ -190,7 +191,26 @@ export function validateDomain(
     addErrorCode(errorCodes, ErrorCodes.MISSING_DEADLINE);
   } else {
     deadlineResult = validateDeadline(safeDeadline, errorCodes);
-    normalizedRow.dead_line = safeDeadline;
+
+    // Persist normalized ISO everywhere (single source of truth)
+    if (deadlineResult.valid) {
+      const n = normalizeDeadline(safeDeadline);
+
+      const isoFromValidator =
+        deadlineResult.date instanceof Date
+          ? `${deadlineResult.date.getUTCFullYear()}-${String(
+              deadlineResult.date.getUTCMonth() + 1
+            ).padStart(2, '0')}-${String(deadlineResult.date.getUTCDate()).padStart(2, '0')}`
+          : null;
+
+      const iso = (n.isValid && n.normalized) || isoFromValidator;
+
+      if (iso) {
+        normalizedRow.dead_line = iso;
+        (normalizedRow as any).dead_line_iso = iso;
+        (normalizedRow as any).dead_line_normalized = iso;
+      }
+    }
   }
 
   // -----------------------------

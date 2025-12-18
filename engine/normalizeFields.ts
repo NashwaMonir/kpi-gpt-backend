@@ -171,6 +171,67 @@ export function normalizeTeamRole(raw: unknown): NormalizedTeamRoleResult {
 }
 
 // ------------------------------------------------------------
+// Deadline normalization (v10.8 canonical)
+// ------------------------------------------------------------
+
+export interface NormalizedDeadlineResult {
+  normalized: string | null; // YYYY-MM-DD
+  isValid: boolean;
+}
+
+/**
+ * Normalize deadline into YYYY-MM-DD (date-only ISO).
+ *
+ * Accepted inputs:
+ * - YYYY-MM-DD
+ * - DD/MM/YYYY
+ * - DD-MM-YYYY
+ * - ISO strings with time (time stripped)
+ *
+ * Locale rule:
+ * - Slash or dash with 3 parts = DD/MM/YYYY (Egypt + Sweden rule)
+ */
+export function normalizeDeadline(raw: unknown): NormalizedDeadlineResult {
+  const safe = toSafeTrimmedString(raw);
+  if (!safe) return { normalized: null, isValid: false };
+
+  // YYYY-MM-DD
+  const iso = safe.match(/^(\d{4})-(\d{2})-(\d{2})$/);
+  if (iso) {
+    const [_, y, m, d] = iso;
+    const dt = new Date(Date.UTC(Number(y), Number(m) - 1, Number(d)));
+    const ok =
+      dt.getUTCFullYear() === Number(y) &&
+      dt.getUTCMonth() === Number(m) - 1 &&
+      dt.getUTCDate() === Number(d);
+    return { normalized: ok ? `${y}-${m}-${d}` : null, isValid: ok };
+  }
+
+  // ISO with time → strip to date, then validate
+  if (/^\d{4}-\d{2}-\d{2}T/.test(safe)) {
+    return normalizeDeadline(safe.slice(0, 10));
+  }
+
+  // DD/MM/YYYY or DD-MM-YYYY (Egypt + Sweden rule)
+  const m = safe.match(/^(\d{1,2})[\/-](\d{1,2})[\/-](\d{4})$/);
+  if (m) {
+    const dd = m[1].padStart(2, '0');
+    const mm = m[2].padStart(2, '0');
+    const yyyy = m[3];
+
+    const dt = new Date(Date.UTC(Number(yyyy), Number(mm) - 1, Number(dd)));
+    const ok =
+      dt.getUTCFullYear() === Number(yyyy) &&
+      dt.getUTCMonth() === Number(mm) - 1 &&
+      dt.getUTCDate() === Number(dd);
+
+    return { normalized: ok ? `${yyyy}-${mm}-${dd}` : null, isValid: ok };
+  }
+
+  return { normalized: null, isValid: false };
+}
+
+// ------------------------------------------------------------
 // Mode normalization
 // ------------------------------------------------------------
 

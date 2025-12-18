@@ -42,6 +42,24 @@
     "replacement": "achieving "
   },
   {
+    "id": "fix_achieving_ensure",
+    "pattern": "\\bachieving\\s+ensure\\b",
+    "flags": "gi",
+    "replacement": "ensuring"
+  },
+  {
+    "id": "fix_with_a_focus_on_to",
+    "pattern": "\\bwith\\s+a\\s+focus\\s+on\\s+to\\b",
+    "flags": "gi",
+    "replacement": "with a focus on"
+  },
+  {
+    "id": "remove_and_also",
+    "pattern": "\\band\\s+also\\b",
+    "flags": "gi",
+    "replacement": "and"
+  },
+  {
     "id": "remove_extra_with_with",
     "pattern": "\\bwith\\s+with\\b",
     "flags": "gi",

@@ -1,40 +1,32 @@
 {
   "simple": {
-    "default": "from the current organizational baseline",
+    "default": "measured against the current organizational baseline",
+    "hard_fallback": "measured against the current organizational baseline",
     "variants": [
-      "from the current organizational baseline",
+      "measured against the current organizational baseline",
       "relative to the current performance baseline",
-      "compared with today's measured baseline",
-      "against the current baseline for this area",
-      "measured against the 2024 baseline",
-      "measured against the Q1-2025 baseline",
-      "measured against the Q1-2025 usability baseline",
-      "measured against the 2024 rework baseline",
-      "measured against the Q1-2025 analytics baseline"
+      "compared with the defined baseline for this area",
+      "against the agreed baseline for this scope"
     ],
     "enterprise_defaults": {
-      "design": "measured against the Q1-2025 usability baseline",
-      "development": "measured against the 2024 incident baseline",
-      "content": "measured against the Q1-2025 analytics baseline"
+      "design": "measured against the established usability baseline",
+      "development": "measured against the established operational baseline",
+      "content": "measured against the established analytics baseline"
     }
   },
   "complex": {
-    "default": "from the current organizational performance baseline",
+    "default": "measured against the current organizational performance baseline",
+    "hard_fallback": "measured against the current organizational performance baseline",
     "variants": [
-      "from the current organizational performance baseline",
+      "measured against the current organizational performance baseline",
       "relative to the agreed performance baseline",
       "compared with the defined measurement baseline",
-      "against the current performance baseline for this scope",
-      "measured against the 2024 baseline",
-      "measured against the Q1-2025 baseline",
-      "measured against the 2024 operations baseline",
-      "measured against the Q1-2025 delivery baseline",
-      "measured against the Q1-2025 governance baseline"
+      "against the established baseline for this scope"
     ],
     "enterprise_defaults": {
-      "design": "measured against the Q1-2025 usability baseline",
-      "development": "measured against the 2024 operations baseline",
-      "content": "measured against the Q1-2025 governance baseline"
+      "design": "measured against the established usability baseline",
+      "development": "measured against the established operations baseline",
+      "content": "measured against the established governance baseline"
     }
   }
 }

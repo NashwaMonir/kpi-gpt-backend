@@ -12,6 +12,7 @@ import {
   RowsTokenPayload,
   encodeRowsToken
 } from '../engine/bulkTypes';
+import { normalizeDeadline } from '../engine/normalizeFields';
 
 function toStringSafe(value: unknown): string {
   if (value === null || value === undefined) return '';
@@ -68,13 +69,17 @@ export function parseCsvToKpiJsonRows(csvText: string): KpiJsonRowIn[] {
   records.forEach((row, index) => {
     const r: Record<string, string | null | undefined> = row;
 
+    const rawDeadline = get(r, 'dead_line', 'deadline');
+    const nd = normalizeDeadline(rawDeadline);
+    const normalizedDeadline = nd.isValid && nd.normalized ? nd.normalized : rawDeadline;
+
     const kpiRow: KpiJsonRowIn = {
       row_id: index + 1,
       task_name: get(r, 'task_name', 'task name'),
       task_type: get(r, 'task_type', 'task type'),
       team_role: get(r, 'team_role', 'team role'),
       // Accept both "dead_line" and "deadline" as header
-      dead_line: get(r, 'dead_line', 'deadline'),
+      dead_line: normalizedDeadline,
       strategic_benefit: get(r, 'strategic_benefit', 'strategic benefit'),
       output_metric: get(r, 'output_metric', 'output metric'),
       quality_metric: get(r, 'quality_metric', 'quality metric'),
@@ -125,7 +130,9 @@ export function normalizeAndValidateRows(
     const team_role = toStringSafe(raw.team_role);
     const task_type = toStringSafe(raw.task_type);
     const task_name = toStringSafe(raw.task_name);
-    const dead_line = toStringSafe(raw.dead_line);
+    const dead_line_raw = toStringSafe(raw.dead_line);
+    const nd = normalizeDeadline(dead_line_raw);
+    const dead_line = nd.isValid && nd.normalized ? nd.normalized : dead_line_raw;
 
     const company = toStringSafe(raw.company);
     const strategic_benefit = toStringSafe(raw.strategic_benefit);

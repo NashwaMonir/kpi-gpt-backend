@@ -20,7 +20,7 @@ import { resolveMetrics } from '../engine/metricsAutoSuggest';
 
 import { ErrorCodes, addErrorCode } from '../engine/errorCodes';
 import type { ErrorCode } from '../engine/errorCodes';
-import { normalizeTaskType, normalizeTeamRole, normalizeMode, toSafeTrimmedString } from '../engine/normalizeFields';
+import { normalizeTaskType, normalizeTeamRole, normalizeMode, toSafeTrimmedString, normalizeDeadline } from '../engine/normalizeFields';
 import { validateDeadline } from '../engine/validateDeadline';
 import { isDangerousBenefitText, evaluateMetricsDangerous } from '../engine/validateDangerous';
 import { buildErrorMessage } from '../engine/buildErrorMessage';
@@ -68,7 +68,6 @@ export default function handler(req: VercelRequest, res: VercelResponse) {
   type RowAssessment = {
     status: 'VALID' | 'NEEDS_REVIEW' | 'INVALID';
     comments: string;
-    summary_reason: string;
     metrics_auto_suggested: boolean;
     error_codes: string[];
     mode: Mode;
@@ -123,6 +122,16 @@ export default function handler(req: VercelRequest, res: VercelResponse) {
 
     // 3) Deadline validation (format + engine-year)
     const deadline = validateDeadline(dead_line, errorCodes as any);
+
+    // Persist normalized ISO deadline back onto the bulk row for downstream parity.
+    // This makes bulk objective generation and exports use the same YYYY-MM-DD canonical form.
+    if (deadline.valid) {
+      const n = normalizeDeadline(dead_line);
+      if (n.isValid && n.normalized) {
+        // Persist canonical ISO directly on the row
+        (row as any).dead_line = n.normalized;
+      }
+    }
 
     // 4) Dangerous / low-signal benefit
     if (strategic_benefit && isDangerousBenefitText(strategic_benefit, errorCodes as any)) {
@@ -205,12 +214,10 @@ export default function handler(req: VercelRequest, res: VercelResponse) {
     });
 
     const comments = finalMessage.comments;
-    const summary_reason = finalMessage.summary_reason;
 
     return {
       status,
       comments,
-      summary_reason,
       metrics_auto_suggested,
       error_codes: Array.from(new Set(errorCodes)).map(String).sort(),
       mode: modeNorm.mode
@@ -232,13 +239,17 @@ export default function handler(req: VercelRequest, res: VercelResponse) {
     .map((row) => {
       const a = assessments.get(row.row_id)!;
 
+      // Canonical ISO deadline for parity across single and bulk flows.
+      // assessRow() already persisted ISO onto row.dead_line when valid.
+      const dead_line_iso = toSafeTrimmedString(row.dead_line);
+
       const variation_seed = computeVariationSeed({
         row_id: row.row_id,
         company: row.company,
         team_role: row.team_role,
         task_type: row.task_type,
         task_name: row.task_name,
-        dead_line: row.dead_line,
+        dead_line: dead_line_iso,
         strategic_benefit: (row as any).strategic_benefit,
         output_metric: (row as any).output_metric,
         quality_metric: (row as any).quality_metric,
@@ -253,7 +264,7 @@ export default function handler(req: VercelRequest, res: VercelResponse) {
         team_role: row.team_role,
         task_type: row.task_type,
         task_name: row.task_name,
-        dead_line: row.dead_line,
+        dead_line: dead_line_iso,
         strategic_benefit: (row as any).strategic_benefit,
         output_metric: toSafeTrimmedString((row as any).output_metric),
         quality_metric: toSafeTrimmedString((row as any).quality_metric),
@@ -264,12 +275,17 @@ export default function handler(req: VercelRequest, res: VercelResponse) {
       // adds canonical E501/E502 for metrics-missing. This call is only to obtain the filled metrics.
       const resolved = resolveMetrics(rowForResolution, variation_seed, [] as any);
 
+      const anyMetricMissingAtInput =
+        !toSafeTrimmedString((row as any).output_metric) ||
+        !toSafeTrimmedString((row as any).quality_metric) ||
+        !toSafeTrimmedString((row as any).improvement_metric);
+
       const engineRow: EnginePreparedRow = {
         row_id: row.row_id,
         team_role: row.team_role,
         task_type: row.task_type,
         task_name: row.task_name,
-        dead_line: row.dead_line,
+        dead_line: dead_line_iso,
         strategic_benefit: (row as any).strategic_benefit,
         company: row.company,
 
@@ -278,8 +294,9 @@ export default function handler(req: VercelRequest, res: VercelResponse) {
         quality_metric: resolved.quality_metric ?? '',
         improvement_metric: resolved.improvement_metric ?? '',
 
-        // Contract: whenever defaults are used, metrics_auto_suggested must be true.
-        metrics_auto_suggested: !!resolved.used_default_metrics,
+        // v10.8 contract: metrics_auto_suggested must be true whenever ANY metric is auto-filled
+        // (partial or default). In this engine, metrics are only auto-filled when at least one input metric is missing.
+        metrics_auto_suggested: anyMetricMissingAtInput || !!resolved.used_default_metrics,
         variation_seed
       };
 
@@ -298,7 +315,7 @@ export default function handler(req: VercelRequest, res: VercelResponse) {
 
   // Build final result rows in original row order
   const resultRows: KpiResultRow[] = bulkRows.map((row) => {
-    const a = assessments.get(row.row_id) ?? assessRow(row);
+    const a = assessments.get(row.row_id)!;
 
     // Only attach objectives for VALID/NEEDS_REVIEW rows
     const obj = a.status === 'INVALID' ? undefined : objectiveMap.get(row.row_id);
@@ -308,15 +325,20 @@ export default function handler(req: VercelRequest, res: VercelResponse) {
     // Derive final objective (simple or complex, depending on mode)
     const objective = a.status === 'INVALID' ? '' : (simple_objective || complex_objective || '');
 
+    // Canonical ISO deadline for export.
+    // assessRow() already persisted ISO onto row.dead_line when valid.
+    const dead_line = toSafeTrimmedString(row.dead_line);
+
     return {
       task_name: row.task_name,
       task_type: row.task_type,
       team_role: row.team_role,
-      dead_line: row.dead_line,
+      dead_line,
       objective,
       validation_status: a.status,
       comments: a.comments,
-      summary_reason: a.summary_reason
+      // v10.8 Lite: summary_reason removed
+      summary_reason: ''
     };
   });
 
@@ -331,8 +353,8 @@ export default function handler(req: VercelRequest, res: VercelResponse) {
   ).length;
 
   const host = req.headers.host ?? null;
-  const download_url = encodeRowsForDownload(resultRows, host);
-
+    const download_url = encodeRowsForDownload(resultRows);
+    
   const response: BulkFinalizeExportResponse = {
     download_url,
     valid_count,

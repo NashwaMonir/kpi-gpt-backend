@@ -1,6 +1,7 @@
 // engine/excelExport.ts
 import ExcelJS from 'exceljs';
 import type { KpiResultExportRow } from './excelTypes';
+import { normalizeDeadline } from './normalizeFields';
 
 // -------------------------------
 // Template workbook (KPI_Input)
@@ -60,11 +61,16 @@ export async function createKpiResultWorkbook(
   sheet.getRow(1).font = { bold: true };
 
   for (const row of rows) {
+    // v10.8: enforce ISO date-only deadline in exports (defensive)
+    const rawDeadline = row.dead_line ?? '';
+    const nDeadline = normalizeDeadline(rawDeadline);
+    const deadLineOut = nDeadline.isValid && nDeadline.normalized ? nDeadline.normalized : rawDeadline;
+
     sheet.addRow([
       row.task_name ?? '',
       row.task_type ?? '',
       row.team_role ?? '',
-      row.dead_line ?? '',
+      deadLineOut,
       row.objective ?? '',
       row.validation_status ?? '',
       row.comments ?? ''

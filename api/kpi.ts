@@ -151,7 +151,19 @@ export default function handler(req: VercelRequest, res: VercelResponse) {
 
       const metricsResult = resolveMetrics(normalized, variation_seed, errorCodes);
 
-      const metricsAutoSuggested = metricsResult.used_default_metrics === true;
+      const metricsAutoSuggested =
+        metricsResult.used_default_metrics === true ||
+        (metricsResult as any).used_matrix_metrics === true ||
+        (metricsResult as any).used_role_matrix === true ||
+        (metricsResult as any).used_matrix === true ||
+        (metricsResult as any).auto_suggested === true;
+
+      const deadLineIso = String(
+        (normalized as any).dead_line_iso ??
+          (normalized as any).dead_line_normalized ??
+          normalized.dead_line ??
+          ''
+      ).trim();
 
       const final = buildFinalMessage(domainResult, metricsResult, errorCodes);
 
@@ -166,7 +178,7 @@ export default function handler(req: VercelRequest, res: VercelResponse) {
         team_role: (normalized.team_role ?? '').toString(),
         task_type: (normalized.task_type ?? '').toString(),
         task_name: (normalized.task_name ?? '').toString(),
-        dead_line: (normalized.dead_line ?? '').toString(),
+        dead_line: deadLineIso,
         strategic_benefit: (normalized.strategic_benefit ?? '').toString(),
         company: (normalized.company ?? '').toString(),
 
@@ -196,7 +208,7 @@ export default function handler(req: VercelRequest, res: VercelResponse) {
         objective_mode,
         status: final.status,
         comments: final.comments,
-        summary_reason: final.summary_reason,
+        //summary_reason: final.summary_reason,
         error_codes: final.errorCodes,
         resolved_metrics: resolvedMetrics,
         metrics_auto_suggested: metricsAutoSuggested,
