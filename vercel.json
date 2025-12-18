@@ -1,8 +1,10 @@
 {
-  "version": 2,
-  "builds": [{ "src": "api/**/*.ts", "use": "@vercel/node" }],
+  "builds": [
+    { "src": "api/**/*.ts", "use": "@vercel/node@3.0.0" },
+    { "src": "public/**", "use": "@vercel/static" }
+  ],
   "routes": [
-    { "src": "^/api/(.*\\.ts)$", "dest": "/api/$1" },
-    { "src": "^/api/(.*)$", "dest": "/api/$1.ts" }
+    { "src": "/KPI_Input_Template\\.xlsx", "dest": "/public/KPI_Input_Template.xlsx" },
+    { "src": "/api/(.*)", "dest": "/api/$1" }
   ]
 }
