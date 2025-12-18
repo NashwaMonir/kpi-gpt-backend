@@ -353,8 +353,8 @@ export default function handler(req: VercelRequest, res: VercelResponse) {
   ).length;
 
   const host = req.headers.host ?? null;
-  const download_url = encodeRowsForDownload(resultRows, host);
-
+    const download_url = encodeRowsForDownload(resultRows);
+    
   const response: BulkFinalizeExportResponse = {
     download_url,
     valid_count,

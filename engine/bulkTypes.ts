@@ -274,18 +274,8 @@ export function decodePrepareToken(token: string): BulkPrepareTokenPayload {
 
 // Helper for building runKpiResultDownload URL payload
 
-export function encodeRowsForDownload(
-  rows: KpiResultRow[],
-  host?: string | null
-): string {
+export function encodeRowsForDownload(rows: KpiResultRow[]): string {
   const json = JSON.stringify(rows);
   const token = toBase64Url(json);
-
-  const path = `/api/runKpiResultDownload?data=${encodeURIComponent(token)}`;
-
-  if (!host || host.trim().length === 0) {
-    return path;
-  }
-
-  return `https://${host}${path}`;
+  return `/api/runKpiResultDownload?data=${encodeURIComponent(token)}`;
 }
