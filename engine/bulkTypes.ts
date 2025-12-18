@@ -57,6 +57,23 @@ export interface ParsedRow {
 // After company strategies are applied
 export interface PreparedRow extends ParsedRow {
   /**
+   * Deterministic seed used by the objective engine for pattern/verb/variation selection.
+   *
+   * NOTE (v10.8): bulk must compute this AFTER canonical normalization
+   * (team_role, task_type, and ISO `dead_line`) to ensure single vs bulk parity.
+   */
+  variation_seed?: number;
+  /**
+   * Canonical ISO deadline (YYYY-MM-DD) when available.
+   *
+   * NOTE (v10.8): `dead_line` remains the single source of truth.
+   * These fields are optional helpers for downstream consumers
+   * (objective engine / exports) that may prefer explicit ISO.
+   */
+  dead_line_iso?: string;
+  dead_line_normalized?: string;
+
+  /**
    * True when one or more metrics (output / quality / improvement)
    * were auto-suggested by the engine during export.
    *
@@ -65,7 +82,9 @@ export interface PreparedRow extends ParsedRow {
    */
   metrics_auto_suggested?: boolean;
 }
+// -----------------------------
 // Inspect summary and options
+// -----------------------------
 
 export interface BulkInspectOption {
   code: string;
@@ -203,8 +222,15 @@ export interface KpiResultRow {
    */
   objective: string;
   validation_status: 'VALID' | 'NEEDS_REVIEW' | 'INVALID';
+
+  /** v10.8 Lite: always a single HR-grade string (never an array). */
   comments: string;
-  summary_reason: string;
+
+  /**
+   * Legacy field (pre-v10.8 Lite). Optional and ignored by v10.8 Lite exports.
+   * Prefer removing when all downstream consumers are migrated.
+   */
+  summary_reason?: string;
 }
 
 // Base64-url helpers

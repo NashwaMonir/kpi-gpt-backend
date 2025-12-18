@@ -1,187 +1,141 @@
 [
   {
-    "id": "simple_ic_default_1",
+    "id": "ic_simple_generic_1",
     "mode": "simple",
     "applicable_roles": ["Design", "Development", "Content"],
     "applicable_task_types": [],
-    "verb_slot": "ic_improve",
-    "template": "By {deadline}, {verb} the {deliverable}{metrics_clause}{tail_clause}"
-  },
-  {
-    "id": "simple_ic_default_2",
-    "mode": "simple",
-    "applicable_roles": ["Design", "Development", "Content"],
-    "applicable_task_types": ["Project", "Change Request", "Consultation"],
     "verb_slot": "ic_deliver",
-    "template": "By {deadline}, {verb} the agreed {deliverable}{metrics_clause}{tail_clause}"
+    "template": "By {deadline}, {verb} {deliverable}{metrics_clause}{tail_clause}"
   },
   {
-    "id": "simple_ic_default_3",
+    "id": "ic_simple_project_1",
     "mode": "simple",
     "applicable_roles": ["Design", "Development", "Content"],
-    "applicable_task_types": [],
+    "applicable_task_types": ["Project"],
     "verb_slot": "ic_improve",
-    "template": "By {deadline}, {verb} outcomes for the {deliverable}{metrics_clause}{tail_clause}"
+    "template": "By {deadline}, {verb} {deliverable}{metrics_clause}{tail_clause}"
   },
-
   {
-    "id": "simple_lead_default_1",
+    "id": "ic_simple_change_request_1",
     "mode": "simple",
-    "applicable_roles": ["Design Lead", "Development Lead", "Content Lead"],
-    "applicable_task_types": [],
-    "verb_slot": "lead_drive",
-    "template": "By {deadline}, {verb} the {deliverable}{metrics_clause}{tail_clause}"
-  },
-  {
-    "id": "simple_lead_default_2",
-    "mode": "simple",
-    "applicable_roles": ["Design Lead", "Development Lead", "Content Lead"],
-    "applicable_task_types": ["Project", "Change Request", "Consultation"],
-    "verb_slot": "lead_drive",
-    "template": "By {deadline}, {verb} predictable delivery of the {deliverable}{metrics_clause}{tail_clause}"
-  },
-
-  {
-    "id": "complex_ic_default_1",
-    "mode": "complex",
     "applicable_roles": ["Design", "Development", "Content"],
-    "applicable_task_types": [],
-    "verb_slot": "ic_improve",
-    "template": "By {deadline}, {verb} the {deliverable}{metrics_clause}, {ic_risk_clause}{tail_clause}"
-  },
-  {
-    "id": "complex_ic_default_2",
-    "mode": "complex",
-    "applicable_roles": ["Design", "Development", "Content"],
-    "applicable_task_types": ["Project", "Change Request", "Consultation"],
+    "applicable_task_types": ["Change Request"],
     "verb_slot": "ic_optimize",
-    "template": "By {deadline}, {verb} quality and performance for the {deliverable}{metrics_clause}, {ic_risk_clause}{tail_clause}"
+    "template": "By {deadline}, {verb} the requested change in {deliverable}{metrics_clause}{tail_clause}"
   },
-
   {
-    "id": "complex_lead_governance_1",
+    "id": "ic_complex_generic_1",
     "mode": "complex",
-    "applicable_roles": ["Design Lead", "Development Lead", "Content Lead"],
+    "applicable_roles": ["Design", "Development", "Content"],
     "applicable_task_types": [],
-    "verb_slot": "lead_govern",
-    "template": "By {deadline}, {verb} the {deliverable}{metrics_clause}, {lead_risk_clause}{tail_clause}"
+    "verb_slot": "ic_deliver",
+    "template": "By {deadline}, {verb} {deliverable}{metrics_clause}{baseline_clause}{tail_clause}"
   },
   {
-    "id": "complex_lead_governance_2",
+    "id": "ic_complex_project_1",
     "mode": "complex",
-    "applicable_roles": ["Design Lead", "Development Lead", "Content Lead"],
-    "applicable_task_types": ["Project", "Change Request", "Consultation"],
-    "verb_slot": "lead_drive",
-    "template": "By {deadline}, {verb} predictable, governed delivery of the {deliverable}{metrics_clause}, {lead_risk_clause}{tail_clause}"
-  },
-  {
-    "id": "enterprise_design_ic_simple_1",
-    "mode": "simple",
-    "role_family": "design",
-    "level": "ic",
-    "task_types": ["Project", "Change Request", "Consultation"],
-    "clause_order": ["deadline", "role_action", "performance", "quality", "improvement", "baseline", "company_tail"],
-    "applicable_roles": ["Design"],
-    "applicable_task_types": ["Project", "Change Request", "Consultation"],
+    "applicable_roles": ["Design", "Development", "Content"],
+    "applicable_task_types": ["Project"],
     "verb_slot": "ic_improve",
     "template": "By {deadline}, {verb} {deliverable}{metrics_clause}{baseline_clause}{tail_clause}"
   },
   {
-    "id": "enterprise_design_ic_complex_1",
+    "id": "ic_complex_consultation_1",
     "mode": "complex",
-    "role_family": "design",
-    "level": "ic",
-    "task_types": ["Project", "Change Request", "Consultation"],
-    "clause_order": ["deadline", "role_action", "performance", "quality", "improvement", "baseline", "risk_dependency", "collaboration", "company_tail"],
-    "applicable_roles": ["Design"],
-    "applicable_task_types": ["Project", "Change Request", "Consultation"],
-    "verb_slot": "ic_improve",
-    "template": "By {deadline}, {verb} {deliverable}{metrics_clause}{baseline_clause}, {ic_risk_clause}{tail_clause}"
+    "applicable_roles": ["Design", "Development", "Content"],
+    "applicable_task_types": ["Consultation"],
+    "verb_slot": "ic_optimize",
+    "template": "By {deadline}, {verb} recommendations and outcomes for {deliverable}{metrics_clause}{baseline_clause}{tail_clause}"
   },
   {
-    "id": "enterprise_design_lead_complex_1",
+    "id": "ic_complex_project_2",
     "mode": "complex",
-    "role_family": "design",
-    "level": "lead",
-    "task_types": ["Project", "Change Request", "Consultation"],
-    "clause_order": ["deadline", "role_action", "performance", "quality", "improvement", "baseline", "governance", "risk_dependency", "collaboration", "company_tail"],
+    "applicable_roles": ["Design", "Development", "Content"],
+    "applicable_task_types": ["Project"],
+    "verb_slot": "ic_execute",
+    "template": "By {deadline}, {verb} scoped delivery of {deliverable}{metrics_clause}{baseline_clause}{tail_clause}"
+  },
+  {
+    "id": "lead_complex_generic_design_1",
+    "mode": "complex",
     "applicable_roles": ["Design Lead"],
-    "applicable_task_types": ["Project", "Change Request", "Consultation"],
+    "applicable_task_types": [],
     "verb_slot": "lead_govern",
-    "template": "By {deadline}, {verb} governed delivery of {deliverable}{metrics_clause}{baseline_clause}, {lead_risk_clause}{tail_clause}"
-  },
-
-  {
-    "id": "enterprise_development_ic_simple_1",
-    "mode": "simple",
-    "role_family": "development",
-    "level": "ic",
-    "task_types": ["Project", "Change Request", "Consultation"],
-    "clause_order": ["deadline", "role_action", "performance", "quality", "improvement", "baseline", "company_tail"],
-    "applicable_roles": ["Development"],
-    "applicable_task_types": ["Project", "Change Request", "Consultation"],
-    "verb_slot": "ic_optimize",
-    "template": "By {deadline}, {verb} {deliverable}{metrics_clause}{baseline_clause}{tail_clause}"
+    "template": "By {deadline}, {verb} delivery of {deliverable}{metrics_clause}{baseline_clause}{governance_clause}{lead_risk_clause}{tail_clause}",
+    "governance_template": "enforcing design governance, accessibility standards, and review gates"
+  
   },
   {
-    "id": "enterprise_development_ic_complex_1",
+    "id": "lead_complex_project_design_1",
     "mode": "complex",
-    "role_family": "development",
-    "level": "ic",
-    "task_types": ["Project", "Change Request", "Consultation"],
-    "clause_order": ["deadline", "role_action", "performance", "quality", "improvement", "baseline", "risk_dependency", "collaboration", "company_tail"],
-    "applicable_roles": ["Development"],
-    "applicable_task_types": ["Project", "Change Request", "Consultation"],
-    "verb_slot": "ic_optimize",
-    "template": "By {deadline}, {verb} {deliverable}{metrics_clause}{baseline_clause}, {ic_risk_clause}{tail_clause}"
+    "applicable_roles": ["Design Lead"],
+    "applicable_task_types": ["Project"],
+    "verb_slot": "lead_drive",
+    "template": "By {deadline}, {verb} predictable, governed delivery of {deliverable}{metrics_clause}{baseline_clause}{governance_clause}{lead_risk_clause}{tail_clause}",
+    "governance_template": "enforcing design governance, accessibility standards, and review gates"
   },
   {
-    "id": "enterprise_development_lead_complex_1",
+    "id": "lead_complex_generic_development_1",
     "mode": "complex",
-    "role_family": "development",
-    "level": "lead",
-    "task_types": ["Project", "Change Request", "Consultation"],
-    "clause_order": ["deadline", "role_action", "performance", "quality", "improvement", "baseline", "governance", "risk_dependency", "collaboration", "company_tail"],
     "applicable_roles": ["Development Lead"],
-    "applicable_task_types": ["Project", "Change Request", "Consultation"],
+    "applicable_task_types": [],
     "verb_slot": "lead_govern",
-    "template": "By {deadline}, {verb} governed delivery of {deliverable}{metrics_clause}{baseline_clause}, {lead_risk_clause}{tail_clause}"
-  },
-
-  {
-    "id": "enterprise_content_ic_simple_1",
-    "mode": "simple",
-    "role_family": "content",
-    "level": "ic",
-    "task_types": ["Project", "Change Request", "Consultation"],
-    "clause_order": ["deadline", "role_action", "performance", "quality", "improvement", "baseline", "company_tail"],
-    "applicable_roles": ["Content"],
-    "applicable_task_types": ["Project", "Change Request", "Consultation"],
-    "verb_slot": "ic_improve",
-    "template": "By {deadline}, {verb} {deliverable}{metrics_clause}{baseline_clause}{tail_clause}"
+    "template": "By {deadline}, {verb} delivery of {deliverable}{metrics_clause}{baseline_clause}{governance_clause}{lead_risk_clause}{tail_clause}",
+    "governance_template": "enforcing engineering governance, architecture standards, and release controls"
+    
   },
   {
-    "id": "enterprise_content_ic_complex_1",
+    "id": "lead_complex_generic_content_1",
     "mode": "complex",
-    "role_family": "content",
-    "level": "ic",
-    "task_types": ["Project", "Change Request", "Consultation"],
-    "clause_order": ["deadline", "role_action", "performance", "quality", "improvement", "baseline", "risk_dependency", "collaboration", "company_tail"],
-    "applicable_roles": ["Content"],
-    "applicable_task_types": ["Project", "Change Request", "Consultation"],
-    "verb_slot": "ic_improve",
-    "template": "By {deadline}, {verb} {deliverable}{metrics_clause}{baseline_clause}, {ic_risk_clause}{tail_clause}"
-  },
-  {
-    "id": "enterprise_content_lead_complex_1",
-    "mode": "complex",
-    "role_family": "content",
-    "level": "lead",
-    "task_types": ["Project", "Change Request", "Consultation"],
-    "clause_order": ["deadline", "role_action", "performance", "quality", "improvement", "baseline", "governance", "risk_dependency", "collaboration", "company_tail"],
     "applicable_roles": ["Content Lead"],
-    "applicable_task_types": ["Project", "Change Request", "Consultation"],
+    "applicable_task_types": [],
     "verb_slot": "lead_govern",
-    "template": "By {deadline}, {verb} governed delivery of {deliverable}{metrics_clause}{baseline_clause}, {lead_risk_clause}{tail_clause}"
+    "template": "By {deadline}, {verb} delivery of {deliverable}{metrics_clause}{baseline_clause}{governance_clause}{lead_risk_clause}{tail_clause}",
+    "governance_template": "enforcing content governance, brand compliance, and editorial review controls"
+  },
+  {
+    "id": "lead_complex_project_development_1",
+    "mode": "complex",
+    "applicable_roles": ["Development Lead"],
+    "applicable_task_types": ["Project"],
+    "verb_slot": "lead_drive",
+    "template": "By {deadline}, {verb} predictable, governed delivery of {deliverable}{metrics_clause}{baseline_clause}{governance_clause}{lead_risk_clause}{tail_clause}",
+    "governance_template": "enforcing engineering governance, architecture standards, and release quality controls"
+  },
+  {
+    "id": "lead_complex_project_content_1",
+    "mode": "complex",
+    "applicable_roles": ["Content Lead"],
+    "applicable_task_types": ["Project"],
+    "verb_slot": "lead_drive",
+    "template": "By {deadline}, {verb} predictable, governed delivery of {deliverable}{metrics_clause}{baseline_clause}{governance_clause}{lead_risk_clause}{tail_clause}",
+    "governance_template": "enforcing content governance, brand compliance, and editorial approval gates"
+  },
+  {
+    "id": "lead_complex_change_request_design_1",
+    "mode": "complex",
+    "applicable_roles": ["Design Lead"],
+    "applicable_task_types": ["Change Request"],
+    "verb_slot": "lead_govern",
+    "template": "By {deadline}, {verb} controlled implementation of {deliverable}{metrics_clause}{baseline_clause}{governance_clause}{lead_risk_clause}{tail_clause}",
+    "governance_template": "enforcing design governance, accessibility standards, and change-control review"
+  },
+  {
+    "id": "lead_complex_change_request_development_1",
+    "mode": "complex",
+    "applicable_roles": ["Development Lead"],
+    "applicable_task_types": ["Change Request"],
+    "verb_slot": "lead_govern",
+    "template": "By {deadline}, {verb} controlled implementation of {deliverable}{metrics_clause}{baseline_clause}{governance_clause}{lead_risk_clause}{tail_clause}",
+    "governance_template": "enforcing engineering governance, architecture standards, and change-control discipline"
+  },
+  {
+    "id": "lead_complex_change_request_content_1",
+    "mode": "complex",
+    "applicable_roles": ["Content Lead"],
+    "applicable_task_types": ["Change Request"],
+    "verb_slot": "lead_govern",
+    "template": "By {deadline}, {verb} controlled implementation of {deliverable}{metrics_clause}{baseline_clause}{governance_clause}{lead_risk_clause}{tail_clause}",
+    "governance_template": "enforcing content governance, brand compliance, and review/approval controls"
   }
 ]

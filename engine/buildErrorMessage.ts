@@ -32,30 +32,27 @@ export interface BuildErrorMessageParams {
 
 export interface BuildErrorMessageResult {
   comments: string;
-  summary_reason: string;
 }
 
 
 function buildErrorMessage(params: BuildErrorMessageParams): BuildErrorMessageResult {
   const { status, metrics_auto_suggested } = params;
 
+  // v10.8 Lite: comments only (single-line, HR-grade)
   if (status === 'INVALID') {
     return {
-      comments: 'Objectives not generated due to validation errors.',
-      summary_reason: 'Objectives not generated due to validation errors.'
+      comments: 'Objectives not generated due to validation errors.'
     };
   }
 
   if (status === 'NEEDS_REVIEW' && metrics_auto_suggested) {
     return {
-      comments: 'Metrics were system-recommended based on the role matrix. Please review for approval.',
-      summary_reason: 'Metrics were system-recommended based on the role matrix. Please review for approval.'
+      comments: 'Metrics were system-recommended based on the role matrix. Please review for approval.'
     };
   }
 
   return {
-    comments: 'All SMART criteria met.',
-    summary_reason: ''
+    comments: 'All SMART criteria met.'
   };
 }
 
@@ -66,7 +63,6 @@ export default buildErrorMessage;
 export interface FinalAssemblyResult {
   status: 'VALID' | 'NEEDS_REVIEW' | 'INVALID';
   comments: string;
-  summary_reason: string;
   errorCodes: ErrorCode[];
 
   /**
@@ -137,12 +133,27 @@ export function buildFinalMessage(
   const teamRoleLower = teamRoleRaw.toLowerCase();
   const taskTypeLower = taskTypeRaw.toLowerCase();
 
-  const metricsNeedsReview = !!metricsResult.used_default_metrics;
+  // v10.8: NEEDS_REVIEW if ANY metric was auto-filled (partial OR default).
+  // Detect partial auto-suggest by comparing user-provided metrics (safe*) vs final resolved metrics.
+  const userOutput = (safeOutput ?? '').toString().trim();
+  const userQuality = (safeQuality ?? '').toString().trim();
+  const userImprovement = (safeImprovement ?? '').toString().trim();
+
+  const finalOutput = (metricsResult.output_metric ?? userOutput).toString().trim();
+  const finalQuality = (metricsResult.quality_metric ?? userQuality).toString().trim();
+  const finalImprovement = (metricsResult.improvement_metric ?? userImprovement).toString().trim();
+
+  const autoSuggested: string[] = [];
+  if (!userOutput && finalOutput) autoSuggested.push('Output');
+  if (!userQuality && finalQuality) autoSuggested.push('Quality');
+  if (!userImprovement && finalImprovement) autoSuggested.push('Improvement');
+
+  const metricsNeedsReview = !!metricsResult.used_default_metrics || autoSuggested.length > 0;
 
   const metricsSnapshot = {
-    output_metric: (metricsResult.output_metric ?? safeOutput ?? '').toString(),
-    quality_metric: (metricsResult.quality_metric ?? safeQuality ?? '').toString(),
-    improvement_metric: (metricsResult.improvement_metric ?? safeImprovement ?? '').toString(),
+    output_metric: finalOutput,
+    quality_metric: finalQuality,
+    improvement_metric: finalImprovement,
     needsReview: metricsNeedsReview
   };
 
@@ -254,20 +265,6 @@ export function buildFinalMessage(
 
   // 2.6 Metrics-related messages (only if status is not INVALID)
   if (status !== 'INVALID' && metricsNeedsReview) {
-    const autoSuggested: string[] = [];
-
-    const userOutput = (safeOutput ?? '').toString().trim();
-    const userQuality = (safeQuality ?? '').toString().trim();
-    const userImprovement = (safeImprovement ?? '').toString().trim();
-
-    const finalOutput = (metricsResult.output_metric ?? '').toString().trim();
-    const finalQuality = (metricsResult.quality_metric ?? '').toString().trim();
-    const finalImprovement = (metricsResult.improvement_metric ?? '').toString().trim();
-
-    if (!userOutput && finalOutput) autoSuggested.push('Output');
-    if (!userQuality && finalQuality) autoSuggested.push('Quality');
-    if (!userImprovement && finalImprovement) autoSuggested.push('Improvement');
-
     if (autoSuggested.length === 3) {
       commentsParts.push(
         'Metrics were system-recommended (Output / Quality / Improvement). Please review for approval.'
@@ -299,16 +296,8 @@ export function buildFinalMessage(
   //  - NEEDS_REVIEW  → fixed metrics summary
   //  - VALID         → empty string
   // ---------------------------------------------------------------------------
-  let summary_reason = '';
+  // Removed per instructions
 
-  if (status === 'INVALID') {
-    summary_reason = 'Objectives not generated due to validation errors.';
-  } else if (status === 'NEEDS_REVIEW') {
-    summary_reason =
-      'Metrics were system-recommended based on the role matrix. Please review for approval.';
-  } else {
-    summary_reason = '';
-  }
 
   // ---------------------------------------------------------------------------
   // 4. VALID comments override (no domain or metrics issues)
@@ -317,7 +306,6 @@ export function buildFinalMessage(
     return {
       status,
       comments: 'All SMART criteria met.',
-      summary_reason,
       errorCodes: canonicalErrorCodes,
       input_row: normalizedRow,
       normalized_row: normalizedRow,
@@ -337,7 +325,6 @@ export function buildFinalMessage(
     comments: comments || (status === 'NEEDS_REVIEW'
       ? 'Metrics were system-recommended based on the role matrix. Please review for approval.'
       : 'Objectives not generated due to validation errors.'),
-    summary_reason,
     errorCodes: canonicalErrorCodes,
     input_row: normalizedRow,
     normalized_row: normalizedRow,
