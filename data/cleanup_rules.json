@@ -3,7 +3,7 @@
     "id": "remove_double_the",
     "pattern": "\\bthe\\s+the\\b",
     "flags": "gi",
-    "replace": "the"
+    "replacement": "the"
   },
   {
     "id": "remove_double_and",
@@ -54,10 +54,10 @@
     "replacement": "ensuring"
   },
   {
-  "id": "fix_to_better_gerund",
-  "pattern": "\\bto\\s+better\\s+(improving|increasing|enhancing|optimizing|streamlining|strengthening|reducing|lowering|maximizing|minimizing)\\b",
-  "flags": "gi",
-  "replace": "to $1"
+    "id": "fix_to_better_gerund",
+    "pattern": "\\bto\\s+better\\s+(improving|increasing|enhancing|optimizing|streamlining|strengthening|reducing|lowering|maximizing|minimizing)\\b",
+    "flags": "gi",
+    "replacement": "to $1"
   },
   {
     "id": "fix_with_a_focus_on_to",
@@ -81,13 +81,19 @@
     "id": "fix_strengthen_supporting",
     "pattern": "\\bstrengthen\\s+supporting\\b",
     "flags": "gi",
-    "replacement": "supporting"
+    "replacement": "to support"
   },
   {
     "id": "fix_strengthen_support",
     "pattern": "\\bstrengthen\\s+support\\b",
     "flags": "gi",
-    "replacement": "support"
+    "replacement": "to support"
+  },
+  {
+    "id": "fix_strengthening_increasing",
+    "pattern": "\\bstrengthening\\s+increasing\\b",
+    "flags": "gi",
+    "replacement": "to strengthen"
   },
   {
     "id": "dedupe_supporting_enhancing",
