@@ -153,7 +153,8 @@ function buildBaselineClause(
   const hasImprovement = !!improvementMetric && improvementMetric.trim().length > 0;
   if (!hasImprovement) return '';
 
-  if (mode === 'simple' && !hasBaselineWorthyImprovement(improvementMetric)) {
+  // v10.8 contract: SIMPLE objectives must NEVER include baseline clauses.
+  if (mode === 'simple') {
     return '';
   }
 
@@ -168,7 +169,7 @@ function buildBaselineClause(
     return baseClause;
   }
 
-  return `${baseClause} (based on the ${baselineLabel})`;
+  return `${baseClause} (based on ${baselineLabel})`;
 }
 
 function buildMetricsClause(row: PreparedRow, mode: 'simple' | 'complex'): string {
@@ -898,20 +899,20 @@ function buildEnterpriseClauses(
   const verb = selectVerb(row, verbSlot, mode);
 
   const metricClauses = buildEnterpriseMetricClauses(row);
+  // v10.8 contract gate:
+  // - SIMPLE: no baseline, no governance, no risk/dependency.
+  // - COMPLEX: baseline required; lead roles may include governance + risk/dependency.
   const baselineClause = mode === 'complex' ? buildEnterpriseBaselineClause(row, mode) : '';
+
   let tailClause = buildTailClause(row, mode);
   if (mode === 'complex' && !tailClause) tailClause = ", supporting the organization's strategic goals";
 
-  // v10.8 contract:
-  // - Lead complex MUST include governance + risk/dependency language.
-  // - Governance wording must be rules-driven (objective_patterns / rules JSON), not hardcoded here.
-  // - This engine may still enforce risk/dependency as a safety net, but governance must come from rules.
- 
-  // v10.8: IC complex must NOT include governance/risk.
-const riskClause = lead ? ensureLeadingComma(buildEnterpriseLeadRiskClause(row)) : ''; // Governance wording must be rules-driven (pattern/rules file). No hardcoded governance text here.
-  
-// If the pattern includes governance text, attach it. Otherwise leave empty.
-  const governanceClause = lead ? buildEnterpriseLeadGovernanceClause(row, pattern) : '';
+  const riskClause =
+    mode === 'complex' && lead ? ensureLeadingComma(buildEnterpriseLeadRiskClause(row)) : '';
+
+  // Governance wording must be rules-driven (pattern/rules file). No hardcoded governance text here.
+  const governanceClause =
+    mode === 'complex' && lead ? buildEnterpriseLeadGovernanceClause(row, pattern) : '';
 
   // Keep these “atomic” so clause_order controls grammar.
   const clauses: Record<string, string> = {
@@ -921,8 +922,8 @@ const riskClause = lead ? ensureLeadingComma(buildEnterpriseLeadRiskClause(row))
     quality: metricClauses.quality,
     improvement: metricClauses.improvement,
     baseline: baselineClause,
-    governance: ensureLeadingComma(stripLeadingPunctuation(governanceClause)),
-    risk_dependency: lead ? riskClause : '',
+    governance: mode === 'complex' ? ensureLeadingComma(stripLeadingPunctuation(governanceClause)) : '',
+    risk_dependency: mode === 'complex' && lead ? riskClause : '',
     collaboration: '', // optional if you later separate collaboration vs risk
     company_tail: tailClause
   };
@@ -1020,22 +1021,19 @@ function buildObjectiveInternal(row: PreparedRow, _requestedMode: 'simple' | 'co
 
   const lead = isLeadRole(row.team_role);
 
-// v10.8 contract:
-// - IC complex: may include collaboration/coordination language, but no governance/risk.
-// - Lead complex: must include risk/dependency + governance (rules-driven).
-// - Simple: never include governance/risk.
+// v10.8 strict gate: SIMPLE must never include governance/risk clauses.
 const ic_risk_clause =
-  !lead && effectiveMode === 'complex'
+  effectiveMode === 'complex' && !lead
     ? ensureLeadingComma(stripLeadingPunctuation(buildEnterpriseIcRiskClause(row)))
     : '';
 
 const lead_risk_clause =
-  lead && effectiveMode === 'complex'
+  effectiveMode === 'complex' && lead
     ? ensureLeadingComma(stripLeadingPunctuation(buildEnterpriseLeadRiskClause(row)))
     : '';
 
 const governance_clause =
-  lead && effectiveMode === 'complex'
+  effectiveMode === 'complex' && lead
     ? ensureLeadingComma(stripLeadingPunctuation(buildEnterpriseLeadGovernanceClause(row, pattern)))
     : '';
 

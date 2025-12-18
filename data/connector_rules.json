@@ -16,10 +16,6 @@
     "prefix": ", while also "
   },
   {
-    "id": "connector_further",
-    "prefix": ", further "
-  },
-  {
     "id": "connector_thereby",
     "prefix": ", thereby "
   },
@@ -45,14 +41,18 @@
   },
   {
     "id": "connector_to_help",
-    "prefix": ", to help "
+    "prefix": ", helping to "
+  },
+    {
+    "id": "connector_further",
+    "prefix": ", further "
   },
   {
     "id": "connector_to_better",
-    "prefix": ", to better "
+    "prefix": ", better "
   },
   {
     "id": "connector_to_strengthen",
-    "prefix": ", to strengthen "
+    "prefix": ", strengthening "
   }
 ]

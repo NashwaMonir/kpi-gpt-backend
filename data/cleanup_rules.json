@@ -1,5 +1,11 @@
 [
   {
+    "id": "remove_double_the",
+    "pattern": "\\bthe\\s+the\\b",
+    "flags": "gi",
+    "replace": "the"
+  },
+  {
     "id": "remove_double_and",
     "pattern": "\\b(and)\\s+and\\b",
     "flags": "gi",
@@ -46,6 +52,12 @@
     "pattern": "\\bachieving\\s+ensure\\b",
     "flags": "gi",
     "replacement": "ensuring"
+  },
+  {
+  "id": "fix_to_better_gerund",
+  "pattern": "\\bto\\s+better\\s+(improving|increasing|enhancing|optimizing|streamlining|strengthening|reducing|lowering|maximizing|minimizing)\\b",
+  "flags": "gi",
+  "replace": "to $1"
   },
   {
     "id": "fix_with_a_focus_on_to",
