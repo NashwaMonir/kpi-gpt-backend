@@ -1,0 +1,11 @@
+{
+  "metrics_connectors": {
+    "simple": {
+      "default": [" with "]
+    },
+    "complex": {
+      "default": [" to achieve "],
+      "imperative": [" to ", " to ensure "]
+    }
+  }
+}
