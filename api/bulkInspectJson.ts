@@ -69,12 +69,17 @@ export function parseCsvToKpiJsonRows(csvText: string): KpiJsonRowIn[] {
   records.forEach((row, index) => {
     const r: Record<string, string | null | undefined> = row;
 
+    // Preserve row_id from CSV when provided (must be a positive integer); else fall back to index+1.
+    const rawRowId = get(r, 'row_id', 'row id', 'Row ID', 'ROW_ID', 'ROW ID ');
+    const parsedRowId = rawRowId ? Number.parseInt(rawRowId, 10) : Number.NaN;
+    const row_id = Number.isFinite(parsedRowId) && parsedRowId > 0 ? parsedRowId : index + 1;
+
     const rawDeadline = get(r, 'dead_line', 'deadline');
     const nd = normalizeDeadline(rawDeadline);
     const normalizedDeadline = nd.isValid && nd.normalized ? nd.normalized : rawDeadline;
 
     const kpiRow: KpiJsonRowIn = {
-      row_id: index + 1,
+      row_id,
       task_name: get(r, 'task_name', 'task name'),
       task_type: get(r, 'task_type', 'task type'),
       team_role: get(r, 'team_role', 'team role'),
@@ -87,20 +92,9 @@ export function parseCsvToKpiJsonRows(csvText: string): KpiJsonRowIn[] {
       company: get(r, 'company')
     };
 
-    const isCompletelyEmpty =
-      !kpiRow.company &&
-      !kpiRow.team_role &&
-      !kpiRow.task_type &&
-      !kpiRow.task_name &&
-      !kpiRow.dead_line &&
-      !kpiRow.strategic_benefit &&
-      !kpiRow.output_metric &&
-      !kpiRow.quality_metric &&
-      !kpiRow.improvement_metric;
-
-    if (!isCompletelyEmpty) {
-      rows.push(kpiRow);
-    }
+    // Keep even fully-empty rows so they can be surfaced as INVALID during bulk export.
+    // This preserves row-count parity with the source sheet / JSON payload.
+    rows.push(kpiRow);
   });
 
   return rows;
@@ -162,7 +156,7 @@ export function normalizeAndValidateRows(
     }
 
     const parsed: ParsedRow = {
-      row_id: raw.row_id ?? index + 1,
+      row_id: (typeof raw.row_id === 'number' && raw.row_id > 0 ? raw.row_id : index + 1),
       company,
       team_role,
       task_type,
@@ -178,20 +172,8 @@ export function normalizeAndValidateRows(
         : `Missing required field(s): ${missingFields.join(', ')}`
     };
 
-    const isCompletelyEmpty =
-      !company &&
-      !team_role &&
-      !task_type &&
-      !task_name &&
-      !dead_line &&
-      !strategic_benefit &&
-      !output_metric &&
-      !quality_metric &&
-      !improvement_metric;
-
-    if (!isCompletelyEmpty) {
-      parsedRows.push(parsed);
-    }
+    // Keep even fully-empty rows so they remain visible to users and exports as INVALID.
+    parsedRows.push(parsed);
   });
 
   const row_count = parsedRows.length;

@@ -11,38 +11,8 @@ import {
   encodePrepareToken
 } from '../engine/bulkTypes';
 import { normalizeDeadline, normalizeTeamRole, normalizeTaskType } from '../engine/normalizeFields';
-
-// v10.8: deterministic variation seed (must include ISO deadline for parity)
-function hashString(str: string): number {
-  let hash = 2166136261;
-  for (let i = 0; i < str.length; i++) {
-    hash ^= str.charCodeAt(i);
-    hash = Math.imul(hash, 16777619);
-  }
-  return hash >>> 0;
-}
-
-function computeVariationSeed(input: {
-  team_role: string;
-  task_type: string;
-  task_name: string;
-  dead_line: string;
-  company?: string;
-  strategic_benefit?: string;
-  row_id?: string;
-}): number {
-  const key = [
-    input.row_id || '',
-    input.team_role || '',
-    input.task_type || '',
-    input.task_name || '',
-    input.dead_line || '',
-    (input.company || '').trim(),
-    (input.strategic_benefit || '').trim()
-  ].join('|');
-
-  return hashString(key);
-}
+import { computeVariationSeed } from '../engine/variationSeed';
+import type { KpiRowIn } from '../engine/types';
 
 function applyCompanyStrategy(
   row: ParsedRow,
@@ -115,8 +85,9 @@ export default function handler(req: VercelRequest, res: VercelResponse) {
 
   const { parsedRows, summaryMeta } = decoded;
 
-  // Default to keeping rows so bulkFinalizeExport can emit deterministic INVALID/NEEDS_REVIEW outcomes.
-  const invalid_handling = body.invalid_handling ?? 'keep';
+  // v10.8/v11 contract: invalid rows are always preserved so bulkFinalizeExport can emit
+  // deterministic INVALID / NEEDS_REVIEW outcomes and maintain row-count parity.
+  // (Any prior "skip" behavior is intentionally disabled.)
 
   const preparedRows: PreparedRow[] = [];
 
@@ -169,23 +140,24 @@ export default function handler(req: VercelRequest, res: VercelResponse) {
       company: finalCompany,
       team_role: teamRoleResult.normalized,
       task_type: taskTypeResult.normalized,
-      // v10.8 parity: recompute variation_seed after ISO deadline normalization.
+      // v10.8 parity: recompute variation_seed using the single source of truth (engine/variationSeed.ts)
+      // IMPORTANT: keep this strongly typed to prevent silent drift.
       variation_seed: computeVariationSeed({
-        row_id: (row as any).row_id,
+        row_id: row.row_id,
+        company: finalCompany,
         team_role: teamRoleResult.normalized,
         task_type: taskTypeResult.normalized,
         task_name: String(row.task_name || ''),
         dead_line,
-        company: finalCompany,
-        strategic_benefit: String(row.strategic_benefit || '')
-      }),
+        strategic_benefit: String(row.strategic_benefit || ''),
+        output_metric: String(row.output_metric || ''),
+        quality_metric: String(row.quality_metric || ''),
+        improvement_metric: String(row.improvement_metric || '')
+      } satisfies KpiRowIn),
       isValid,
       invalidReason
     };
 
-    if (invalid_handling === 'skip' && !newRow.isValid) {
-      continue;
-    }
 
     preparedRows.push(newRow);
   }

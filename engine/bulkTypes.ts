@@ -212,10 +212,20 @@ export interface ObjectiveOutput {
 // Shape for result rows used by runKpiResultDownload
 
 export interface KpiResultRow {
+  row_id: number;
   task_name: string;
   task_type: string;
   team_role: string;
   dead_line: string;
+
+  // Resolved metrics used to generate the objective (auto-suggested or user-provided)
+  output_metric: string;
+  quality_metric: string;
+  improvement_metric: string;
+
+  // Audit flag: true when one or more metrics were auto-filled by the engine
+  metrics_auto_suggested: boolean;
+
   /**
    * Final, authoritative objective selected by the engine
    * (simple or complex, depending on the contract rules).

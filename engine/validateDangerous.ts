@@ -1,5 +1,5 @@
 // engine/validateDangerous.ts
-// High-security dangerous-text detection for KPI Engine v10.7.5 (Option C-FULL)
+// High-security dangerous-text detection for KPI Engine v10.8 (Option C-FULL)
 
 import {
   HTML_TAG_REGEX,

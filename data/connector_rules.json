@@ -6,9 +6,10 @@
   { "id": "connector_while_also", "prefix": ", while also " },
   { "id": "connector_thereby", "prefix": ", thereby " },
   { "id": "connector_in_turn", "prefix": ", in turn " },
+  { "id": "connector_enabling", "prefix": ", enabling " },
 
-  { "id": "connector_with_focus_on", "prefix": ", with a focus on " },
-  { "id": "connector_with_emphasis_on", "prefix": ", with particular emphasis on " },
+  { "id": "connector_focus_on", "prefix": ", focused on " },
+  { "id": "connector_with_emphasis_on", "prefix": ", emphasizing " },
   { "id": "connector_in_support_of", "prefix": ", in support of " },
   { "id": "connector_as_a_step_towards", "prefix": ", as a step towards " },
 

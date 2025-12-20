@@ -1,5 +1,5 @@
 // engine/config.ts
-// Canonical config for KPI Engine v10.7.5 (Option C-FULL)
+// Canonical config for KPI Engine v10.8 (Option C-FULL)
 
 export interface DomainConfig {
   allowedTaskTypes: string[];        // ['Project', ...]

@@ -1,7 +1,7 @@
 // engine/errorCodes.ts
-// Canonical error codes for the KPI Engine (v10.7.5, Option C-FULL)
+// Canonical error codes for the KPI Engine (v10.8, Option C-FULL)
 //
-// Code ranges follow the v10.7.5 specs:
+// Code ranges follow the v10.8 specs:
 //
 //  E200–E299 → Missing mandatory fields
 //  E300–E399 → Invalid formats / values (task type, team role, deadline, mode)

@@ -157,7 +157,7 @@
         {
           "id": "named_company_cx_1",
           "category": "digital_cx",
-          "template": "enabling improved digital customer experience and increased self-service adoption across {company}"
+          "template": "improving digital customer experience and increased self-service adoption across {company}"
         },
         {
           "id": "named_company_reliability_1",
@@ -212,7 +212,7 @@
         {
           "id": "generic_company_cx_1",
           "category": "digital_cx",
-          "template": "enabling improved digital customer experience and increased self-service adoption across the organization"
+          "template": "improving digital customer experience and increased self-service adoption across the organization"
         },
         {
           "id": "generic_company_reliability_1",

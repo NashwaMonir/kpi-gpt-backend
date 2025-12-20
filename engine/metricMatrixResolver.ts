@@ -1,5 +1,5 @@
 // engine/metricMatrixResolver.ts
-// Resolve role/task → matrix metrics for KPI Engine v10.7.5
+// Resolve role/task → matrix metrics for KPI Engine v10.8
 //
 // This module is the single source of truth for looking up metric
 // triples from role_metric_matrix.json using:
@@ -12,7 +12,6 @@
 
 import role_metric_matrix from '../data/role_metric_matrix.json';
 import type { KpiRowIn } from './types';
-
 // High-level role + task typing (used for diagnostics / defaults)
 export type RoleFamily = 'content' | 'design' | 'development';
 export type TaskTypeKey = 'project' | 'change_request' | 'consultation';
@@ -87,17 +86,6 @@ function normalizeKey(
   return map[lower] ?? null;
 }
 
-function seededIndex(seed: number, salt: string, size: number): number {
-  if (size <= 0) return 0;
-  let hash = 2166136261;
-  const key = seed.toString() + '|' + salt;
-  for (let i = 0; i < key.length; i++) {
-    hash ^= key.charCodeAt(i);
-    hash = Math.imul(hash, 16777619);
-  }
-  return (hash >>> 0) % size;
-}
-
 /**
  * Normalize raw team_role text down to a high-level family.
  * This is independent from the JSON normalization mapping and can be
@@ -150,6 +138,8 @@ export function resolveMatrixKey(
  * Canonical resolver used by metricsAutoSuggest:
  * - Uses MATRIX.normalization mappings to normalize team_role and task_type.
  * - Uses variationSeed to select a deterministic variant from the bucket.
+ *   Strict determinism: selection is derived ONLY from the passed seed.
+ *   No additional hashing / derived seeds inside the resolver.
  * - Returns a MatrixMetricSet describing the chosen entry.
  */
 export function resolveMatrixMetrics(
@@ -184,7 +174,9 @@ export function resolveMatrixMetrics(
   const items = buckets.get(bucketKey);
   if (!items || items.length === 0) return null;
 
-  const idx = seededIndex(variationSeed, `matrix|${bucketKey}`, items.length);
+  // Strict determinism: selection is derived ONLY from the passed seed.
+  // No additional hashing / derived seeds inside the resolver.
+  const idx = (variationSeed >>> 0) % items.length;
   const chosen = items[idx];
 
   return {

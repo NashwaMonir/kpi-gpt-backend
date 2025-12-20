@@ -102,16 +102,33 @@ function selectVerb(
 // -----------------------------
 // Baseline + metrics
 // -----------------------------
+function containsBaselineMarker(text: string): boolean {
+  return /\b(measured\s+against|based\s+on|baseline)\b/i.test(String(text || ''));
+}
 
-function hasBaselineWorthyImprovement(improvement: string): boolean {
-  if (!improvement) return false;
-  const lower = improvement.toLowerCase();
+function anyMetricContainsBaseline(row: PreparedRow): boolean {
+  return (
+    containsBaselineMarker(row.output_metric) ||
+    containsBaselineMarker(row.quality_metric) ||
+    containsBaselineMarker(row.improvement_metric)
+  );
+}
 
-  const hasNumber = /\d/.test(lower);
-  const hasChangeVerb = /(increase|decrease|reduce|improve|boost|raise|grow|expand)/.test(lower);
-  const hasPercent = /%/.test(lower);
+function startsWithEnsure(text: string): boolean {
+  return /^\s*ensure\b/i.test(String(text || ''));
+}
 
-  return hasNumber && (hasChangeVerb || hasPercent);
+function startsWithImperativeVerb(text: string): boolean {
+  const s = String(text || '').trim();
+  // Common imperative verbs used in KPI metrics.
+  // Keep intentionally tight to avoid false positives (e.g., nouns).
+  return /^(reduce|increase|improve|decrease|lower|raise|maximize|minimize|deliver|publish|complete|implement|roll\s+out|rollout|launch|ship|optimize|streamline|ensure)\b/i.test(s);
+}
+
+function lowerFirst(text: string): string {
+  const s = String(text || '').trim();
+  if (!s) return '';
+  return s.charAt(0).toLowerCase() + s.slice(1);
 }
 
 function pickBaselineLabel(improvementMetric: string): string {
@@ -145,6 +162,8 @@ function pickBaselineVariant(mode: 'simple' | 'complex', seed: number): string {
   return variants[idx];
 }
 
+// NOTE (v10.8+): Legacy baseline builder kept for backward compatibility.
+// The enterprise path uses buildEnterpriseBaselineClause(); avoid adding new logic here.
 function buildBaselineClause(
   improvementMetric: string,
   mode: 'simple' | 'complex',
@@ -157,19 +176,23 @@ function buildBaselineClause(
   if (mode === 'simple') {
     return '';
   }
+  // Enterprise guard: never add a baseline clause if the improvement metric already includes baseline markers.
+  if (containsBaselineMarker(improvementMetric)) return '';
 
   const baseClause = pickBaselineVariant(mode, seed);
   if (!baseClause) return '';
 
-  const baselineLabel = pickBaselineLabel(improvementMetric).trim();
+  const baselineLabelRaw = pickBaselineLabel(improvementMetric).trim();
   const perf = performance_targets as any;
   const defaultLabel = (perf.default_baseline as string | undefined)?.trim();
 
-  if (!baselineLabel || (defaultLabel && baselineLabel === defaultLabel)) {
+  if (!baselineLabelRaw || (defaultLabel && baselineLabelRaw === defaultLabel)) {
     return baseClause;
   }
 
-  return `${baseClause} (based on ${baselineLabel})`;
+  // Prevent accidental double-parentheses if the rules already include them.
+  const baselineLabel = baselineLabelRaw.replace(/^\(\s*/, '').replace(/\s*\)$/, '').trim();
+  return `${baseClause} (${baselineLabel})`;
 }
 
 function buildMetricsClause(row: PreparedRow, mode: 'simple' | 'complex'): string {
@@ -178,17 +201,9 @@ function buildMetricsClause(row: PreparedRow, mode: 'simple' | 'complex'): strin
   if (row.output_metric) metricParts.push(row.output_metric);
   if (row.quality_metric) metricParts.push(row.quality_metric);
 
-  let improvementText = row.improvement_metric || '';
-  let baselineClause = '';
-
+  const improvementText = (row.improvement_metric || '').trim();
   if (improvementText) {
-    baselineClause = buildBaselineClause(improvementText, mode, row.variation_seed);
-    if (baselineClause) improvementText = `${improvementText} ${baselineClause}`;
     metricParts.push(improvementText);
-  } else if (mode === 'complex' && metricParts.length) {
-    const syntheticImprovement = metricParts.join(' and ');
-    baselineClause = buildBaselineClause(syntheticImprovement, mode, row.variation_seed);
-    if (baselineClause) metricParts.push(`measured ${baselineClause}`);
   }
 
   if (!metricParts.length) return '';
@@ -198,9 +213,17 @@ function buildMetricsClause(row: PreparedRow, mode: 'simple' | 'complex'): strin
   else if (metricParts.length === 2) metricsJoined = metricParts.join(' and ');
   else metricsJoined = metricParts.slice(0, -1).join(', ') + ', and ' + metricParts[metricParts.length - 1];
 
-  // Avoid "achieving Ensure ..." grammar issues by using a neutral connector.
-  // Enterprise clause assembly will handle stronger phrasing.
-  const connector = mode === 'simple' ? ' with ' : ' to achieve ';
+  // Avoid "to achieve Ensure ..." grammar issues by using a mode-aware connector.
+  let connector = ' with ';
+
+  if (mode !== 'simple') {
+    // If output metric begins with an imperative verb, do NOT prepend "to achieve"
+    if (row.output_metric && startsWithImperativeVerb(row.output_metric)) {
+      connector = startsWithEnsure(row.output_metric) ? ' to ensure ' : ' to ';
+    } else {
+      connector = ' to achieve ';
+    }
+  }
   return connector + metricsJoined;
 }
 // -----------------------------
@@ -518,8 +541,6 @@ function hasBaseline(text: string): boolean {
   return /\b(measured\s+against|based\s+on|baseline)\b/i.test(text);
 }
 
-
-
 function repairDoubleConnectors(text: string): string {
   return text.replace(/\bwhile\b([^.]*)\bwhile\b/gi, 'while$1and');
 }
@@ -551,6 +572,7 @@ function decideEffectiveMode(row: PreparedRow): ObjectiveMode {
 
   return forceComplex ? 'complex' : 'simple';
 }
+
 
 // -----------------------------
 // Enterprise pattern selection + clause assembly (Phase 2)
@@ -648,6 +670,11 @@ function buildEnterpriseBaselineClause(row: PreparedRow, mode: ObjectiveMode): s
   const explicit = String((row as any).base_line || (row as any).baseline || '').trim();
   if (explicit) return ensureLeadingComma(`measured against ${explicit}`);
 
+  // Guard: if any metric already embeds baseline markers, do not add another baseline clause.
+  if (mode === 'complex' && anyMetricContainsBaseline(row)) {
+    return '';
+  }
+
   const family = roleFamilyFromTeamRole(row.team_role);
   try {
     const cfg = (baseline_clause_rules as any)?.[mode]?.enterprise_defaults;
@@ -681,8 +708,12 @@ function buildEnterpriseMetricsClause(row: PreparedRow, mode: ObjectiveMode): st
   else if (parts.length === 2) joined = parts.join(' and ');
   else joined = parts.slice(0, -1).join(', ') + ', and ' + parts[parts.length - 1];
 
-  const connector = mode === 'simple' ? ' with ' : ' to achieve ';
-  return connector + joined;
+ const connector =
+  mode === 'simple'
+    ? ' with '
+    : (row.output_metric && startsWithEnsure(row.output_metric) ? ' to ensure ' : ' to achieve ');
+
+return connector + joined;
 }
 // Enterprise clause-order needs atomic metric clauses (performance/quality/improvement),
 // not a single combined blob, otherwise clause_order cannot control grammar.
@@ -701,7 +732,7 @@ function buildEnterpriseMetricClauses(row: PreparedRow): {
   let improvement = '';
 
   if (out) {
-    performance = `to achieve ${out}`;
+    performance = startsWithEnsure(out) ? `to ensure ${stripLeadingPunctuation(out)}` : `to achieve ${out}`;
     first = false;
   }
 
@@ -712,8 +743,18 @@ function buildEnterpriseMetricClauses(row: PreparedRow): {
   }
 
   if (imp) {
-    // If improvement is the first (rare), use "to improve" for grammar.
-    improvement = first ? `to improve ${imp}` : `and improving ${imp}`;
+    // Enterprise grammar:
+    // - If metric starts with an imperative verb (Reduce/Increase/Improve...), use it directly.
+    // - Otherwise fall back to a gerund form.
+    if (first) {
+      improvement = startsWithImperativeVerb(imp)
+        ? `to ${lowerFirst(imp)}`
+        : `to improve ${imp}`;
+    } else {
+      improvement = startsWithImperativeVerb(imp)
+        ? `and ${lowerFirst(imp)}`
+        : `and improving ${imp}`;
+    }
     first = false;
   }
 
@@ -875,6 +916,15 @@ function lintAndRepairObjective(
   return out;
 }
 
+function finalizeObjectiveText(objective: string): string {
+  let s = String(objective || '');
+
+  // Minimal trust fix: remove duplicate support phrase when pattern + tail collide
+  s = s.replace(/\bin support of supporting\b/gi, 'in support of');
+
+  return s;
+}
+
 function assembleFromClauses(order: EnterpriseClauseKey[], clauses: Record<string, string>): string {
   const out: string[] = [];
   for (const k of order) {
@@ -960,6 +1010,11 @@ function applyVariationRules(
 // -----------------------------
 
 function buildObjectiveInternal(row: PreparedRow, _requestedMode: 'simple' | 'complex'): string {
+  // Contract: never generate objective text for invalid rows.
+  const anyRow = row as any;
+  if (anyRow.isValid === false || (typeof anyRow.invalidReason === 'string' && anyRow.invalidReason.trim())) {
+    return '';
+  }
   // --- v10.8 mode guard (engine-owned mode) ---
   // Even if a caller requests "simple", the engine must enforce the contract.
   const contractMode: ObjectiveMode = decideEffectiveMode(row);
@@ -989,6 +1044,7 @@ function buildObjectiveInternal(row: PreparedRow, _requestedMode: 'simple' | 'co
 
     // Lint/repair must use the enforced mode.
     objective = lintAndRepairObjective(objective, row, effectiveMode);
+    objective = finalizeObjectiveText(objective);
 
     return objective;
   }
@@ -1055,10 +1111,32 @@ const governance_clause =
     .replace('{ic_risk_clause}', ic_risk_clause)
     .replace('{lead_risk_clause}', lead_risk_clause);
 
+  // v10.8/v11 baseline contract:
+  // - SIMPLE: never include baseline
+  // - COMPLEX: include baseline at most once
+  // Some legacy templates do not include {baseline_clause}; inject baselineClause once (before tail) when needed.
+  if (effectiveMode === 'complex' && baselineClause && !containsBaselineMarker(objective)) {
+    const templateHasBaseline = template.includes('{baseline_clause}');
+    if (!templateHasBaseline) {
+      const tail = String(tailClause || '');
+      if (tail && objective.includes(tail)) {
+        objective = objective.replace(tail, `${baselineClause}${tail}`);
+      } else {
+        objective = objective.replace(/\.$/, '') + baselineClause;
+      }
+    }
+  }
+
+  // Ensure SIMPLE never leaks baseline even if a legacy template contains {baseline_clause}.
+  if (effectiveMode === 'simple') {
+    objective = objective.replace(/\s*,\s*(measured\s+against|based\s+on)[^,.]*?(?=[,.])/gi, '');
+  }
+
   objective = applyVariationRules(objective, row, effectiveMode);
   objective = postProcessObjective(objective);
 
   objective = lintAndRepairObjective(objective, row, effectiveMode);
+  objective = finalizeObjectiveText(objective);
 
   return objective;
 }
@@ -1072,6 +1150,17 @@ export function buildComplexObjective(row: PreparedRow): string {
 }
 
 export function buildObjectivesForRow(row: PreparedRow): ObjectiveOutput {
+  // Contract: INVALID rows must never have objectives.
+  // Upstream validators set `isValid` / `invalidReason` on PreparedRow for bulk flows.
+  // For safety, treat any explicit invalid signal as a hard stop.
+  const anyRow = row as any;
+  if (anyRow.isValid === false || (typeof anyRow.invalidReason === 'string' && anyRow.invalidReason.trim())) {
+    return {
+      row_id: row.row_id,
+      simple_objective: '',
+      complex_objective: ''
+    };
+  }
   const effectiveMode = decideEffectiveMode(row);
 
   let simple = '';
