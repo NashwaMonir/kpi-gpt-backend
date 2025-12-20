@@ -31,7 +31,41 @@ FAIL=0
 
 section() { echo; echo "===================="; echo "$1"; echo "===================="; }
 ok() { echo "✅ $1"; PASS=$((PASS+1)); }
+
 bad() { echo "❌ $1"; FAIL=$((FAIL+1)); }
+
+# --- JSON guard helpers ---
+is_json() {
+  # Returns 0 if stdin is valid JSON, else 1
+  jq -e . >/dev/null 2>&1
+}
+
+die_non_json() {
+  local label="$1"
+  local body="$2"
+  echo "❌ $label: API returned non-JSON (or empty) response"
+  echo "----- raw response (first 2000 chars) -----"
+  echo "$body" | head -c 2000
+  echo
+  FAIL=$((FAIL+1))
+  section "SUMMARY"
+  echo "PASS=$PASS"
+  echo "FAIL=$FAIL"
+  echo
+  echo "FAILED: Non-JSON response encountered."
+  exit 1
+}
+
+require_json() {
+  local label="$1"
+  local body="$2"
+  if [[ -z "${body:-}" ]]; then
+    die_non_json "$label" "$body"
+  fi
+  if ! echo "$body" | is_json; then
+    die_non_json "$label" "$body"
+  fi
+}
 
 assert_eq() {
   local name="$1" got="$2" want="$3"
@@ -286,6 +320,7 @@ ok "Script started"
 # -------------------------
 section "1) Single: INVALID hard-stop (no objectives, no autosuggest flags)"
 R1=$(post_json "/api/kpi" '{"rows":[{"row_id":1}] }')
+require_json "Single INVALID /api/kpi" "$R1"
 
 S1_STATUS=$(echo "$R1" | jq -r '.rows[0].status')
 S1_OBJ=$(echo "$R1" | jq -r '.rows[0].objective // ""')
@@ -316,6 +351,7 @@ R2=$(post_json "/api/kpi" '{
     }
   ]
 }')
+require_json "Single VALID /api/kpi" "$R2"
 
 S2_STATUS=$(echo "$R2" | jq -r '.rows[0].status')
 S2_MODE=$(echo "$R2" | jq -r '.rows[0].objective_mode')
@@ -350,6 +386,7 @@ R3=$(post_json "/api/kpi" '{
     }
   ]
 }')
+require_json "Single NEEDS_REVIEW /api/kpi" "$R3"
 
 S3_STATUS=$(echo "$R3" | jq -r '.rows[0].status')
 S3_AUTO=$(echo "$R3" | jq -r '.rows[0].metrics_auto_suggested')
@@ -378,6 +415,7 @@ R4=$(post_json "/api/kpi" '{
     }
   ]
 }')
+require_json "Single wrong-year /api/kpi" "$R4"
 S4_STATUS=$(echo "$R4" | jq -r '.rows[0].status')
 S4_OBJ=$(echo "$R4" | jq -r '.rows[0].objective // ""')
 S4_AUTO=$(echo "$R4" | jq -r '.rows[0].metrics_auto_suggested // false')
@@ -392,10 +430,13 @@ section "4B) Bulk: INVALID hard-stop (missing required fields)"
 CSV_INV='row_id,team_role,task_type,task_name,dead_line,strategic_benefit
 1,Design,Project,,2025-10-01,Enhance the organization’s digital presence.'
 INS_INV=$(post_json "/api/bulkInspectJson" "$(jq -n --arg csv "$CSV_INV" '{excel_csv_text:$csv}')")
+require_json "Bulk inspect INVALID /api/bulkInspectJson" "$INS_INV"
 RT_INV=$(echo "$INS_INV" | jq -r '.rows_token')
 PRE_INV=$(post_json "/api/bulkPrepareRows" "$(jq -n --arg t "$RT_INV" '{rows_token:$t, generic_mode:true}')")
+require_json "Bulk prepare INVALID /api/bulkPrepareRows" "$PRE_INV"
 PT_INV=$(echo "$PRE_INV" | jq -r '.prep_token')
 FIN_INV=$(post_json "/api/bulkFinalizeExport" "$(jq -n --arg t "$PT_INV" '{prep_token:$t}')")
+require_json "Bulk finalize INVALID /api/bulkFinalizeExport" "$FIN_INV"
 DL_INV=$(echo "$FIN_INV" | jq -r '.download_url')
 
 ROW_INV=$(bulk_first_row_from_download_url "$DL_INV")
@@ -414,6 +455,7 @@ section "5) Bulk: 1-row flow + download integrity (no xargs)"
 CSV='row_id,team_role,task_type,task_name,dead_line,strategic_benefit
 1,Design,Project,Homepage redesign,2025-10-01,Enhance the organization’s digital presence.'
 INSPECT=$(post_json "/api/bulkInspectJson" "$(jq -n --arg csv "$CSV" '{excel_csv_text:$csv}')")
+require_json "Bulk inspect 1-row /api/bulkInspectJson" "$INSPECT"
 
 ROWS_TOKEN=$(echo "$INSPECT" | jq -r '.rows_token')
 ROW_COUNT=$(echo "$INSPECT" | jq -r '.row_count')
@@ -421,12 +463,14 @@ assert_eq "Bulk inspect row_count=1" "$ROW_COUNT" "1"
 [[ -n "$ROWS_TOKEN" && "$ROWS_TOKEN" != "null" ]] && ok "Bulk rows_token present" || bad "Bulk rows_token missing"
 
 PREP=$(post_json "/api/bulkPrepareRows" "$(jq -n --arg t "$ROWS_TOKEN" '{rows_token:$t, generic_mode:true}')")
+require_json "Bulk prepare 1-row /api/bulkPrepareRows" "$PREP"
 PREP_TOKEN=$(echo "$PREP" | jq -r '.prep_token')
 STATE=$(echo "$PREP" | jq -r '.state')
 assert_eq "Bulk prepare state READY_FOR_OBJECTIVES" "$STATE" "READY_FOR_OBJECTIVES"
 [[ -n "$PREP_TOKEN" && "$PREP_TOKEN" != "null" ]] && ok "Bulk prep_token present" || bad "Bulk prep_token missing"
 
 FINAL=$(post_json "/api/bulkFinalizeExport" "$(jq -n --arg t "$PREP_TOKEN" '{prep_token:$t}')")
+require_json "Bulk finalize 1-row /api/bulkFinalizeExport" "$FINAL"
 DL=$(echo "$FINAL" | jq -r '.download_url')
 [[ -n "$DL" && "$DL" != "null" ]] && ok "Bulk finalize download_url present" || bad "Bulk finalize download_url missing"
 
@@ -469,6 +513,7 @@ S_PAR=$(post_json "/api/kpi" '{
     }
   ]
 }')
+require_json "Single parity /api/kpi" "$S_PAR"
 S6_STATUS=$(echo "$S_PAR" | jq -r '.rows[0].status')
 S6_RES=$(echo "$S_PAR" | jq -r '.rows[0].resolved_metrics | "\(.output_metric) | \(.quality_metric) | \(.improvement_metric)"')
 assert_eq "Single Design missing metrics => NEEDS_REVIEW" "$S6_STATUS" "NEEDS_REVIEW"
@@ -540,6 +585,7 @@ R_PART=$(post_json "/api/kpi" '{
     }
   ]
 }')
+require_json "Single partial metrics /api/kpi" "$R_PART"
 
 EXP_P_OUT=$(echo "$R_PART" | jq -r '.rows[0].resolved_metrics.output_metric')
 EXP_P_QUAL=$(echo "$R_PART" | jq -r '.rows[0].resolved_metrics.quality_metric')
@@ -548,10 +594,13 @@ EXP_P_IMP=$(echo "$R_PART" | jq -r '.rows[0].resolved_metrics.improvement_metric
 CSV_PART='row_id,team_role,task_type,task_name,dead_line,strategic_benefit,output_metric
 61,Design,Project,Pricing page update,2025-09-15,Improve conversion rate.,Publish updated pricing UI'
 INS_P=$(post_json "/api/bulkInspectJson" "$(jq -n --arg csv "$CSV_PART" '{excel_csv_text:$csv}')")
+require_json "Bulk inspect partial /api/bulkInspectJson" "$INS_P"
 RT_P=$(echo "$INS_P" | jq -r '.rows_token')
 PRE_P=$(post_json "/api/bulkPrepareRows" "$(jq -n --arg t "$RT_P" '{rows_token:$t, generic_mode:true}')")
+require_json "Bulk prepare partial /api/bulkPrepareRows" "$PRE_P"
 PT_P=$(echo "$PRE_P" | jq -r '.prep_token')
 FIN_P=$(post_json "/api/bulkFinalizeExport" "$(jq -n --arg t "$PT_P" '{prep_token:$t}')")
+require_json "Bulk finalize partial /api/bulkFinalizeExport" "$FIN_P"
 DL_P=$(echo "$FIN_P" | jq -r '.download_url')
 ROW_P=$(bulk_first_row_from_download_url "$DL_P")
 
@@ -566,10 +615,13 @@ section "7) Bulk normalization drift: whitespace/casing should still hit correct
 CSV2='row_id,team_role,task_type,task_name,dead_line,strategic_benefit
 1," Design "," Project ",Homepage redesign,2025-10-01,Enhance the organization’s digital presence.'
 INS2=$(post_json "/api/bulkInspectJson" "$(jq -n --arg csv "$CSV2" '{excel_csv_text:$csv}')")
+require_json "Bulk inspect whitespace /api/bulkInspectJson" "$INS2"
 RT2=$(echo "$INS2" | jq -r '.rows_token')
 PRE2=$(post_json "/api/bulkPrepareRows" "$(jq -n --arg t "$RT2" '{rows_token:$t, generic_mode:true}')")
+require_json "Bulk prepare whitespace /api/bulkPrepareRows" "$PRE2"
 PT2=$(echo "$PRE2" | jq -r '.prep_token')
 FIN2=$(post_json "/api/bulkFinalizeExport" "$(jq -n --arg t "$PT2" '{prep_token:$t}')")
+require_json "Bulk finalize whitespace /api/bulkFinalizeExport" "$FIN2"
 DL2=$(echo "$FIN2" | jq -r '.download_url')
 get_file "$BASE$DL2" "KPI_Output_ws.xlsx"
 unzip -t "KPI_Output_ws.xlsx" >/dev/null 2>&1 && ok "Bulk whitespace XLSX ok" || bad "Bulk whitespace XLSX corrupt"
@@ -590,16 +642,20 @@ R_LEAD=$(post_json "/api/kpi" '{
     }
   ]
 }')
+require_json "Single lead /api/kpi" "$R_LEAD"
 LEAD_MODE=$(echo "$R_LEAD" | jq -r '.rows[0].objective_mode')
 [[ "$LEAD_MODE" == "complex" ]] && ok "Single lead role forces complex mode" || bad "Lead role did not force complex mode"
 
 CSV_LEAD='row_id,team_role,task_type,task_name,dead_line,strategic_benefit
 1,Design Lead,Project,Design system rollout,2025-11-01,Improve cross-team consistency.'
 INS_L=$(post_json "/api/bulkInspectJson" "$(jq -n --arg csv "$CSV_LEAD" '{excel_csv_text:$csv}')")
+require_json "Bulk inspect lead /api/bulkInspectJson" "$INS_L"
 RT_L=$(echo "$INS_L" | jq -r '.rows_token')
 PRE_L=$(post_json "/api/bulkPrepareRows" "$(jq -n --arg t "$RT_L" '{rows_token:$t, generic_mode:true}')")
+require_json "Bulk prepare lead /api/bulkPrepareRows" "$PRE_L"
 PT_L=$(echo "$PRE_L" | jq -r '.prep_token')
 FIN_L=$(post_json "/api/bulkFinalizeExport" "$(jq -n --arg t "$PT_L" '{prep_token:$t}')")
+require_json "Bulk finalize lead /api/bulkFinalizeExport" "$FIN_L"
 DL_L=$(echo "$FIN_L" | jq -r '.download_url')
 ROW_L=$(bulk_first_row_from_download_url "$DL_L")
 
@@ -621,14 +677,17 @@ CSV_M='row_id,team_role,task_type,task_name,dead_line,strategic_benefit
 106,Development Lead,Consultation,API governance and standards,2025-07-15,Reduce risk and improve maintainability.'
 
 INS_M=$(post_json "/api/bulkInspectJson" "$(jq -n --arg csv "$CSV_M" '{excel_csv_text:$csv}')")
+require_json "Bulk inspect multi /api/bulkInspectJson" "$INS_M"
 RT_M=$(echo "$INS_M" | jq -r '.rows_token')
 [[ -n "$RT_M" && "$RT_M" != "null" ]] && ok "Bulk multi rows_token present" || bad "Bulk multi rows_token missing"
 
 PRE_M=$(post_json "/api/bulkPrepareRows" "$(jq -n --arg t "$RT_M" '{rows_token:$t, generic_mode:true}')")
+require_json "Bulk prepare multi /api/bulkPrepareRows" "$PRE_M"
 PT_M=$(echo "$PRE_M" | jq -r '.prep_token')
 [[ -n "$PT_M" && "$PT_M" != "null" ]] && ok "Bulk multi prep_token present" || bad "Bulk multi prep_token missing"
 
 FIN_M=$(post_json "/api/bulkFinalizeExport" "$(jq -n --arg t "$PT_M" '{prep_token:$t}')")
+require_json "Bulk finalize multi /api/bulkFinalizeExport" "$FIN_M"
 DL_M=$(echo "$FIN_M" | jq -r '.download_url')
 [[ -n "$DL_M" && "$DL_M" != "null" ]] && ok "Bulk multi download_url present" || bad "Bulk multi download_url missing"
 
@@ -743,10 +802,145 @@ else
   if echo "$XIDS" | grep -qx "305"; then ok "XLSX contains row_id=305"; else bad "XLSX missing row_id=305"; fi
   if echo "$XIDS" | grep -qx "999"; then ok "XLSX contains row_id=999"; else bad "XLSX missing row_id=999"; fi
 fi
+# ====================
+# 7E) Objective quality intensive suite (enterprise-grade)
+# ====================
 
+# Helper: assert objective text is enterprise-safe (no duplicated connectors/verbs, punctuation, etc.)
+assert_objective_quality() {
+  local label="$1"
+  local obj="$2"
+  local mode="$3"
+  local role="$4"
+
+  # 1) No hard duplication bugs
+  assert_not_contains "$label: no 'to achieve Achieve'" "$obj" "to achieve Achieve"
+  assert_not_contains "$label: no 'to achieve Ensure'" "$obj" "to achieve Ensure"
+  assert_not_contains "$label: no 'to achieve Deliver'" "$obj" "to achieve Deliver"
+  assert_not_contains "$label: no 'in support of supporting'" "$obj" "in support of supporting"
+
+  # 2) No obvious punctuation/spacing damage
+  assert_not_contains "$label: no ', .'" "$obj" ", ."
+  assert_not_contains "$label: no ', ,'" "$obj" ", ,"
+  assert_not_contains "$label: no double spaces" "$obj" "  "
+
+  # 3) Ends with a period
+  if [[ "$obj" != *"." ]]; then
+    echo "❌ $label: objective must end with '.'"
+    FAIL=$((FAIL+1))
+  else
+    echo "✅ $label: objective ends with '.'"
+    PASS=$((PASS+1))
+  fi
+
+  # 4) Complex must include baseline marker
+  if [[ "$mode" == "complex" ]]; then
+    if echo "$obj" | grep -Eqi "(measured against|based on|baseline)"; then
+      echo "✅ $label: complex includes baseline marker"
+      PASS=$((PASS+1))
+    else
+      echo "❌ $label: complex missing baseline marker"
+      FAIL=$((FAIL+1))
+    fi
+  fi
+
+  # 5) IC must not include governance/risk language
+  if echo "$role" | grep -Eqi "(^|\s)lead(\s|$)"; then
+    :
+  else
+    if echo "$obj" | grep -Eqi "(governance|risk review|structured risk|approval gate|review gate|architecture oversight|compliance oversight)"; then
+      echo "❌ $label: IC objective contains governance/risk language"
+      FAIL=$((FAIL+1))
+    else
+      echo "✅ $label: IC objective has no governance/risk leakage"
+      PASS=$((PASS+1))
+    fi
+  fi
+}
+
+# Helper: ensure role-family tails do not leak dev-only keywords into Design/Content
+assert_role_family_tail_safety() {
+  local label="$1"
+  local obj="$2"
+  local role="$3"
+
+  local dev_kw="(uptime|availability|incident|mttr|latency|response time|sla|vulnerab|security posture|privacy controls)"
+  if echo "$role" | grep -Eqi "design|content"; then
+    if echo "$obj" | grep -Eqi "$dev_kw"; then
+      echo "❌ $label: design/content objective contains dev-only tail keywords"
+      FAIL=$((FAIL+1))
+    else
+      echo "✅ $label: design/content tail safety ok"
+      PASS=$((PASS+1))
+    fi
+  fi
+}
+
+# Intensive role/type/metric shapes (imperative + non-imperative + lead vs IC + generic company)
+QUALITY_ROWS_JSON='[
+  {"row_id":901,"company":"Org","team_role":"Design","task_type":"Project","task_name":"Homepage redesign","dead_line":"2025-10-01","strategic_benefit":"Increase company presence","output_metric":"Achieve ≥95% in-scope journeys have approved UX/UI designs at design freeze","quality_metric":"≤3% usability or accessibility defects identified post-launch","improvement_metric":"Increase task success rate in prioritized journeys by 15%"},
+  {"row_id":902,"company":"Org","team_role":"Design","task_type":"Project","task_name":"Checkout redesign","dead_line":"2025-10-01","strategic_benefit":"Improve conversion","output_metric":"Ensure ≥90% adherence to the design system for new or updated screens","quality_metric":"≤2% cross-platform visual or interaction inconsistencies in QA","improvement_metric":"Reduce cross-platform UX defects reported after launch by 25%"},
+  {"row_id":903,"company":"Org","team_role":"Content","task_type":"Consultation","task_name":"Editorial guidelines","dead_line":"2025-09-15","strategic_benefit":"Improve consistency","output_metric":"Publish updated content governance guidelines covering ≥95% priority use cases","quality_metric":"≥4.3/5 internal rating for clarity and usability of guidelines","improvement_metric":"Increase adoption of content guidelines to ≥80% of new assets"},
+  {"row_id":904,"company":"Org","team_role":"Development","task_type":"Project","task_name":"API Rate-Limit Upgrade","dead_line":"2025-06-30","strategic_benefit":"Improve reliability","output_metric":"Achieve ≥99.5% uptime for the in-scope services over the measurement period","quality_metric":"≤0.5% of incidents caused by regressions from this project","improvement_metric":"Improve service response times by 20%"},
+  {"row_id":905,"company":"Org","team_role":"Design Lead","task_type":"Project","task_name":"Design system rollout","dead_line":"2025-08-31","strategic_benefit":"Standardize UX","output_metric":"Deliver design system v1.0 with token and component documentation","quality_metric":"≤2 critical design debt items per release post-rollout","improvement_metric":"Reduce design-to-dev rework cycles by 20%"},
+  {"row_id":906,"company":"Generic","team_role":"Design","task_type":"Project","task_name":"Pricing page refresh","dead_line":"2025-10-01","strategic_benefit":"Increase digital presence","output_metric":"Publish updated pricing page UI","quality_metric":"≥4.3/5 internal review score for clarity and tone","improvement_metric":"Reduce user confusion-related support contacts by 15%"}
+]'
+
+QUALITY_RES=$(curl -sS -X POST "$BASE/api/kpi" \
+  -H "content-type: application/json" \
+  -d "{\"engine_version\":\"v10.8\",\"rows\":$QUALITY_ROWS_JSON}" || true)
+
+# Guard: if backend returned non-JSON (HTML / text / error), fail fast with body.
+if ! echo "$QUALITY_RES" | jq -e . >/dev/null 2>&1; then
+  echo "❌ Quality suite: /api/kpi returned non-JSON response"
+  echo "----- raw response -----"
+  echo "$QUALITY_RES" | head -c 2000
+  echo
+  FAIL=$((FAIL+1))
+  # Skip the rest of this suite to avoid misleading jq parse errors.
+else
+  for rid in 901 902 903 904 905 906; do
+    OBJ=$(echo "$QUALITY_RES" | jq -r --argjson rid "$rid" '.rows[] | select(.row_id==$rid) | (.objective // "")')
+    MODE=$(echo "$QUALITY_RES" | jq -r --argjson rid "$rid" '.rows[] | select(.row_id==$rid) | (.objective_mode // "")')
+    ROLE=$(echo "$QUALITY_ROWS_JSON" | jq -r --argjson rid "$rid" '.[] | select(.row_id==$rid) | (.team_role // "")')
+
+    echo "Row $rid mode=$MODE role=$ROLE"
+
+    if [[ -z "$OBJ" || "$OBJ" == "null" ]]; then
+      echo "❌ Quality row_id=$rid objective missing"
+      FAIL=$((FAIL+1))
+    else
+      echo "✅ Quality row_id=$rid objective present"
+      PASS=$((PASS+1))
+    fi
+
+    assert_objective_quality "Quality row_id=$rid" "$OBJ" "$MODE" "$ROLE"
+    assert_role_family_tail_safety "Quality row_id=$rid" "$OBJ" "$ROLE"
+
+    # Lead roles must be complex by contract
+    if echo "$ROLE" | grep -Eqi "(^|\s)lead(\s|$)"; then
+      if [[ "$MODE" == "complex" ]]; then
+        echo "✅ Quality row_id=$rid lead role forces complex"
+        PASS=$((PASS+1))
+      else
+        echo "❌ Quality row_id=$rid lead role did not force complex"
+        FAIL=$((FAIL+1))
+      fi
+    fi
+  done
+
+  if echo "$QUALITY_RES" | jq -r '.rows[].objective' | grep -Fq "to achieve Achieve"; then
+    echo "❌ Quality suite: found 'to achieve Achieve' anywhere"
+    FAIL=$((FAIL+1))
+  else
+    echo "✅ Quality suite: no 'to achieve Achieve' anywhere"
+    PASS=$((PASS+1))
+  fi
+fi
 # -------------------------
 # 8) Task type variant handling: ensure invalid variant becomes INVALID (no silent fallback)
 # -------------------------
+
 section "8) Task type variants: unsupported values should be INVALID (not fallback)"
 R8=$(post_json "/api/kpi" '{
   "rows":[
@@ -760,8 +954,9 @@ R8=$(post_json "/api/kpi" '{
     }
   ]
 }')
-# Depending on your normalizeTaskType rules: either it normalizes, or it invalidates.
-# We accept only: VALID/NEEDS_REVIEW if normalized; INVALID if not allowed. But MUST NOT silently hit wrong matrix.
+require_json "Single task_type variant /api/kpi" "$R8"
+S8_TASK_TYPE=$(echo "$R8" | jq -r '.rows[0].task_type // ""')
+echo "Task type observed by API: '$S8_TASK_TYPE'"
 S8_STATUS=$(echo "$R8" | jq -r '.rows[0].status')
 if [[ "$S8_STATUS" == "INVALID" ]]; then
   ok "Unsupported task_type correctly INVALID"
