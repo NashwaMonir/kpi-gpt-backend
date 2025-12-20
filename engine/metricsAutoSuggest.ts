@@ -1,12 +1,12 @@
 // engine/metricsAutoSuggest.ts
-// Metric auto-suggest logic for KPI Engine v10.7.5 (Option C-FULL)
+// Metric auto-suggest logic for KPI Engine v10.8 (Option C-FULL)
 //
 // Rules:
 //  - If ALL 3 metrics missing  → auto-suggest defaults + E501 (NEEDS_REVIEW)
 //  - If SOME metrics missing   → auto-suggest defaults + E502 (NEEDS_REVIEW)
 //  - If NONE missing           → no auto-suggest, no E501/E502
 //
-// v10.7.5+variant-seed:
+// v10.8+variant-seed:
 //  - Primary source = role_metric_matrix via metricMatrixResolver.resolveMatrixMetrics(row, variationSeed)
 //  - Fallback       = ROLE_DEFAULT_METRICS (role-family defaults)
 
@@ -18,6 +18,7 @@ import {
   resolveMatrixMetrics,
   type MatrixKey
 } from './metricMatrixResolver';
+import { normalizeTeamRole, normalizeTaskType } from './normalizeFields';
 
 import role_default_metrics from '../data/role_default_metrics.json';
 
@@ -35,6 +36,43 @@ type RoleDefaultMetrics = {
   quality: string;
   improvement: string;
 };
+
+function stripBaselinePhrases(text: string): string {
+  let s = String(text || "").trim();
+  if (!s) return "";
+
+  // Remove embedded baseline language so objectiveEngine owns baseline clauses.
+  s = s
+    .replace(/\bmeasured\s+against\b[^,.]*?(?=[,.]|$)/gi, "") // remove "measured against …"
+    .replace(/\(\s*based\s+on\b[^)]*\)/gi, "")                // remove "(based on …)"
+    .replace(/\b(measured\s+against|based\s+on)\b/gi, "")
+    .replace(/\s{2,}/g, " ")
+    .replace(/\s+,/g, ",")
+    .replace(/,\s*,/g, ",")
+    .trim();
+
+  return s;
+}
+
+function sanitizeSuggestedMetric(
+  kind: "output" | "quality" | "improvement",
+  text: string
+): string {
+  let s = stripBaselinePhrases(text);
+  if (!s) return "";
+
+  // OUTPUT must not start with "Ensure" (prevents "to achieve Ensure …" grammar).
+  if (kind === "output" && /^ensure\b/i.test(s)) {
+    s = s.replace(/^ensure\b\s*/i, "Deliver ");
+  }
+
+  // IMPROVEMENT should be baseline-neutral (optionally allow "vs baseline").
+  // Do not inject any baseline clause here.
+  s = s.replace(/\bvs\s+baseline\b\s*vs\s+baseline\b/gi, "vs baseline");
+
+  return s.trim();
+}
+
 const ROLE_DEFAULT_METRICS = role_default_metrics as Record<RoleDefaultKey, RoleDefaultMetrics>;
 export interface MetricResolutionResult {
   output_metric: string | null;
@@ -90,13 +128,23 @@ export function resolveMetrics(
     };
   }
 
-  // 3) Some/all missing → fill from matrix (if available) or role defaults
-  //
-  // 3.1 Family-level key kept only for diagnostics / default_source
-  const key = resolveMatrixKey(row.team_role, row.task_type);
+  // 3.1 Canonicalize role/type for matrix resolution (defensive).
+  // IMPORTANT: We do NOT compute any new seed here. We only ensure the resolver
+  // sees canonical labels, even if a caller accidentally passed raw values.
+  const roleNorm = normalizeTeamRole(row.team_role);
+  const typeNorm = normalizeTaskType(row.task_type);
 
-  // 3.2 Canonical matrix resolver using normalization + seeded rotation
-  const matrixDefaults = resolveMatrixMetrics(row, variationSeed);
+  const rowForMatrix: KpiRowIn = {
+    ...row,
+    team_role: roleNorm.isAllowed && roleNorm.normalized ? roleNorm.normalized : (row.team_role ?? ''),
+    task_type: typeNorm.isAllowed && typeNorm.normalized ? typeNorm.normalized : (row.task_type ?? '')
+  };
+
+  // 3.2 Family-level key kept only for diagnostics / default_source
+  const key = resolveMatrixKey(rowForMatrix.team_role, rowForMatrix.task_type);
+
+  // 3.3 Canonical matrix resolver using passed seeded rotation only
+  const matrixDefaults = resolveMatrixMetrics(rowForMatrix, variationSeed);
 
   if (!output) {
     output = matrixDefaults ? matrixDefaults.output : defaults.output;
@@ -114,6 +162,13 @@ export function resolveMetrics(
   output = output.trim();
   quality = quality.trim();
   improvement = improvement.trim();
+
+  // v10.8/v11 contract hardening:
+  // - Auto-suggested metrics must be baseline-neutral (objectiveEngine owns baseline clauses)
+  // - Output metrics must not start with "Ensure" (prevents "to achieve Ensure …" grammar)
+  output = sanitizeSuggestedMetric('output', output);
+  quality = sanitizeSuggestedMetric('quality', quality);
+  improvement = sanitizeSuggestedMetric('improvement', improvement);
 
   // 4) Metrics error codes (E501 / E502)
   if (missing.length === 3) {

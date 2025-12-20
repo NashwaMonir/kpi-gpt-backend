@@ -1,5 +1,5 @@
 // engine/constants.ts
-// Canonical constants for KPI Engine v10.7.5 (Option C-FULL)
+// Canonical constants for KPI Engine v10.8 (Option C-FULL)
 // Ensures predictable validation behavior and ordering across all modules.
 
 import { DEFAULT_TENANT_CONFIG } from './config';
@@ -144,6 +144,6 @@ export const INVALID_TEXT_ORDER = [
 // ------------------------------------------------------------
 
 export function getCurrentEngineYear(): number {
-  // v10.7.5 rule: only deadlines in current calendar year are accepted
+  // v10.8 rule: only deadlines in current calendar year are accepted
   return new Date().getFullYear();
 }

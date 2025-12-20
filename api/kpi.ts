@@ -151,13 +151,6 @@ export default function handler(req: VercelRequest, res: VercelResponse) {
 
       const metricsResult = resolveMetrics(normalized, variation_seed, errorCodes);
 
-      const metricsAutoSuggested =
-        metricsResult.used_default_metrics === true ||
-        (metricsResult as any).used_matrix_metrics === true ||
-        (metricsResult as any).used_role_matrix === true ||
-        (metricsResult as any).used_matrix === true ||
-        (metricsResult as any).auto_suggested === true;
-
       const deadLineIso = String(
         (normalized as any).dead_line_iso ??
           (normalized as any).dead_line_normalized ??
@@ -166,6 +159,8 @@ export default function handler(req: VercelRequest, res: VercelResponse) {
       ).trim();
 
       const final = buildFinalMessage(domainResult, metricsResult, errorCodes);
+
+      const metricsAutoSuggested = final.metrics_auto_suggested;
 
       const resolvedMetrics: ResolvedMetricsSnapshot = {
         output_metric: final.metrics.output_metric ?? '',
@@ -228,7 +223,7 @@ export default function handler(req: VercelRequest, res: VercelResponse) {
     logKpiInfo('kpi_request_completed_200', {
       rows_count: rowsOut.length,
       status_counts: statusCounts,
-      engine_version: body.engine_version ?? 'v10.7.5'
+      engine_version: body.engine_version ?? 'v10.8'
     });
 
     return res.status(200).json(response);

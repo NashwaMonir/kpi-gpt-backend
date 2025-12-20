@@ -1,5 +1,5 @@
 // engine/normalizeFields.ts
-// Field normalization helpers for KPI Engine v10.7.5 (Option C-FULL)
+// Field normalization helpers for KPI Engine v10.8 (Option C-FULL)
 
 // ---- Types (imported first) ----
 import type { ErrorCode } from './errorCodes';

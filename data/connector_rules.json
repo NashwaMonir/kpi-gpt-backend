@@ -1,58 +1,19 @@
 [
-  {
-      "id": "tail_default_comma",
-      "prefix": ", "
-    },
-    {
-      "id": "tail_while_aligned",
-      "prefix": ", while "
-    },
-    {
-      "id": "tail_and_aligned",
-      "prefix": ", and "
-    },
-  {
-    "id": "connector_while_also",
-    "prefix": ", while also "
-  },
-  {
-    "id": "connector_further",
-    "prefix": ", further "
-  },
-  {
-    "id": "connector_thereby",
-    "prefix": ", thereby "
-  },
-  {
-    "id": "connector_in_turn",
-    "prefix": ", in turn "
-  },
-  {
-    "id": "connector_with_focus_on",
-    "prefix": ", with a focus on "
-  },
-  {
-    "id": "connector_with_emphasis_on",
-    "prefix": ", with particular emphasis on "
-  },
-  {
-    "id": "connector_in_support_of",
-    "prefix": ", in support of "
-  },
-  {
-    "id": "connector_as_a_step_towards",
-    "prefix": ", as a step towards "
-  },
-  {
-    "id": "connector_to_help",
-    "prefix": ", to help "
-  },
-  {
-    "id": "connector_to_better",
-    "prefix": ", to better "
-  },
-  {
-    "id": "connector_to_strengthen",
-    "prefix": ", to strengthen "
-  }
+  { "id": "tail_default_comma", "prefix": ", " },
+  { "id": "tail_while_aligned", "prefix": ", while " },
+  { "id": "tail_and_aligned", "prefix": ", and " },
+
+  { "id": "connector_while_also", "prefix": ", while also " },
+  { "id": "connector_thereby", "prefix": ", thereby " },
+  { "id": "connector_in_turn", "prefix": ", in turn " },
+  { "id": "connector_enabling", "prefix": ", enabling " },
+
+  { "id": "connector_focus_on", "prefix": ", focused on " },
+  { "id": "connector_with_emphasis_on", "prefix": ", emphasizing " },
+  { "id": "connector_in_support_of", "prefix": ", in support of " },
+  { "id": "connector_as_a_step_towards", "prefix": ", as a step towards " },
+
+  { "id": "connector_to_help", "prefix": ", to help " },
+  { "id": "connector_to_further", "prefix": ", to further " },
+  { "id": "connector_to_strengthen", "prefix": ", to strengthen " }
 ]

@@ -1,5 +1,5 @@
 // engine/buildErrorMessage.ts
-// Final error/comment/message builder for KPI Engine v10.7.5 (Option C-FULL)
+// Final error/comment/message builder for KPI Engine v10.8 (Option C-FULL)
 //
 // Responsibilities (per row):
 //  - Convert domain validation + metrics auto-suggest into final status:
@@ -47,7 +47,8 @@ function buildErrorMessage(params: BuildErrorMessageParams): BuildErrorMessageRe
 
   if (status === 'NEEDS_REVIEW' && metrics_auto_suggested) {
     return {
-      comments: 'Metrics were system-recommended based on the role matrix. Please review for approval.'
+      comments:
+        'System-recommended metrics applied based on the role/task matrix. Confirm or adjust to align with approved measurement definitions.'
     };
   }
 
@@ -69,7 +70,7 @@ export interface FinalAssemblyResult {
    * Canonical row snapshots (for safe echoes / future v10.8 use)
    */
   input_row: KpiRowIn; // sanitized input row used by the engine
-  normalized_row: KpiRowIn; // same as input_row under v10.7.5, reserved for future transforms
+  normalized_row: KpiRowIn; // same as input_row under v10.8, reserved for future transforms
 
   /**
    * Normalized control fields
@@ -94,6 +95,12 @@ export interface FinalAssemblyResult {
    * (this is what /api/kpi will expose as resolved_metrics to GPT)
    */
   resolved_metrics: MetricResolutionResult;
+
+  /**
+   * True when the engine used any system-recommended metrics (partial or full).
+   * Forced to false for INVALID rows.
+   */
+  metrics_auto_suggested: boolean;
 }
 
 /**
@@ -148,7 +155,7 @@ export function buildFinalMessage(
   if (!userQuality && finalQuality) autoSuggested.push('Quality');
   if (!userImprovement && finalImprovement) autoSuggested.push('Improvement');
 
-  const metricsNeedsReview = !!metricsResult.used_default_metrics || autoSuggested.length > 0;
+  let metricsNeedsReview = !!metricsResult.used_default_metrics || autoSuggested.length > 0;
 
   const metricsSnapshot = {
     output_metric: finalOutput,
@@ -156,6 +163,18 @@ export function buildFinalMessage(
     improvement_metric: finalImprovement,
     needsReview: metricsNeedsReview
   };
+
+  // ---------------------------------------------------------------------------
+  // Enterprise-safe constants and helpers (v10.8/v11 contract)
+  // Inserted after metricsSnapshot, before status derivation
+  // ---------------------------------------------------------------------------
+  const EMPTY_METRICS = { output_metric: "", quality_metric: "", improvement_metric: "" };
+
+  // Determine which metrics were system-filled (partial vs full)
+  const suggestedKinds: Array<"Output" | "Quality" | "Improvement"> = [];
+  if (!normalizedRow.output_metric && metricsResult.output_metric) suggestedKinds.push("Output");
+  if (!normalizedRow.quality_metric && metricsResult.quality_metric) suggestedKinds.push("Quality");
+  if (!normalizedRow.improvement_metric && metricsResult.improvement_metric) suggestedKinds.push("Improvement");
 
   // ---------------------------------------------------------------------------
   // 1. Status derivation (domain first, then metrics/mode)
@@ -171,6 +190,39 @@ export function buildFinalMessage(
   } else if (metricsNeedsReview) {
     status = 'NEEDS_REVIEW';
   }
+
+  // ---------------------------------------------------------------------------
+  // v10.8/v11 contract hard-stop:
+  // INVALID rows must not surface suggested metrics flags or metric snapshots.
+  // This prevents downstream consumers from interpreting INVALID rows as needing
+  // metric approval.
+  // ---------------------------------------------------------------------------
+  if (status === 'INVALID') {
+    metricsNeedsReview = false;
+    autoSuggested.length = 0;
+    metricsSnapshot.output_metric = '';
+    metricsSnapshot.quality_metric = '';
+    metricsSnapshot.improvement_metric = '';
+    metricsSnapshot.needsReview = false;
+  }
+
+  // ---------------------------------------------------------------------------
+  // Enterprise-safe defaults for NEEDS_REVIEW/INVALID (after status derivation)
+  // ---------------------------------------------------------------------------
+  const needsReviewDefault =
+    suggestedKinds.length === 0 || suggestedKinds.length === 3
+      ? 'System-recommended metrics applied based on the role/task matrix. Confirm or adjust to align with approved measurement definitions.'
+      : `System-recommended metrics applied for: ${suggestedKinds.join(', ')}. Confirm or adjust to align with approved measurement definitions.`;
+
+  const isInvalid = status === 'INVALID';
+
+  // Hard cleanup for INVALID (no misleading metrics)
+  const safeResolvedMetrics = isInvalid ? (EMPTY_METRICS as MetricResolutionResult) : metricsResult;
+  const safeMetricsSnapshot = isInvalid
+    ? { ...EMPTY_METRICS, needsReview: false }
+    : metricsSnapshot;
+
+  const safeAutoSuggested = isInvalid ? false : metricsNeedsReview;
 
   // ---------------------------------------------------------------------------
   // 2. Comments assembly (category-ordered)
@@ -267,16 +319,15 @@ export function buildFinalMessage(
   if (status !== 'INVALID' && metricsNeedsReview) {
     if (autoSuggested.length === 3) {
       commentsParts.push(
-        'Metrics were system-recommended (Output / Quality / Improvement). Please review for approval.'
+        'System-recommended metrics were applied based on the role/task matrix (Output / Quality / Improvement). Confirm or adjust to align with approved measurement definitions.'
       );
     } else if (autoSuggested.length > 0) {
       commentsParts.push(
-        `Metrics were system-recommended for: ${autoSuggested.join(', ')}. Please review for approval.`
+        `System-recommended metrics were applied for: ${autoSuggested.join(', ')}. Confirm or adjust to align with approved measurement definitions.`
       );
     } else {
-      // Fallback generic note if we cannot infer exact fields
       commentsParts.push(
-        'Metrics were system-recommended based on the role matrix. Please review for approval.'
+        'System-recommended metrics were applied based on the role/task matrix. Confirm or adjust to align with approved measurement definitions.'
       );
     }
   }
@@ -313,25 +364,31 @@ export function buildFinalMessage(
       team_role_lower: teamRoleLower,
       task_type_lower: taskTypeLower,
       metrics: metricsSnapshot,
-      resolved_metrics: metricsResult
+      resolved_metrics: metricsResult,
+      metrics_auto_suggested: false,
     };
   }
 
   // ---------------------------------------------------------------------------
-  // 5. Final assembly result for INVALID / NEEDS_REVIEW
+  // 5. Final assembly result for INVALID / NEEDS_REVIEW (enterprise-safe)
   // ---------------------------------------------------------------------------
+  const safeComments =
+    comments ||
+    (status === 'NEEDS_REVIEW'
+      ? needsReviewDefault
+      : 'Objectives not generated due to validation errors.');
+
   return {
     status,
-    comments: comments || (status === 'NEEDS_REVIEW'
-      ? 'Metrics were system-recommended based on the role matrix. Please review for approval.'
-      : 'Objectives not generated due to validation errors.'),
+    comments: safeComments,
     errorCodes: canonicalErrorCodes,
     input_row: normalizedRow,
     normalized_row: normalizedRow,
     mode,
     team_role_lower: teamRoleLower,
     task_type_lower: taskTypeLower,
-    metrics: metricsSnapshot,
-    resolved_metrics: metricsResult
+    metrics: safeMetricsSnapshot,
+    resolved_metrics: safeResolvedMetrics,
+    metrics_auto_suggested: safeAutoSuggested
   };
 }

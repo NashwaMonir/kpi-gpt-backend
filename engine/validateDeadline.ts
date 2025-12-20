@@ -1,5 +1,5 @@
 // engine/validateDeadline.ts
-// Flexible multi-format deadline parsing for KPI Engine v10.7.5 (Option C-FULL)
+// Flexible multi-format deadline parsing for KPI Engine v10.8 (Option C-FULL)
 
 import {
   DEADLINE_YYYY_MM_DD,

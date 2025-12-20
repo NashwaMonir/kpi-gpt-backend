@@ -113,11 +113,17 @@ export default function handler(req: VercelRequest, res: VercelResponse) {
     const taskTypeNorm = normalizeTaskType(task_type);
     if (task_type && !taskTypeNorm.isAllowed) {
       addErrorCode(errorCodes, ErrorCodes.INVALID_TASK_TYPE as any);
+    } else if (taskTypeNorm.isAllowed && taskTypeNorm.normalized) {
+      // ✅ Persist canonical task_type for matrix + objective parity
+      (row as any).task_type = taskTypeNorm.normalized;
     }
 
     const roleNorm = normalizeTeamRole(team_role);
     if (team_role && !roleNorm.isAllowed) {
       addErrorCode(errorCodes, ErrorCodes.INVALID_TEAM_ROLE as any);
+    } else if (roleNorm.isAllowed && roleNorm.normalized) {
+      // ✅ Persist canonical team_role for matrix + objective parity
+      (row as any).team_role = roleNorm.normalized;
     }
 
     // 3) Deadline validation (format + engine-year)
@@ -203,7 +209,8 @@ export default function handler(req: VercelRequest, res: VercelResponse) {
       parts.push('Mode fallback applied: defaulting to "both".');
     }
 
-    const metrics_auto_suggested = metricsMissing;
+    const metrics_auto_suggested =
+      status === 'INVALID' ? false : metricsMissing;
 
     const finalMessage = buildErrorMessage({
       status,
@@ -237,66 +244,98 @@ export default function handler(req: VercelRequest, res: VercelResponse) {
       return a?.status !== 'INVALID';
     })
     .map((row) => {
-      const a = assessments.get(row.row_id)!;
+      // --- Canonicalize fields for strict single vs bulk parity ---
+      // Do not rely on prior row mutation; re-derive canonical forms here.
+      const team_role_raw = toSafeTrimmedString(row.team_role);
+      const task_type_raw = toSafeTrimmedString(row.task_type);
+
+      const roleNorm2 = normalizeTeamRole(team_role_raw);
+      const taskNorm2 = normalizeTaskType(task_type_raw);
+
+      // If normalization fails (should have been caught in assessRow), fall back to trimmed raw.
+      const team_role_canonical =
+        roleNorm2.isAllowed && roleNorm2.normalized ? roleNorm2.normalized : team_role_raw;
+      const task_type_canonical =
+        taskNorm2.isAllowed && taskNorm2.normalized ? taskNorm2.normalized : task_type_raw;
 
       // Canonical ISO deadline for parity across single and bulk flows.
-      // assessRow() already persisted ISO onto row.dead_line when valid.
-      const dead_line_iso = toSafeTrimmedString(row.dead_line);
+      // assessRow() already attempted to persist ISO; normalize again for safety.
+      const dead_line_raw = toSafeTrimmedString(row.dead_line);
+      const dlNorm2 = normalizeDeadline(dead_line_raw);
+      const dead_line_iso = dlNorm2.isValid && dlNorm2.normalized ? dlNorm2.normalized : dead_line_raw;
 
-      const variation_seed = computeVariationSeed({
-        row_id: row.row_id,
-        company: row.company,
-        team_role: row.team_role,
-        task_type: row.task_type,
-        task_name: row.task_name,
-        dead_line: dead_line_iso,
-        strategic_benefit: (row as any).strategic_benefit,
-        output_metric: (row as any).output_metric,
-        quality_metric: (row as any).quality_metric,
-        improvement_metric: (row as any).improvement_metric
-      });
+      const output_metric_in = toSafeTrimmedString((row as any).output_metric);
+      const quality_metric_in = toSafeTrimmedString((row as any).quality_metric);
+      const improvement_metric_in = toSafeTrimmedString((row as any).improvement_metric);
+
+      // --- Variation seed (single source of truth) ---
+      // Prefer the seed generated in bulkPrepareRows (stored in prep_token) to guarantee
+      // strict parity across the bulk pipeline. If missing, recompute using the same canonical
+      // (team_role, task_type, company, row_id) features used by /api/kpi.
+      const seedFromPrep = (row as any).variation_seed;
+      const variation_seed =
+        typeof seedFromPrep === 'number' && Number.isFinite(seedFromPrep)
+          ? seedFromPrep
+          : computeVariationSeed({
+              row_id: row.row_id,
+              company: row.company,
+              team_role: team_role_canonical,
+              task_type: task_type_canonical
+            } as any);
+      (row as any).variation_seed = variation_seed;
 
       // Resolve metrics exactly like /api/kpi (matrix + role defaults) when any metric is missing.
       // This is required for single vs bulk objective parity.
       const rowForResolution: KpiRowIn = {
         row_id: row.row_id,
         company: row.company,
-        team_role: row.team_role,
-        task_type: row.task_type,
+        team_role: team_role_canonical,
+        task_type: task_type_canonical,
         task_name: row.task_name,
         dead_line: dead_line_iso,
         strategic_benefit: (row as any).strategic_benefit,
-        output_metric: toSafeTrimmedString((row as any).output_metric),
-        quality_metric: toSafeTrimmedString((row as any).quality_metric),
-        improvement_metric: toSafeTrimmedString((row as any).improvement_metric)
+        output_metric: output_metric_in,
+        quality_metric: quality_metric_in,
+        improvement_metric: improvement_metric_in
       };
+
+      const anyMetricMissingAtInput = !output_metric_in || !quality_metric_in || !improvement_metric_in;
 
       // We do not need to mutate the row-level error codes here because assessRow already
       // adds canonical E501/E502 for metrics-missing. This call is only to obtain the filled metrics.
-      const resolved = resolveMetrics(rowForResolution, variation_seed, [] as any);
+      const resolved = anyMetricMissingAtInput
+        ? resolveMetrics(rowForResolution, variation_seed, [] as any)
+        : {
+            output_metric: output_metric_in,
+            quality_metric: quality_metric_in,
+            improvement_metric: improvement_metric_in,
+            used_default_metrics: false
+          };
 
-      const anyMetricMissingAtInput =
-        !toSafeTrimmedString((row as any).output_metric) ||
-        !toSafeTrimmedString((row as any).quality_metric) ||
-        !toSafeTrimmedString((row as any).improvement_metric);
+      // Persist resolved metrics onto the bulk row so exports (and encoded payload) are auditable.
+      // This is safe because only VALID/NEEDS_REVIEW rows are included in engineRows.
+      (row as any).output_metric = (resolved as any).output_metric ?? '';
+      (row as any).quality_metric = (resolved as any).quality_metric ?? '';
+      (row as any).improvement_metric = (resolved as any).improvement_metric ?? '';
+      (row as any).metrics_auto_suggested = anyMetricMissingAtInput || !!(resolved as any).used_default_metrics;
 
       const engineRow: EnginePreparedRow = {
         row_id: row.row_id,
-        team_role: row.team_role,
-        task_type: row.task_type,
+        team_role: team_role_canonical,
+        task_type: task_type_canonical,
         task_name: row.task_name,
         dead_line: dead_line_iso,
         strategic_benefit: (row as any).strategic_benefit,
         company: row.company,
 
         // Use resolved metrics so bulk objective includes the same auto-suggested metric text as single.
-        output_metric: resolved.output_metric ?? '',
-        quality_metric: resolved.quality_metric ?? '',
-        improvement_metric: resolved.improvement_metric ?? '',
+        output_metric: (resolved as any).output_metric ?? '',
+        quality_metric: (resolved as any).quality_metric ?? '',
+        improvement_metric: (resolved as any).improvement_metric ?? '',
 
         // v10.8 contract: metrics_auto_suggested must be true whenever ANY metric is auto-filled
         // (partial or default). In this engine, metrics are only auto-filled when at least one input metric is missing.
-        metrics_auto_suggested: anyMetricMissingAtInput || !!resolved.used_default_metrics,
+        metrics_auto_suggested: anyMetricMissingAtInput || !!(resolved as any).used_default_metrics,
         variation_seed
       };
 
@@ -330,11 +369,19 @@ export default function handler(req: VercelRequest, res: VercelResponse) {
     const dead_line = toSafeTrimmedString(row.dead_line);
 
     return {
+      row_id: row.row_id,
       task_name: row.task_name,
       task_type: row.task_type,
       team_role: row.team_role,
       dead_line,
       objective,
+
+      // Metrics are included for auditability and exact bulk assertions.
+      output_metric: a.status === 'INVALID' ? '' : toSafeTrimmedString((row as any).output_metric),
+      quality_metric: a.status === 'INVALID' ? '' : toSafeTrimmedString((row as any).quality_metric),
+      improvement_metric: a.status === 'INVALID' ? '' : toSafeTrimmedString((row as any).improvement_metric),
+      metrics_auto_suggested: a.status === 'INVALID' ? false : !!(row as any).metrics_auto_suggested,
+
       validation_status: a.status,
       comments: a.comments,
       // v10.8 Lite: summary_reason removed

@@ -1,5 +1,5 @@
 // engine/regex.ts
-// Centralized regular expressions for KPI Engine v10.7.5 (Option C-FULL)
+// Centralized regular expressions for KPI Engine v10.8 (Option C-FULL)
 
 // ------------------------------------------------------------
 // Deadline formats (string patterns only)
