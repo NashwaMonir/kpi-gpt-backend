@@ -9,6 +9,7 @@
 import objective_patterns from '../data/objective_patterns.json';
 import verb_pool from '../data/verb_pool.json';
 import connector_rules from '../data/connector_rules.json';
+import metrics_connector_rules from '../data/metrics_connector_rules.json';
 import variation_rules from '../data/variation_rules.json';
 import cleanup_rules from '../data/cleanup_rules.json';
 import humanization_rules from '../data/humanization_rules.json';
@@ -118,11 +119,17 @@ function startsWithEnsure(text: string): boolean {
   return /^\s*ensure\b/i.test(String(text || ''));
 }
 
+function stripLeadingEnsureVerb(text: string): string {
+  const s = String(text || '').trim();
+  if (!s) return '';
+  return s.replace(/^ensure\b\s*/i, '').trim();
+}
+
 function startsWithImperativeVerb(text: string): boolean {
   const s = String(text || '').trim();
   // Common imperative verbs used in KPI metrics.
   // Keep intentionally tight to avoid false positives (e.g., nouns).
-  return /^(reduce|increase|improve|decrease|lower|raise|maximize|minimize|deliver|publish|complete|implement|roll\s+out|rollout|launch|ship|optimize|streamline|ensure)\b/i.test(s);
+  return /^(reduce|increase|improve|decrease|lower|raise|maximize|minimize|achieve|deliver|publish|complete|implement|roll\s+out|rollout|launch|ship|optimize|streamline|ensure)\b/i.test(s);
 }
 
 function lowerFirst(text: string): string {
@@ -213,17 +220,7 @@ function buildMetricsClause(row: PreparedRow, mode: 'simple' | 'complex'): strin
   else if (metricParts.length === 2) metricsJoined = metricParts.join(' and ');
   else metricsJoined = metricParts.slice(0, -1).join(', ') + ', and ' + metricParts[metricParts.length - 1];
 
-  // Avoid "to achieve Ensure ..." grammar issues by using a mode-aware connector.
-  let connector = ' with ';
-
-  if (mode !== 'simple') {
-    // If output metric begins with an imperative verb, do NOT prepend "to achieve"
-    if (row.output_metric && startsWithImperativeVerb(row.output_metric)) {
-      connector = startsWithEnsure(row.output_metric) ? ' to ensure ' : ' to ';
-    } else {
-      connector = ' to achieve ';
-    }
-  }
+  const connector = pickMetricsConnector(row, mode);
   return connector + metricsJoined;
 }
 // -----------------------------
@@ -708,12 +705,8 @@ function buildEnterpriseMetricsClause(row: PreparedRow, mode: ObjectiveMode): st
   else if (parts.length === 2) joined = parts.join(' and ');
   else joined = parts.slice(0, -1).join(', ') + ', and ' + parts[parts.length - 1];
 
- const connector =
-  mode === 'simple'
-    ? ' with '
-    : (row.output_metric && startsWithEnsure(row.output_metric) ? ' to ensure ' : ' to achieve ');
-
-return connector + joined;
+  const connector = pickMetricsConnector(row, mode === 'simple' ? 'simple' : 'complex');
+  return connector + joined;
 }
 // Enterprise clause-order needs atomic metric clauses (performance/quality/improvement),
 // not a single combined blob, otherwise clause_order cannot control grammar.
@@ -731,30 +724,73 @@ function buildEnterpriseMetricClauses(row: PreparedRow): {
   let quality = '';
   let improvement = '';
 
+  // For enterprise clause-order, we still need atomic clauses,
+  // but connectors must remain JSON-driven via pickMetricsConnector() to avoid hardcoded drift.
   if (out) {
-    performance = startsWithEnsure(out) ? `to ensure ${stripLeadingPunctuation(out)}` : `to achieve ${out}`;
+    const cleaned = stripLeadingPunctuation(out);
+
+    // Use the same connector logic as the legacy path (JSON-driven + seeded).
+    const conn = pickMetricsConnector(row, 'complex');
+
+    if (startsWithEnsure(cleaned)) {
+      const body = stripLeadingEnsureVerb(cleaned);
+      // Ensure connector matches “ensure” semantics.
+      // If JSON is missing, pickMetricsConnector already falls back safely.
+      if (String(conn).toLowerCase().includes('ensure')) {
+        performance = body ? `${conn}${body}`.trim() : String(conn).trim();
+      } else {
+        performance = body ? `to ensure ${body}` : 'to ensure';
+      }
+    } else if (startsWithImperativeVerb(cleaned)) {
+      // Imperative metrics should never get “to achieve”.
+      // Connector should typically be “ to ”; we keep grammar by lowercasing the first letter.
+      performance = `${conn}${lowerFirst(cleaned)}`.trim();
+    } else {
+      // Non-imperative metric phrases should use the default (non-imperative) connector bucket.
+      // pickMetricsConnector(row,'complex') selects from JSON (default) and falls back safely.
+      performance = `${conn}${cleaned}`.trim();
+    }
+
     first = false;
   }
 
   if (qual) {
-    // If quality is the first (rare), use "to ensure" for grammar.
-    quality = first ? `to ensure ${qual}` : `ensuring ${qual}`;
+    const cleaned = stripLeadingPunctuation(qual);
+
+    // If quality is the first (rare), use a complex connector to keep grammar consistent.
+    if (first) {
+      const conn = pickMetricsConnector(row, 'complex');
+      const body = startsWithEnsure(cleaned) ? stripLeadingEnsureVerb(cleaned) : cleaned;
+
+      if (String(conn).toLowerCase().includes('ensure')) {
+        quality = body ? `${conn}${body}`.trim() : String(conn).trim();
+      } else {
+        quality = body ? `to ensure ${body}` : 'to ensure';
+      }
+    } else {
+      // Subsequent quality clause should remain gerund form.
+      quality = `ensuring ${startsWithEnsure(cleaned) ? stripLeadingEnsureVerb(cleaned) : cleaned}`;
+    }
+
     first = false;
   }
 
   if (imp) {
+    const cleaned = stripLeadingPunctuation(imp);
+
     // Enterprise grammar:
-    // - If metric starts with an imperative verb (Reduce/Increase/Improve...), use it directly.
+    // - If metric starts with an imperative verb (Reduce/Increase/Improve/Achieve...), use it directly.
     // - Otherwise fall back to a gerund form.
     if (first) {
-      improvement = startsWithImperativeVerb(imp)
-        ? `to ${lowerFirst(imp)}`
-        : `to improve ${imp}`;
+      improvement = startsWithImperativeVerb(cleaned)
+        ? `to ${lowerFirst(cleaned)}`
+        : `to improve ${cleaned}`;
     } else {
-      improvement = startsWithImperativeVerb(imp)
-        ? `and ${lowerFirst(imp)}`
-        : `and improving ${imp}`;
+      improvement = startsWithImperativeVerb(cleaned)
+        ? `and ${lowerFirst(cleaned)}`
+        : `and improving ${cleaned}`;
     }
+
     first = false;
   }
 
@@ -955,7 +991,7 @@ function buildEnterpriseClauses(
   const baselineClause = mode === 'complex' ? buildEnterpriseBaselineClause(row, mode) : '';
 
   let tailClause = buildTailClause(row, mode);
-  if (mode === 'complex' && !tailClause) tailClause = ", supporting the organization's strategic goals";
+  if (mode === 'complex' && !tailClause) tailClause = '';
 
   const riskClause =
     mode === 'complex' && lead ? ensureLeadingComma(buildEnterpriseLeadRiskClause(row)) : '';
@@ -1008,6 +1044,67 @@ function applyVariationRules(
 // -----------------------------
 // Main builders
 // -----------------------------
+
+function getMetricsConnectorVariants(mode: 'simple' | 'complex', kind: 'default' | 'imperative'): string[] {
+  const cfg = metrics_connector_rules as any;
+  const root = cfg?.metrics_connectors;
+  if (!root) return [];
+
+  if (mode === 'simple') {
+    const simple = root.simple;
+    return Array.isArray(simple) ? simple : [];
+  }
+
+  // complex
+  const complex = root.complex;
+  if (!complex) return [];
+
+  const arr = kind === 'imperative' ? complex.imperative : complex.default;
+  return Array.isArray(arr) ? arr : [];
+}
+
+function pickMetricsConnector(row: PreparedRow, mode: 'simple' | 'complex'): string {
+  // SIMPLE always uses JSON-driven connectors (default to " with " if config missing)
+  if (mode === 'simple') {
+    const variants = getMetricsConnectorVariants('simple', 'default');
+    const picked = seededPick(row.variation_seed, `metrics_connector|simple|${row.team_role}|${row.task_type}`, variants);
+    return (picked as any) || ' with ';
+  }
+
+  // COMPLEX: imperative metrics must not get "to achieve".
+  const out = String(row.output_metric || '').trim();
+  const isImperative = !!out && startsWithImperativeVerb(out);
+
+  const kind: 'default' | 'imperative' = isImperative ? 'imperative' : 'default';
+  const variants = getMetricsConnectorVariants('complex', kind);
+
+  // v10.8: If JSON is missing, fall back to a minimal safe connector.
+  // We intentionally avoid hardcoding "to achieve" to prevent "to achieve Achieve ..." duplication.
+  if (!variants.length) {
+    if (isImperative) return startsWithEnsure(out) ? ' to ensure ' : ' to ';
+    return ' to ';
+  }
+
+  // For imperative, allow JSON to contain both " to " and " to ensure ".
+  // Enforce ensure-selection when output starts with Ensure.
+  if (kind === 'imperative' && startsWithEnsure(out)) {
+    const ensureCandidates = variants.filter((v) => String(v).toLowerCase().includes('ensure'));
+    const ensurePicked = seededPick(
+      row.variation_seed,
+      `metrics_connector|complex|imperative|ensure|${row.team_role}|${row.task_type}`,
+      ensureCandidates
+    );
+    if (ensurePicked) return String(ensurePicked);
+  }
+
+  const picked = seededPick(
+    row.variation_seed,
+    `metrics_connector|complex|${kind}|${row.team_role}|${row.task_type}`,
+    variants
+  );
+
+  return (picked as any) || (isImperative ? (startsWithEnsure(out) ? ' to ensure ' : ' to ') : ' to ');
+}
 
 function buildObjectiveInternal(row: PreparedRow, _requestedMode: 'simple' | 'complex'): string {
   // Contract: never generate objective text for invalid rows.
@@ -1069,7 +1166,7 @@ function buildObjectiveInternal(row: PreparedRow, _requestedMode: 'simple' | 'co
 
   let tailClause = buildTailClause(row, effectiveMode);
   if (shouldUseEnterprise && effectiveMode === 'complex' && !tailClause) {
-    tailClause = ", supporting the organization's strategic goals";
+    tailClause = '';
   }
   if (shouldUseEnterprise && effectiveMode === 'complex') {
     tailClause = dedupeTailPhrases(tailClause);
