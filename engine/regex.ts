@@ -9,6 +9,10 @@
 // ISO: 2025-10-01
 export const DEADLINE_YYYY_MM_DD = /^\d{4}-\d{2}-\d{2}$/;
 
+// ISO datetime: 2025-10-01T00:00:00Z or with offset
+export const DEADLINE_ISO_DATETIME =
+  /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(?:\.\d+)?(?:Z|[+-]\d{2}:\d{2})$/;
+
 // Slash: 2025/10/01
 export const DEADLINE_YYYY_MM_DD_SLASH = /^\d{4}\/\d{1,2}\/\d{1,2}$/;   // allow 2025/1/5, 2025/01/05
 

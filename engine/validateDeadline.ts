@@ -13,7 +13,8 @@ import {
   DEADLINE_YYYY_TEXT_MONTH_DD_SPACE,
   DEADLINE_DD_TEXT_MONTH_YYYY_DASH,
   DEADLINE_DD_TEXT_MONTH_YYYY_SPACE,
-  DEADLINE_TEXT_MONTH_DD_YYYY_SPACE
+  DEADLINE_TEXT_MONTH_DD_YYYY_SPACE,
+  DEADLINE_ISO_DATETIME
 } from './regex';
 
 import { getCurrentEngineYear } from './constants';
@@ -89,7 +90,8 @@ function matchesAnySupportedFormat(raw: string): boolean {
     DEADLINE_YYYY_TEXT_MONTH_DD_SPACE.test(raw) ||
     DEADLINE_DD_TEXT_MONTH_YYYY_DASH.test(raw) ||
     DEADLINE_DD_TEXT_MONTH_YYYY_SPACE.test(raw) ||
-    DEADLINE_TEXT_MONTH_DD_YYYY_SPACE.test(raw)
+    DEADLINE_TEXT_MONTH_DD_YYYY_SPACE.test(raw) ||
+    DEADLINE_ISO_DATETIME.test(raw)
   );
 }
 
@@ -157,7 +159,8 @@ export function validateDeadline(
   }
 
   // Valid date — enforce engine-year rule
-  const year = parsed.getFullYear();
+  // IMPORTANT: use UTC year to avoid timezone drift when parsing date-only strings.
+  const year = parsed.getUTCFullYear();
   const currentYear = getCurrentEngineYear();
 
   if (year !== currentYear) {
@@ -174,73 +177,171 @@ export function validateDeadline(
  * Assumes the caller has already checked matchesAnySupportedFormat().
  */
 function tryParseAllFormats(raw: string): Date | null {
+  const makeUtcDate = (y: number, m1: number, d: number): Date | null => {
+    if (!Number.isFinite(y) || !Number.isFinite(m1) || !Number.isFinite(d)) return null;
+    if (m1 < 1 || m1 > 12) return null;
+    if (d < 1 || d > 31) return null;
+
+    const dt = new Date(Date.UTC(y, m1 - 1, d));
+
+    // Reject JS rollover (e.g., 2025-13-01 → 2026-01-01)
+    if (dt.getUTCFullYear() !== y) return null;
+    if (dt.getUTCMonth() !== m1 - 1) return null;
+    if (dt.getUTCDate() !== d) return null;
+
+    return dt;
+  };
+
+  const monthIndex = (mon: string): number | null => {
+    const v = mon.trim().toLowerCase();
+    const map: Record<string, number> = {
+      jan: 1,
+      january: 1,
+      feb: 2,
+      february: 2,
+      mar: 3,
+      march: 3,
+      apr: 4,
+      april: 4,
+      may: 5,
+      jun: 6,
+      june: 6,
+      jul: 7,
+      july: 7,
+      aug: 8,
+      august: 8,
+      sep: 9,
+      sept: 9,
+      september: 9,
+      oct: 10,
+      october: 10,
+      nov: 11,
+      november: 11,
+      dec: 12,
+      december: 12
+    };
+    return map[v] ?? null;
+  };
+
+  // 0. ISO datetime: 2025-10-01T00:00:00Z / 2025-10-01T00:00:00+02:00
+  if (DEADLINE_ISO_DATETIME.test(raw)) {
+    const y = Number(raw.slice(0, 4));
+    const m = Number(raw.slice(5, 7));
+    const d = Number(raw.slice(8, 10));
+    return makeUtcDate(y, m, d);
+  }
+
   // 1. ISO 2025-10-01
   if (DEADLINE_YYYY_MM_DD.test(raw)) {
-    return new Date(raw);
+    const [yyyy, mm, dd] = raw.split('-');
+    const y = Number(yyyy);
+    const m = Number(mm);
+    const d = Number(dd);
+    return makeUtcDate(y, m, d);
   }
 
   // 2. Slash 2025/1/5 or 2025/01/05
   if (DEADLINE_YYYY_MM_DD_SLASH.test(raw)) {
     const [yyyy, mm, dd] = raw.split('/');
-    return new Date(`${yyyy}-${mm.padStart(2, '0')}-${dd.padStart(2, '0')}`);
+    const y = Number(yyyy);
+    const m = Number(mm);
+    const d = Number(dd);
+    return makeUtcDate(y, m, d);
   }
 
   // 3. Dot 2025.1.5 or 2025.01.05
   if (DEADLINE_YYYY_MM_DD_DOT.test(raw)) {
     const [yyyy, mm, dd] = raw.split('.');
-    return new Date(`${yyyy}-${mm.padStart(2, '0')}-${dd.padStart(2, '0')}`);
+    const y = Number(yyyy);
+    const m = Number(mm);
+    const d = Number(dd);
+    return makeUtcDate(y, m, d);
   }
 
   // 4. Space 2025 05 01 (numeric)
   if (DEADLINE_YYYY_MM_DD_SPACE.test(raw)) {
     const [yyyy, mm, dd] = raw.split(/\s+/);
-    return new Date(`${yyyy}-${mm}-${dd}`);
+    const y = Number(yyyy);
+    const m = Number(mm);
+    const d = Number(dd);
+    return makeUtcDate(y, m, d);
   }
 
   // 5. Egyptian DD/MM/YYYY → YYYY-MM-DD
   if (DEADLINE_DD_MM_YYYY_SLASH.test(raw)) {
     const [dd, mm, yyyy] = raw.split('/');
-    return new Date(`${yyyy}-${mm}-${dd}`);
+    const y = Number(yyyy);
+    const m = Number(mm);
+    const d = Number(dd);
+    return makeUtcDate(y, m, d);
   }
 
   // 6. European DD-MM-YYYY → YYYY-MM-DD
   if (DEADLINE_DD_MM_YYYY_DASH.test(raw)) {
     const [dd, mm, yyyy] = raw.split('-');
-    return new Date(`${yyyy}-${mm}-${dd}`);
+    const y = Number(yyyy);
+    const m = Number(mm);
+    const d = Number(dd);
+    return makeUtcDate(y, m, d);
   }
 
   // 7. European DD.MM.YYYY → YYYY-MM-DD
   if (DEADLINE_DD_MM_YYYY_DOT.test(raw)) {
     const [dd, mm, yyyy] = raw.split('.');
-    return new Date(`${yyyy}-${mm}-${dd}`);
+    const y = Number(yyyy);
+    const m = Number(mm);
+    const d = Number(dd);
+    return makeUtcDate(y, m, d);
   }
 
   // 8. Text month — year-first: 2025-Sep-30 or 2025-September-30
   if (DEADLINE_YYYY_TEXT_MONTH_DD.test(raw)) {
-    return new Date(raw);
+    const [yyyy, mon, dd] = raw.split('-');
+    const y = Number(yyyy);
+    const m = monthIndex(mon);
+    const d = Number(dd);
+    if (!m) return null;
+    return makeUtcDate(y, m, d);
   }
 
   // 9. Text month — year-first spaced: 2025 Sep 30 or 2025 September 30
   if (DEADLINE_YYYY_TEXT_MONTH_DD_SPACE.test(raw)) {
-    return new Date(raw);
+    const [yyyy, mon, dd] = raw.split(/\s+/);
+    const y = Number(yyyy);
+    const m = monthIndex(mon);
+    const d = Number(dd);
+    if (!m) return null;
+    return makeUtcDate(y, m, d);
   }
 
-  // 10. Day-first text month: 30-Sep-2025 → rearrange
+  // 10. Day-first text month: 30-Sep-2025
   if (DEADLINE_DD_TEXT_MONTH_YYYY_DASH.test(raw)) {
     const [dd, mon, yyyy] = raw.split('-');
-    return new Date(`${yyyy}-${mon}-${dd}`);
+    const y = Number(yyyy);
+    const m = monthIndex(mon);
+    const d = Number(dd);
+    if (!m) return null;
+    return makeUtcDate(y, m, d);
   }
 
   // 11. Day-first text month: 30 Sep 2025
   if (DEADLINE_DD_TEXT_MONTH_YYYY_SPACE.test(raw)) {
     const [dd, mon, yyyy] = raw.split(/\s+/);
-    return new Date(`${yyyy}-${mon}-${dd}`);
+    const y = Number(yyyy);
+    const m = monthIndex(mon);
+    const d = Number(dd);
+    if (!m) return null;
+    return makeUtcDate(y, m, d);
   }
 
   // 12. Month-first text month: September 1 2025
   if (DEADLINE_TEXT_MONTH_DD_YYYY_SPACE.test(raw)) {
     const [mon, dd, yyyy] = raw.split(/\s+/);
-    return new Date(`${yyyy}-${mon}-${dd}`);
+    const y = Number(yyyy);
+    const m = monthIndex(mon);
+    const d = Number(dd);
+    if (!m) return null;
+    return makeUtcDate(y, m, d);
   }
 
   return null;
