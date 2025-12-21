@@ -61,27 +61,34 @@ get_json() {
 }
 
 # Decode /api/runKpiResultDownload?data=... token without depending on server.
-# Accepts a URL path, extracts data= token, base64url-decodes into JSON array.
+# Accepts either a full URL or a path that contains ?data=...
+# Extracts data= token, URL-decodes it, base64url-decodes, and prints JSON (string).
 decode_download_url_to_json() {
   local dl="$1"
-  local token
-  token=$(echo "$dl" | sed -n 's/.*[?&]data=\([^&]*\).*/\1/p')
-  if [[ -z "$token" ]]; then
+  local token=""
+
+  if [[ "$dl" != *"?data="* ]]; then
     echo "[]"
-    return
+    return 0
   fi
 
-  python3 - <<'PY'
-import os, sys, urllib.parse, base64, json
-u = sys.argv[1]
-tok = urllib.parse.unquote(u)
-# base64url -> base64
-s = tok.replace('-', '+').replace('_', '/')
-# pad
-pad = (-len(s)) % 4
-s += '=' * pad
-raw = base64.b64decode(s.encode('utf-8'))
-print(raw.decode('utf-8'))
+  token="${dl#*data=}"
+
+  python3 - <<'PY' "$token"
+import sys, json, base64, urllib.parse
+
+tok = urllib.parse.unquote(sys.argv[1] or "")
+if not tok:
+  print("[]")
+  raise SystemExit(0)
+
+# base64url -> bytes
+pad = "=" * ((4 - (len(tok) % 4)) % 4)
+raw = base64.urlsafe_b64decode(tok + pad)
+
+# ensure JSON
+obj = json.loads(raw.decode("utf-8"))
+print(json.dumps(obj))
 PY
 }
 
@@ -207,7 +214,9 @@ lint_objective() {
   # baseline duplication heuristic (light): repeated 'measured against' twice
   # If your baseline rules change, keep as heuristic only.
   local ma_count
-  ma_count=$(echo "$obj" | grep -Eio "measured against" | wc -l | tr -d ' ')
+  ma_count=$(
+    (echo "$obj" | grep -Eio "measured against" || true) | wc -l | tr -d ' '
+  )
   if [[ "$ma_count" -le 1 ]]; then
     pass "$label: baseline phrase not duplicated (measured against count=$ma_count)"
   else
@@ -362,41 +371,25 @@ bf=$(bulk_finalize "$prep_token")
 dl=$(echo "$bf" | jq -r '.download_url')
 [[ -n "$dl" && "$dl" != "null" ]] && pass "Bulk finalize download_url present" || fail "Bulk finalize download_url missing"
 
-# Decode payload JSON array
-payload_json=$(python3 - <<PY
-import urllib.parse
-print(urllib.parse.unquote("$dl"))
-PY
-)
+# Safe, quoted vars for download path/url
+DL_PATH="$dl"
+DL_URL="${BASE}${DL_PATH}"
 
-data_token=$(echo "$payload_json" | sed -n 's/.*data=//p')
+# Decode payload JSON array (from the download_url token)
+rows_json="$(decode_download_url_to_json "$DL_PATH")"
 
-rows_json=$(python3 - <<'PY'
-import os, sys, urllib.parse, base64, json
-from urllib.parse import unquote
-
-dl = sys.argv[1]
-# extract data=
-import re
-m = re.search(r"[?&]data=([^&]+)", dl)
-if not m:
-  print('[]')
-  sys.exit(0)
-
-tok = unquote(m.group(1))
-s = tok.replace('-', '+').replace('_', '/')
-# pad
-s += '=' * ((4 - len(s) % 4) % 4)
-raw = base64.b64decode(s)
-print(raw.decode('utf-8'))
-PY
-"$dl")
-
-# Basic decode checks
-if echo "$rows_json" | jq 'type=="array"' >/dev/null 2>&1; then
-  pass "Decoded bulk rows JSON array"
+# Download XLSX via the actual URL (sanity / contract check)
+OUT_FILE="KPI_Output_intensive_A5.xlsx"
+curl -sS "$DL_URL" -o "$OUT_FILE"
+if file "$OUT_FILE" | grep -qi "Microsoft Excel"; then
+  pass "A.5 XLSX file signature ok"
 else
-  fail "Decoded bulk rows not an array"
+  fail "A.5 XLSX file signature missing"
+fi
+if unzip -t "$OUT_FILE" >/dev/null 2>&1; then
+  pass "A.5 XLSX zip integrity ok"
+else
+  fail "A.5 XLSX zip integrity failed"
 fi
 
 # Assert parity per row_id
@@ -461,23 +454,10 @@ bf2=$(bulk_finalize "$pt2")
 dl2=$(echo "$bf2" | jq -r '.download_url')
 [[ -n "$dl2" && "$dl2" != "null" ]] && pass "Bulk row_id fixture download_url present" || fail "Bulk row_id fixture download_url missing"
 
-rows_json2=$(python3 - <<'PY'
-import os, sys, urllib.parse, base64, json, re
-from urllib.parse import unquote
+DL_PATH2="$dl2"
+DL_URL2="${BASE}${DL_PATH2}"
 
-dl = sys.argv[1]
-m = re.search(r"[?&]data=([^&]+)", dl)
-if not m:
-  print('[]')
-  sys.exit(0)
-
-tok = unquote(m.group(1))
-s = tok.replace('-', '+').replace('_', '/')
-s += '=' * ((4 - len(s) % 4) % 4)
-raw = base64.b64decode(s)
-print(raw.decode('utf-8'))
-PY
-"$dl2")
+rows_json2="$(decode_download_url_to_json "$DL_PATH2")"
 
 for rid in 101 305 999; do
   if echo "$rows_json2" | jq -e --argjson rid "$rid" '.[] | select(.row_id==$rid) | .row_id' >/dev/null 2>&1; then
@@ -491,7 +471,7 @@ done
 # Download XLSX and check it contains row ids (string search in unzipped XML)
 # This is a pragmatic check without adding xlsx parsing deps.
 file_out="KPI_Output_intensive_rowid.xlsx"
-curl -sS "$BASE$dl2" -o "$file_out"
+curl -sS "$DL_URL2" -o "$file_out"
 if file "$file_out" | grep -qi "Microsoft Excel"; then
   pass "XLSX file signature (row_id fixture)"
 else
