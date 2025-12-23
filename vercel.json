@@ -4,5 +4,11 @@
   "routes": [
     { "src": "^/api/(.*\\.ts)$", "dest": "/api/$1" },
     { "src": "^/api/(.*)$", "dest": "/api/$1.ts" }
+  ],
+  "crons": [
+    {
+      "path": "/api/cron/cleanupKpiResults",
+      "schedule": "0 * * * *"
+    }
   ]
 }

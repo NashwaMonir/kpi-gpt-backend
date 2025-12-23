@@ -7,7 +7,6 @@ import {
   BulkFinalizeExportRequest,
   BulkFinalizeExportResponse,
   decodePrepareToken,
-  encodeRowsForDownload,
   PreparedRow as BulkPreparedRow,
   KpiResultRow
 } from '../engine/bulkTypes';
@@ -20,12 +19,40 @@ import { resolveMetrics } from '../engine/metricsAutoSuggest';
 
 import { ErrorCodes, addErrorCode } from '../engine/errorCodes';
 import type { ErrorCode } from '../engine/errorCodes';
-import { normalizeTaskType, normalizeTeamRole, normalizeMode, toSafeTrimmedString, normalizeDeadline } from '../engine/normalizeFields';
+import {
+  normalizeTaskType,
+  normalizeTeamRole,
+  normalizeMode,
+  toSafeTrimmedString,
+  normalizeDeadline
+} from '../engine/normalizeFields';
 import { validateDeadline } from '../engine/validateDeadline';
 import { isDangerousBenefitText, evaluateMetricsDangerous } from '../engine/validateDangerous';
 import { buildErrorMessage } from '../engine/buildErrorMessage';
 
-export default function handler(req: VercelRequest, res: VercelResponse) {
+// NEW: Blob storage (short, stable download_url)
+import { put } from '@vercel/blob';
+import crypto from 'crypto';
+
+// NEW: shared XLSX builder (no duplication). We will create this file next.
+import { buildKpiOutputWorkbook } from '../engine/kpiWorkbook';
+
+const XLSX_CONTENT_TYPE =
+  'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet';
+
+function toUtcDateISO(d: Date): string {
+  return d.toISOString().slice(0, 10); // YYYY-MM-DD
+}
+
+function toSafeIsoTimestamp(d: Date): string {
+  // "YYYY-MM-DDTHH-mm-ssZ" (safe in keys)
+  return d
+    .toISOString()
+    .replace(/\.\d{3}Z$/, 'Z')
+    .replace(/:/g, '-');
+}
+
+export default async function handler(req: VercelRequest, res: VercelResponse) {
   if (req.method !== 'POST') {
     res.setHeader('Allow', 'POST');
     return res.status(405).json({ error: 'Method not allowed' });
@@ -52,7 +79,7 @@ export default function handler(req: VercelRequest, res: VercelResponse) {
     });
   }
 
-  const { preparedRows, summary } = decoded;
+  const { preparedRows} = decoded;
   const bulkRows: BulkPreparedRow[] = preparedRows || [];
 
   if (!Array.isArray(bulkRows) || bulkRows.length === 0) {
@@ -170,44 +197,12 @@ export default function handler(req: VercelRequest, res: VercelResponse) {
       errorCodes.includes(ErrorCodes.INVALID_TEAM_ROLE) ||
       errorCodes.includes(ErrorCodes.DANGEROUS_TEXT) ||
       errorCodes.includes(ErrorCodes.LOW_SIGNAL_TEXT) ||
-      (!deadline.valid) ||
+      !deadline.valid ||
       (deadline.valid && deadline.wrongYear);
 
     let status: 'VALID' | 'NEEDS_REVIEW' | 'INVALID' = 'VALID';
     if (hasBlocking) status = 'INVALID';
     else if (metricsMissing || modeNorm.wasInvalid) status = 'NEEDS_REVIEW';
-
-    // 9) Comments + summary_reason (HR-grade, deterministic)
-    const parts: string[] = [];
-
-    if (missing.length > 0) {
-      parts.push(`Missing mandatory field(s): ${missing.join(', ')}.`);
-    }
-
-    if (errorCodes.includes(ErrorCodes.INVALID_TASK_TYPE) || errorCodes.includes(ErrorCodes.INVALID_TEAM_ROLE)) {
-      const invalids: string[] = [];
-      if (errorCodes.includes(ErrorCodes.INVALID_TASK_TYPE)) invalids.push('Task Type');
-      if (errorCodes.includes(ErrorCodes.INVALID_TEAM_ROLE)) invalids.push('Team Role');
-      if (invalids.length) parts.push(`Invalid value(s) for: ${invalids.join(', ')}.`);
-    }
-
-    if (errorCodes.includes(ErrorCodes.DANGEROUS_TEXT) || errorCodes.includes(ErrorCodes.LOW_SIGNAL_TEXT)) {
-      parts.push('Invalid text format detected in one or more fields.');
-    }
-
-    if (!deadline.valid) {
-      if (errorCodes.includes(ErrorCodes.DEADLINE_TEXTUAL_NONDATE)) {
-        parts.push('Deadline contains non-parsable or textual content.');
-      } else if (errorCodes.includes(ErrorCodes.DEADLINE_INVALID_FORMAT)) {
-        parts.push('Invalid deadline format.');
-      }
-    } else if (deadline.wrongYear) {
-      parts.push('Deadline outside valid calendar year.');
-    }
-
-    if (modeNorm.wasInvalid || errorCodes.includes(ErrorCodes.INVALID_MODE_VALUE)) {
-      parts.push('Mode fallback applied: defaulting to "both".');
-    }
 
     const metrics_auto_suggested =
       status === 'INVALID' ? false : metricsMissing;
@@ -399,17 +394,46 @@ export default function handler(req: VercelRequest, res: VercelResponse) {
     (r) => r.validation_status === 'NEEDS_REVIEW'
   ).length;
 
-  const host = req.headers.host ?? null;
-    const download_url = encodeRowsForDownload(resultRows);
-    
-  const response: BulkFinalizeExportResponse = {
-    download_url,
-    valid_count,
-    needs_review_count,
-    invalid_count,
-    ui_message:
-      'KPI result file is ready. Click the link to download KPI_Output.xlsx.'
-  };
+  // NEW: Blob-backed download URL (short, stable)
+  try {
+    const now = new Date();
+    const dateISO = toUtcDateISO(now);
+    const fileName = `KPI_Output_${dateISO}.xlsx`;
 
-  return res.status(200).json(response);
+    const iso_timestamp = toSafeIsoTimestamp(now);
+    const request_id = crypto.randomUUID();
+
+    // Your chosen pattern B: kpi-results/{iso_timestamp}_{request_id}.xlsx
+    const pathname = `kpi-results/${iso_timestamp}_${request_id}.xlsx`;
+
+    // Build the workbook bytes (shared builder; implemented next file)
+    const xlsxBuffer = await buildKpiOutputWorkbook(resultRows, dateISO);
+
+    const blob = await put(pathname, xlsxBuffer, {
+      access: 'public',
+      contentType: XLSX_CONTENT_TYPE,
+      addRandomSuffix: false
+    });
+
+    const download_url = blob.url;
+
+    const response: BulkFinalizeExportResponse = {
+      download_url,
+      valid_count,
+      needs_review_count,
+      invalid_count,
+      ui_message:
+        `KPI result file is ready. Click the link to download ${fileName}.`
+    };
+
+    return res.status(200).json(response);
+  } catch (err) {
+    console.error('[bulkFinalizeExport] Blob upload failed', err);
+    return res.status(500).json({
+      error: true,
+      code: 'BULK_EXPORT_STORAGE_FAILED',
+      message:
+        'Bulk export completed, but failed to store the output file for download.'
+    });
+  }
 }
