@@ -6,9 +6,9 @@
     { "src": "^/api/(.*)$", "dest": "/api/$1.ts" }
   ],
   "crons": [
-    {
-      "path": "/api/cron/cleanupKpiResults",
-      "schedule": "0 * * * *"
-    }
-  ]
+  {
+    "path": "/api/cron/cleanupKpiResults",
+    "schedule": "0 2 * * *"
+  }
+]
 }
