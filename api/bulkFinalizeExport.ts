@@ -34,7 +34,7 @@ import { buildErrorMessage } from '../engine/buildErrorMessage';
 import { put } from '@vercel/blob';
 import crypto from 'crypto';
 
-// NEW: shared XLSX builder (no duplication). We will create this file next.
+// NEW: shared XLSX builder (no duplication)
 import { buildKpiOutputWorkbook } from '../engine/kpiWorkbook';
 
 const XLSX_CONTENT_TYPE =
@@ -50,6 +50,20 @@ function toSafeIsoTimestamp(d: Date): string {
     .toISOString()
     .replace(/\.\d{3}Z$/, 'Z')
     .replace(/:/g, '-');
+}
+
+function coerceRowIdToNumber(raw: unknown): number | null {
+  // Accept numbers OR numeric strings (e.g., "901") because token/CSV parsing
+  // may carry row_id as string even when the contract is numeric.
+  if (typeof raw === 'number' && Number.isFinite(raw)) return raw;
+  if (typeof raw === 'string') {
+    const s = raw.trim();
+    if (/^\d+$/.test(s)) {
+      const n = Number(s);
+      return Number.isFinite(n) ? n : null;
+    }
+  }
+  return null;
 }
 
 export default async function handler(req: VercelRequest, res: VercelResponse) {
@@ -71,7 +85,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
   let decoded;
   try {
     decoded = decodePrepareToken(body.prep_token);
-  } catch (err) {
+  } catch {
     return res.status(400).json({
       error: true,
       code: 'INVALID_PREP_TOKEN',
@@ -79,7 +93,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     });
   }
 
-  const { preparedRows} = decoded;
+  const { preparedRows } = decoded;
   const bulkRows: BulkPreparedRow[] = preparedRows || [];
 
   if (!Array.isArray(bulkRows) || bulkRows.length === 0) {
@@ -157,18 +171,16 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     const deadline = validateDeadline(dead_line, errorCodes as any);
 
     // Persist normalized ISO deadline back onto the bulk row for downstream parity.
-    // This makes bulk objective generation and exports use the same YYYY-MM-DD canonical form.
     if (deadline.valid) {
       const n = normalizeDeadline(dead_line);
       if (n.isValid && n.normalized) {
-        // Persist canonical ISO directly on the row
         (row as any).dead_line = n.normalized;
       }
     }
 
     // 4) Dangerous / low-signal benefit
     if (strategic_benefit && isDangerousBenefitText(strategic_benefit, errorCodes as any)) {
-      // isDangerousBenefitText adds E401/E402 category error codes
+      // adds E401/E402 category error codes
     }
 
     // 5) Dangerous / low-signal metrics (only for non-empty metrics)
@@ -177,11 +189,9 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     // 6) Mode normalization
     const modeNorm = normalizeMode((row as any).mode, errorCodes as any);
 
-    // 7) Metrics auto-suggest semantics (bulk contract):
-    // If any metric is missing, bulk must surface NEEDS_REVIEW.
+    // 7) Metrics auto-suggest semantics (bulk contract)
     const metricsMissing = !output_metric || !quality_metric || !improvement_metric;
     if (metricsMissing) {
-      // Preserve canonical E501/E502 mapping.
       if (!output_metric && !quality_metric && !improvement_metric) {
         addErrorCode(errorCodes, ErrorCodes.METRICS_AUTOSUGGEST_ALL as any);
       } else {
@@ -190,7 +200,6 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     }
 
     // 8) Status derivation
-    // INVALID if: missing mandatory, invalid enums, dangerous/low-signal, or invalid deadline/wrong-year
     const hasBlocking =
       missing.length > 0 ||
       errorCodes.includes(ErrorCodes.INVALID_TASK_TYPE) ||
@@ -203,6 +212,38 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     let status: 'VALID' | 'NEEDS_REVIEW' | 'INVALID' = 'VALID';
     if (hasBlocking) status = 'INVALID';
     else if (metricsMissing || modeNorm.wasInvalid) status = 'NEEDS_REVIEW';
+
+    // 9) Comments + summary_reason (HR-grade, deterministic)
+    /*const parts: string[] = [];
+
+    if (missing.length > 0) {
+      parts.push(`Missing mandatory field(s): ${missing.join(', ')}.`);
+    }
+
+    if (errorCodes.includes(ErrorCodes.INVALID_TASK_TYPE) || errorCodes.includes(ErrorCodes.INVALID_TEAM_ROLE)) {
+      const invalids: string[] = [];
+      if (errorCodes.includes(ErrorCodes.INVALID_TASK_TYPE)) invalids.push('Task Type');
+      if (errorCodes.includes(ErrorCodes.INVALID_TEAM_ROLE)) invalids.push('Team Role');
+      if (invalids.length) parts.push(`Invalid value(s) for: ${invalids.join(', ')}.`);
+    }
+
+    if (errorCodes.includes(ErrorCodes.DANGEROUS_TEXT) || errorCodes.includes(ErrorCodes.LOW_SIGNAL_TEXT)) {
+      parts.push('Invalid text format detected in one or more fields.');
+    }
+
+    if (!deadline.valid) {
+      if (errorCodes.includes(ErrorCodes.DEADLINE_TEXTUAL_NONDATE)) {
+        parts.push('Deadline contains non-parsable or textual content.');
+      } else if (errorCodes.includes(ErrorCodes.DEADLINE_INVALID_FORMAT)) {
+        parts.push('Invalid deadline format.');
+      }
+    } else if (deadline.wrongYear) {
+      parts.push('Deadline outside valid calendar year.');
+    }
+
+    if (modeNorm.wasInvalid || errorCodes.includes(ErrorCodes.INVALID_MODE_VALUE)) {
+      parts.push('Mode fallback applied: defaulting to "both".');
+    }*/
 
     const metrics_auto_suggested =
       status === 'INVALID' ? false : metricsMissing;
@@ -225,64 +266,84 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       mode: modeNorm.mode
     };
   }
+  // ------------------------------------------------------------
+  // NEW: Engine-owned row_id enforcement (bulk-only responsibility)
+  // - If row_id is provided and numeric: keep it (stable parity fixtures)
+  // - Else: assign sequential 1..N based on stable order
+  // - Duplicates: fail fast (never suffix/mutate IDs => seed drift)
+  // ------------------------------------------------------------
+  const seenRowIds = new Set<number>();
+  for (let i = 0; i < bulkRows.length; i++) {
+    const row = bulkRows[i] as any;
+
+    const provided = coerceRowIdToNumber(row.row_id);
+    const enforced = provided ?? (i + 1);
+
+    if (seenRowIds.has(enforced)) {
+      return res.status(400).json({
+        error: true,
+        code: 'DUPLICATE_ROW_ID',
+        message: `Duplicate row_id detected in bulk export: ${enforced}. Row IDs must be unique.`
+      });
+    }
+
+    seenRowIds.add(enforced);
+    row.row_id = enforced;
+  }
 
   // Assess all rows using engine-aligned rules
   const assessments = new Map<number, RowAssessment>();
   for (const row of bulkRows) {
-    assessments.set(row.row_id, assessRow(row));
+    assessments.set((row as any).row_id as number, assessRow(row));
   }
 
   // Build engine rows for rows that can generate objectives (VALID + NEEDS_REVIEW)
   const engineRows: EnginePreparedRow[] = bulkRows
     .filter((r) => {
-      const a = assessments.get(r.row_id);
+      const a = assessments.get((r as any).row_id as number);
       return a?.status !== 'INVALID';
     })
     .map((row) => {
-      // --- Canonicalize fields for strict single vs bulk parity ---
-      // Do not rely on prior row mutation; re-derive canonical forms here.
+      const row_id = (row as any).row_id as number;
+
+      // Canonicalize fields for strict single vs bulk parity
       const team_role_raw = toSafeTrimmedString(row.team_role);
       const task_type_raw = toSafeTrimmedString(row.task_type);
 
       const roleNorm2 = normalizeTeamRole(team_role_raw);
       const taskNorm2 = normalizeTaskType(task_type_raw);
 
-      // If normalization fails (should have been caught in assessRow), fall back to trimmed raw.
       const team_role_canonical =
         roleNorm2.isAllowed && roleNorm2.normalized ? roleNorm2.normalized : team_role_raw;
       const task_type_canonical =
         taskNorm2.isAllowed && taskNorm2.normalized ? taskNorm2.normalized : task_type_raw;
 
-      // Canonical ISO deadline for parity across single and bulk flows.
-      // assessRow() already attempted to persist ISO; normalize again for safety.
       const dead_line_raw = toSafeTrimmedString(row.dead_line);
       const dlNorm2 = normalizeDeadline(dead_line_raw);
-      const dead_line_iso = dlNorm2.isValid && dlNorm2.normalized ? dlNorm2.normalized : dead_line_raw;
+      const dead_line_iso =
+        dlNorm2.isValid && dlNorm2.normalized ? dlNorm2.normalized : dead_line_raw;
 
       const output_metric_in = toSafeTrimmedString((row as any).output_metric);
       const quality_metric_in = toSafeTrimmedString((row as any).quality_metric);
       const improvement_metric_in = toSafeTrimmedString((row as any).improvement_metric);
 
-      // --- Variation seed (single source of truth) ---
-      // Prefer the seed generated in bulkPrepareRows (stored in prep_token) to guarantee
-      // strict parity across the bulk pipeline. If missing, recompute using the same canonical
-      // (team_role, task_type, company, row_id) features used by /api/kpi.
+      // Variation seed: prefer prep token seed if present; else recompute using canonical inputs
       const seedFromPrep = (row as any).variation_seed;
       const variation_seed =
         typeof seedFromPrep === 'number' && Number.isFinite(seedFromPrep)
           ? seedFromPrep
           : computeVariationSeed({
-              row_id: row.row_id,
+              row_id,
               company: row.company,
               team_role: team_role_canonical,
               task_type: task_type_canonical
             } as any);
+
       (row as any).variation_seed = variation_seed;
 
-      // Resolve metrics exactly like /api/kpi (matrix + role defaults) when any metric is missing.
-      // This is required for single vs bulk objective parity.
+      // Resolve metrics exactly like /api/kpi when any metric is missing
       const rowForResolution: KpiRowIn = {
-        row_id: row.row_id,
+        row_id,
         company: row.company,
         team_role: team_role_canonical,
         task_type: task_type_canonical,
@@ -294,10 +355,9 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         improvement_metric: improvement_metric_in
       };
 
-      const anyMetricMissingAtInput = !output_metric_in || !quality_metric_in || !improvement_metric_in;
+      const anyMetricMissingAtInput =
+        !output_metric_in || !quality_metric_in || !improvement_metric_in;
 
-      // We do not need to mutate the row-level error codes here because assessRow already
-      // adds canonical E501/E502 for metrics-missing. This call is only to obtain the filled metrics.
       const resolved = anyMetricMissingAtInput
         ? resolveMetrics(rowForResolution, variation_seed, [] as any)
         : {
@@ -307,15 +367,14 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
             used_default_metrics: false
           };
 
-      // Persist resolved metrics onto the bulk row so exports (and encoded payload) are auditable.
-      // This is safe because only VALID/NEEDS_REVIEW rows are included in engineRows.
       (row as any).output_metric = (resolved as any).output_metric ?? '';
       (row as any).quality_metric = (resolved as any).quality_metric ?? '';
       (row as any).improvement_metric = (resolved as any).improvement_metric ?? '';
-      (row as any).metrics_auto_suggested = anyMetricMissingAtInput || !!(resolved as any).used_default_metrics;
+      (row as any).metrics_auto_suggested =
+        anyMetricMissingAtInput || !!(resolved as any).used_default_metrics;
 
       const engineRow: EnginePreparedRow = {
-        row_id: row.row_id,
+        row_id,
         team_role: team_role_canonical,
         task_type: task_type_canonical,
         task_name: row.task_name,
@@ -323,14 +382,12 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         strategic_benefit: (row as any).strategic_benefit,
         company: row.company,
 
-        // Use resolved metrics so bulk objective includes the same auto-suggested metric text as single.
         output_metric: (resolved as any).output_metric ?? '',
         quality_metric: (resolved as any).quality_metric ?? '',
         improvement_metric: (resolved as any).improvement_metric ?? '',
 
-        // v10.8 contract: metrics_auto_suggested must be true whenever ANY metric is auto-filled
-        // (partial or default). In this engine, metrics are only auto-filled when at least one input metric is missing.
-        metrics_auto_suggested: anyMetricMissingAtInput || !!(resolved as any).used_default_metrics,
+        metrics_auto_suggested:
+          anyMetricMissingAtInput || !!(resolved as any).used_default_metrics,
         variation_seed
       };
 
@@ -340,8 +397,8 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
   const objectiveOutputs = runObjectiveEngine(engineRows);
 
   const objectiveMap = new Map<number, { simple: string; complex: string }>();
-  for (const obj of objectiveOutputs) {
-    objectiveMap.set(obj.row_id, {
+  for (const obj of objectiveOutputs as any[]) {
+    objectiveMap.set(obj.row_id as number, {
       simple: obj.simple_objective,
       complex: obj.complex_objective
     });
@@ -349,29 +406,25 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
 
   // Build final result rows in original row order
   const resultRows: KpiResultRow[] = bulkRows.map((row) => {
-    const a = assessments.get(row.row_id)!;
+    const row_id = (row as any).row_id as number;
+    const a = assessments.get(row_id)!;
 
-    // Only attach objectives for VALID/NEEDS_REVIEW rows
-    const obj = a.status === 'INVALID' ? undefined : objectiveMap.get(row.row_id);
+    const obj = a.status === 'INVALID' ? undefined : objectiveMap.get(row_id);
     const simple_objective = a.status === 'INVALID' ? '' : (obj?.simple ?? '');
     const complex_objective = a.status === 'INVALID' ? '' : (obj?.complex ?? '');
 
-    // Derive final objective (simple or complex, depending on mode)
     const objective = a.status === 'INVALID' ? '' : (simple_objective || complex_objective || '');
 
-    // Canonical ISO deadline for export.
-    // assessRow() already persisted ISO onto row.dead_line when valid.
     const dead_line = toSafeTrimmedString(row.dead_line);
 
     return {
-      row_id: row.row_id,
+      row_id,
       task_name: row.task_name,
       task_type: row.task_type,
       team_role: row.team_role,
       dead_line,
       objective,
 
-      // Metrics are included for auditability and exact bulk assertions.
       output_metric: a.status === 'INVALID' ? '' : toSafeTrimmedString((row as any).output_metric),
       quality_metric: a.status === 'INVALID' ? '' : toSafeTrimmedString((row as any).quality_metric),
       improvement_metric: a.status === 'INVALID' ? '' : toSafeTrimmedString((row as any).improvement_metric),
@@ -380,21 +433,17 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       validation_status: a.status,
       comments: a.comments,
       // v10.8 Lite: summary_reason removed
-      summary_reason: ''
+      //summary_reason: ''
     };
   });
 
-  const valid_count = resultRows.filter(
-    (r) => r.validation_status === 'VALID'
-  ).length;
-  const invalid_count = resultRows.filter(
-    (r) => r.validation_status === 'INVALID'
-  ).length;
-  const needs_review_count = resultRows.filter(
-    (r) => r.validation_status === 'NEEDS_REVIEW'
-  ).length;
+  const valid_count = resultRows.filter((r) => r.validation_status === 'VALID').length;
+  const invalid_count = resultRows.filter((r) => r.validation_status === 'INVALID').length;
+  const needs_review_count = resultRows.filter((r) => r.validation_status === 'NEEDS_REVIEW').length;
 
+  // ------------------------------------------------------------
   // NEW: Blob-backed download URL (short, stable)
+  // ------------------------------------------------------------
   try {
     const now = new Date();
     const dateISO = toUtcDateISO(now);
@@ -402,11 +451,8 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
 
     const iso_timestamp = toSafeIsoTimestamp(now);
     const request_id = crypto.randomUUID();
-
-    // Your chosen pattern B: kpi-results/{iso_timestamp}_{request_id}.xlsx
     const pathname = `kpi-results/${iso_timestamp}_${request_id}.xlsx`;
 
-    // Build the workbook bytes (shared builder; implemented next file)
     const xlsxBuffer = await buildKpiOutputWorkbook(resultRows, dateISO);
 
     const blob = await put(pathname, xlsxBuffer, {
@@ -415,15 +461,12 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       addRandomSuffix: false
     });
 
-    const download_url = blob.url;
-
     const response: BulkFinalizeExportResponse = {
-      download_url,
+      download_url: blob.url,
       valid_count,
       needs_review_count,
       invalid_count,
-      ui_message:
-        `KPI result file is ready. Click the link to download ${fileName}.`
+      ui_message: `KPI result file is ready. Click the link to download ${fileName}.`
     };
 
     return res.status(200).json(response);
@@ -432,8 +475,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     return res.status(500).json({
       error: true,
       code: 'BULK_EXPORT_STORAGE_FAILED',
-      message:
-        'Bulk export completed, but failed to store the output file for download.'
+      message: 'Bulk export completed, but failed to store the output file for download.'
     });
   }
 }

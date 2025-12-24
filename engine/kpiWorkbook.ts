@@ -19,26 +19,32 @@ export async function buildKpiOutputWorkbook(
   const sheet = workbook.addWorksheet('KPI_Output'); 
 
   // ✅ UX: No internal Row ID column
-  sheet.columns = [
-    { header: 'Task Name', key: 'task_name', width: 40 },
-    { header: 'Task Type', key: 'task_type', width: 18 },
-    { header: 'Team Role', key: 'team_role', width: 18 },
-    { header: 'Deadline', key: 'dead_line', width: 15 },
-    { header: 'Objective', key: 'objective', width: 80 },
-    { header: 'Validation Status', key: 'validation_status', width: 18 },
-    { header: 'Comments', key: 'comments', width: 50 }
-  ];
+sheet.columns = [
+  { header: 'Task Name', key: 'task_name', width: 40 },
+  { header: 'Task Type', key: 'task_type', width: 18 },
+  { header: 'Team Role', key: 'team_role', width: 18 },
+  { header: 'Deadline', key: 'dead_line', width: 15 },
+  { header: 'Objective', key: 'objective', width: 80 },
+  { header: 'Output Metric', key: 'output_metric', width: 40 },
+  { header: 'Quality Metric', key: 'quality_metric', width: 40 },
+  { header: 'Improvement Metric', key: 'improvement_metric', width: 40 },
+  { header: 'Validation Status', key: 'validation_status', width: 18 },
+  { header: 'Comments', key: 'comments', width: 50 }
+];
 
   for (const row of rows) {
-    sheet.addRow({
-      task_name: row.task_name ?? '',
-      task_type: row.task_type ?? '',
-      team_role: row.team_role ?? '',
-      dead_line: row.dead_line ?? '',
-      objective: row.objective ?? '',
-      validation_status: row.validation_status ?? '',
-      comments: row.comments ?? ''
-    });
+sheet.addRow({
+  task_name: row.task_name ?? '',
+  task_type: row.task_type ?? '',
+  team_role: row.team_role ?? '',
+  dead_line: row.dead_line ?? '',
+  objective: row.objective ?? '',
+  output_metric: row.output_metric ?? '',
+  quality_metric: row.quality_metric ?? '',
+  improvement_metric: row.improvement_metric ?? '',
+  validation_status: row.validation_status ?? '',
+  comments: row.comments ?? ''
+});
   }
 
   const buffer = await workbook.xlsx.writeBuffer();
