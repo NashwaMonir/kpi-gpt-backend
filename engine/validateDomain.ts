@@ -38,10 +38,52 @@ import {
 } from './normalizeFields';
 import {
   checkDangerousText,
-  evaluateMetricsDangerous,
+  evaluateMetricsDangerous
 } from './validateDangerous';
 import { validateDeadline } from './validateDeadline';
 
+function fnv1a32(key: string): number {
+  let hash = 2166136261;
+  for (let i = 0; i < key.length; i++) {
+    hash ^= key.charCodeAt(i);
+    hash = Math.imul(hash, 16777619);
+  }
+  return hash >>> 0;
+}
+
+function deriveRowId(normalized: KpiRowIn, fallbackDeadlineRaw?: string): string {
+  const task = (normalized.task_name ?? '')
+    .toString()
+    .trim()
+    .replace(/\s+/g, ' ')
+    .toLowerCase();
+
+  const role = (normalized.team_role ?? '')
+    .toString()
+    .trim()
+    .replace(/\s+/g, ' ')
+    .toLowerCase();
+
+  const type = (normalized.task_type ?? '')
+    .toString()
+    .trim()
+    .replace(/\s+/g, ' ')
+    .toLowerCase();
+
+  // Prefer normalized ISO deadline when present; otherwise fall back to the raw deadline string.
+  const dl = String(
+    (normalized as any).dead_line_iso ??
+      normalized.dead_line ??
+      fallbackDeadlineRaw ??
+      ''
+  )
+    .trim()
+    .replace(/\s+/g, ' ')
+    .toLowerCase();
+
+  const h = fnv1a32(`${task}|${dl}|${role}|${type}`);
+  return `r_${h}`;
+}
 
 /**
  * Main entry point: validate a single KPI row at the domain level.
@@ -76,8 +118,7 @@ export function validateDomain(
   const safeQuality = toSafeTrimmedString(row.quality_metric ?? '');
   const safeImprovement = toSafeTrimmedString(row.improvement_metric ?? '');
 
-
-    // ----------------------------------------------------
+  // ----------------------------------------------------
   // Dangerous / low-signal metrics (Output / Quality / Improvement)
   // ----------------------------------------------------
   const { dangerousMetrics } = evaluateMetricsDangerous(
@@ -159,14 +200,6 @@ export function validateDomain(
     // treat empty/undefined as null in normalized row
     normalizedRow.company = null;
   }
-  /*
-  // If you want to reuse the helpers, you can later switch to:
-  if (safeCompany) {
-  if (isDangerousCompanyText(safeCompany, errorCodes)) {
-    invalidTextFields.push('Company');
-  }
-  normalizedRow.company = safeCompany;
-}*/
 
   // -----------------------------
   // 3) Metrics normalization
@@ -214,6 +247,28 @@ export function validateDomain(
   }
 
   // -----------------------------
+  //  4) Row ID normalization (contract: row-unique, deterministic)
+  // -----------------------------
+  // Contract (updated):
+  // - Preserve a valid caller-provided numeric row_id (number or numeric string)
+  //   so different rows produce different variation seeds.
+  // - Otherwise derive a deterministic fallback id from normalized content.
+  const rawRowId = (row as any).row_id;
+  let canonicalRowId: number | null = null;
+
+  if (typeof rawRowId === 'number' && Number.isFinite(rawRowId) && rawRowId > 0) {
+    canonicalRowId = Math.trunc(rawRowId);
+  } else if (typeof rawRowId === 'string') {
+    const s = rawRowId.trim();
+    if (/^\d+$/.test(s)) {
+      const n = Number(s);
+      if (Number.isFinite(n) && n > 0) canonicalRowId = Math.trunc(n);
+    }
+  }
+
+  (normalizedRow as any).row_id = canonicalRowId ?? deriveRowId(normalizedRow, safeDeadline);
+
+  // -----------------------------
   // 5) Mode normalization (simple / complex / both, with fallback)
   // -----------------------------
   const safeMode = toSafeTrimmedString(row.mode);
@@ -237,10 +292,10 @@ export function validateDomain(
   );
 
   const fieldChecks: FieldCheckResult = {
-  missing: missingFields,
-  invalid: invalidFields,
-  invalidText: invalidTextFields,  // ← this array you push into earlier
-};
+    missing: missingFields,
+    invalid: invalidFields,
+    invalidText: invalidTextFields
+  };
 
   // ---------------------------------------------
   // 7) Compute hasBlockingErrors + statusHint
@@ -251,32 +306,33 @@ export function validateDomain(
   //  - Any dangerous/low-signal text issues (E4xx)
   //  - Any deadline issues (BAD_FORMAT or WRONG_YEAR)
   // must mark the row as INVALID at the domain layer.
-    const hasBlockingErrors =
+  const hasBlockingErrors =
     missingFields.length > 0 ||
     invalidFields.length > 0 ||
     invalidTextFields.length > 0 ||
-    dangerousMetrics.length > 0 ||   // dangerous metrics are blocking
+    dangerousMetrics.length > 0 || // dangerous metrics are blocking
     !deadlineResult.valid ||
     deadlineResult.wrongYear;
-    
-const statusHint: 'VALID' | 'INVALID' = hasBlockingErrors ? 'INVALID' : 'VALID';
+
+  const statusHint: 'VALID' | 'INVALID' = hasBlockingErrors ? 'INVALID' : 'VALID';
+
   // ---------------------------------------------
   // 8) Return structured result
   // ---------------------------------------------
   return {
-  inputRow: row,                     // ← add this
-  normalizedRow,
-  fieldChecks,
-  dangerousMetrics,             // keep this
-  deadline: deadlineResult,
-  mode: normalizedMode,
-  modeWasInvalid,
-  safeOutput,
-  safeQuality,
-  safeImprovement,
-  safeCompany,
-  safeStrategicBenefit,
-  statusHint,
-  hasBlockingErrors
-};
+    inputRow: row,
+    normalizedRow,
+    fieldChecks,
+    dangerousMetrics,
+    deadline: deadlineResult,
+    mode: normalizedMode,
+    modeWasInvalid,
+    safeOutput,
+    safeQuality,
+    safeImprovement,
+    safeCompany,
+    safeStrategicBenefit,
+    statusHint,
+    hasBlockingErrors
+  };
 }

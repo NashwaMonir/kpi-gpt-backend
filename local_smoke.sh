@@ -16,6 +16,7 @@
 set -euo pipefail
 
 BASE="${BASE:-http://localhost:3000}"
+BASE="${BASE%/}"
 
 # NOTE: Do not hardcode expected metrics in this script.
 # For exact assertions, derive expectations from the single-row /api/kpi pipeline using the same inputs.
@@ -84,126 +85,204 @@ assert_not_contains() {
 
 post_json() {
   local path="$1" body="$2"
-  curl -sS -X POST "$BASE$path" -H "Content-Type: application/json" -d "$body"
+  # Follow redirects (e.g., trailing-slash normalization) while preserving POST.
+  curl -sS --location --post301 --post302 --post303 \
+    -X POST "$BASE$path" \
+    -H "Content-Type: application/json" \
+    -d "$body"
 }
 
 get_file() {
   local url="$1" out="$2"
-  curl -sSL -o "$out" "$url"
-}
 
-extract_download_data_param() {
-  local url="$1"
-  # Pull everything after 'data=' (ignore any other params)
-  local data="${url#*data=}"
-  data="${data%%&*}"
-  echo "$data"
-}
-
-bulk_rows_from_download_url() {
-  local dl="$1"
-  local data
-  data=$(extract_download_data_param "$dl")
-
-  if command -v python3 >/dev/null 2>&1; then
-    DATA="$data" python3 - <<'PY'
-import os, sys, base64, json
-
-data = os.environ.get('DATA','')
-if not data:
-    print('[]')
-    sys.exit(0)
-
-pad = '=' * ((4 - len(data) % 4) % 4)
-try:
-    raw = base64.urlsafe_b64decode((data + pad).encode('utf-8'))
-except Exception:
-    raw = base64.b64decode((data + pad).encode('utf-8'))
-
-try:
-    rows = json.loads(raw.decode('utf-8'))
-except Exception:
-    print('[]')
-    sys.exit(0)
-
-if not isinstance(rows, list):
-    print('[]')
-else:
-    # Compact JSON array
-    print(json.dumps(rows, ensure_ascii=False, separators=(',',':')))
-PY
+  # Accept either absolute URLs (https://...) or relative paths (/api/..)
+  if [[ "$url" == http://* || "$url" == https://* ]]; then
+    curl -sSL -o "$out" "$url"
   else
-    echo "[]"
+    curl -sSL -o "$out" "$BASE$url"
   fi
 }
 
-bulk_first_row_from_download_url() {
-  local dl="$1"
-  local rows_json
-  rows_json=$(bulk_rows_from_download_url "$dl")
-  if [[ -z "$rows_json" || "$rows_json" == "[]" ]]; then
-    echo ""
-    return 0
-  fi
-  echo "$rows_json" | jq -c '.[0] // empty'
-}
+# --- XLSX helpers (read values by header name) ---
+# Reads the first worksheet (sheet1) and sharedStrings, then prints:
+# - header names (row 1)
+# - row values for a given row index (1-based data rows; i.e., 1 = first data row after header)
+#
+# Usage:
+#   xlsx_get_cell_by_header "KPI_Output.xlsx" 1 "Validation Status"
+#   xlsx_has_header "KPI_Output.xlsx" "Row ID"
 
-bulk_objective_from_download_url() {
-  local dl="$1"
-  local row_json
-  row_json=$(bulk_first_row_from_download_url "$dl")
-
-  if [[ -z "$row_json" ]]; then
+xlsx_get_cell_by_header() {
+  local xlsx="$1" data_row_index="$2" header_name="$3"
+  if ! command -v python3 >/dev/null 2>&1; then
     echo ""
     return 0
   fi
 
-  if command -v python3 >/dev/null 2>&1; then
-    ROW_JSON="$row_json" python3 - <<'PY'
-import os, json
-row = json.loads(os.environ['ROW_JSON'])
-print(row.get('objective','') or '')
+  PY_XLSX="$xlsx" PY_ROW="$data_row_index" PY_HEADER="$header_name" python3 - <<'PY'
+import os, zipfile, xml.etree.ElementTree as ET
+
+xlsx = os.environ.get('PY_XLSX','')
+row_index = int(os.environ.get('PY_ROW','1'))
+header_name = os.environ.get('PY_HEADER','')
+
+ns = {'s': 'http://schemas.openxmlformats.org/spreadsheetml/2006/main'}
+
+def txt(el):
+  return (el.text or '') if el is not None else ''
+
+def load_shared(z):
+  shared = []
+  if 'xl/sharedStrings.xml' not in z.namelist():
+    return shared
+  root = ET.fromstring(z.read('xl/sharedStrings.xml'))
+  for si in root.findall('s:si', ns):
+    parts = [txt(t) for t in si.findall('.//s:t', ns)]
+    shared.append(''.join(parts))
+  return shared
+
+def cell_value(c, shared):
+  t = c.attrib.get('t','')
+  v = c.find('s:v', ns)
+  if v is None:
+    return ''
+  raw = txt(v)
+  if raw == '':
+    return ''
+  if t == 's':
+    try:
+      idx = int(raw)
+      return shared[idx] if 0 <= idx < len(shared) else ''
+    except Exception:
+      return ''
+  return raw
+
+try:
+  with zipfile.ZipFile(xlsx) as z:
+    shared = load_shared(z)
+    sheet_path = 'xl/worksheets/sheet1.xml'
+    if sheet_path not in z.namelist():
+      print('')
+      raise SystemExit
+    sheet = ET.fromstring(z.read(sheet_path))
+
+  rows = sheet.findall('.//s:sheetData/s:row', ns)
+  if not rows:
+    print('')
+    raise SystemExit
+
+  # Header row is first row
+  header_row = rows[0]
+  headers = {}
+  for c in header_row.findall('s:c', ns):
+    r = c.attrib.get('r','')
+    # Column letters from cell ref, e.g., "C1" -> "C"
+    col = ''.join([ch for ch in r if ch.isalpha()])
+    val = cell_value(c, shared).strip()
+    if val:
+      headers[val] = col
+
+  col = headers.get(header_name)
+  if not col:
+    print('')
+    raise SystemExit
+
+  # Data row: header is row 1, so first data row is rows[1]
+  target_idx = row_index
+  if target_idx < 1:
+    target_idx = 1
+
+  if len(rows) <= target_idx:
+    print('')
+    raise SystemExit
+
+  target_row = rows[target_idx]
+  target_cell_ref_prefix = col
+  value = ''
+  for c in target_row.findall('s:c', ns):
+    r = c.attrib.get('r','')
+    if r.startswith(target_cell_ref_prefix):
+      value = cell_value(c, shared).strip()
+      break
+
+  print(value)
+except Exception:
+  print('')
 PY
-  else
-    echo ""
-  fi
 }
 
-bulk_field_from_download_url() {
-  local dl="$1" field="$2"
-  local row_json
-  row_json=$(bulk_first_row_from_download_url "$dl")
-
-  if [[ -z "$row_json" ]]; then
-    echo ""
-    return 0
+xlsx_has_header() {
+  local xlsx="$1" header_name="$2"
+  if ! command -v python3 >/dev/null 2>&1; then
+    return 1
   fi
 
-  echo "$row_json" | jq -r --arg f "$field" '.[$f] // ""'
+  PY_XLSX="$xlsx" PY_HEADER="$header_name" python3 - <<'PY'
+import os, zipfile, xml.etree.ElementTree as ET
+
+xlsx = os.environ.get('PY_XLSX','')
+header_name = os.environ.get('PY_HEADER','')
+
+ns = {'s': 'http://schemas.openxmlformats.org/spreadsheetml/2006/main'}
+
+def txt(el):
+  return (el.text or '') if el is not None else ''
+
+def load_shared(z):
+  shared = []
+  if 'xl/sharedStrings.xml' not in z.namelist():
+    return shared
+  root = ET.fromstring(z.read('xl/sharedStrings.xml'))
+  for si in root.findall('s:si', ns):
+    parts = [txt(t) for t in si.findall('.//s:t', ns)]
+    shared.append(''.join(parts))
+  return shared
+
+def cell_value(c, shared):
+  t = c.attrib.get('t','')
+  v = c.find('s:v', ns)
+  if v is None:
+    return ''
+  raw = txt(v)
+  if raw == '':
+    return ''
+  if t == 's':
+    try:
+      idx = int(raw)
+      return shared[idx] if 0 <= idx < len(shared) else ''
+    except Exception:
+      return ''
+  return raw
+
+try:
+  with zipfile.ZipFile(xlsx) as z:
+    shared = load_shared(z)
+    sheet_path = 'xl/worksheets/sheet1.xml'
+    if sheet_path not in z.namelist():
+      raise SystemExit(2)
+    sheet = ET.fromstring(z.read(sheet_path))
+
+  rows = sheet.findall('.//s:sheetData/s:row', ns)
+  if not rows:
+    raise SystemExit(2)
+
+  header_row = rows[0]
+  found = False
+  for c in header_row.findall('s:c', ns):
+    val = cell_value(c, shared).strip()
+    if val == header_name:
+      found = True
+      break
+
+  raise SystemExit(0 if found else 1)
+except SystemExit as e:
+  raise
+except Exception:
+  raise SystemExit(2)
+PY
+  return $?
 }
 
-bulk_row_by_id_from_download_url() {
-  local dl="$1" id="$2"
-  local rows_json
-  rows_json=$(bulk_rows_from_download_url "$dl")
-  if [[ -z "$rows_json" || "$rows_json" == "[]" ]]; then
-    echo ""
-    return 0
-  fi
-  echo "$rows_json" | jq -c --argjson rid "$id" '.[] | select(.row_id == $rid) | .'
-}
-
-
-bulk_row_field_by_id_from_download_url() {
-  local dl="$1" id="$2" field="$3"
-  local row_json
-  row_json=$(bulk_row_by_id_from_download_url "$dl" "$id")
-  if [[ -z "$row_json" ]]; then
-    echo ""
-    return 0
-  fi
-  echo "$row_json" | jq -r --arg f "$field" '.[$f] // ""'
-}
 
 # Helper: extract first column (row_id) values from XLSX file
 xlsx_first_col_ids() {
@@ -439,14 +518,28 @@ FIN_INV=$(post_json "/api/bulkFinalizeExport" "$(jq -n --arg t "$PT_INV" '{prep_
 require_json "Bulk finalize INVALID /api/bulkFinalizeExport" "$FIN_INV"
 DL_INV=$(echo "$FIN_INV" | jq -r '.download_url')
 
-ROW_INV=$(bulk_first_row_from_download_url "$DL_INV")
-INV_STATUS=$(echo "$ROW_INV" | jq -r '.validation_status')
-INV_OBJ=$(echo "$ROW_INV" | jq -r '.objective')
-INV_AUTO=$(echo "$ROW_INV" | jq -r '.metrics_auto_suggested')
+OUT_INV="KPI_Output_invalid.xlsx"
+get_file "$DL_INV" "$OUT_INV"
+
+# Validate row values from the XLSX (Row 1 is header; data row index 1 = first data row)
+INV_STATUS=$(xlsx_get_cell_by_header "$OUT_INV" 1 "Validation Status")
+INV_OBJ=$(xlsx_get_cell_by_header "$OUT_INV" 1 "Objective")
 
 assert_eq "Bulk invalid status" "$INV_STATUS" "INVALID"
 assert_eq "Bulk invalid objective empty" "$INV_OBJ" ""
-assert_eq "Bulk invalid metrics_auto_suggested=false" "$INV_AUTO" "false"
+
+# UX contract: Row ID and Metrics Auto-Suggested columns must NOT exist in KPI_Output
+if xlsx_has_header "$OUT_INV" "Row ID"; then
+  bad "KPI_Output must not include 'Row ID' column"
+else
+  ok "KPI_Output has no 'Row ID' column"
+fi
+
+if xlsx_has_header "$OUT_INV" "Metrics Auto-Suggested"; then
+  bad "KPI_Output must not include 'Metrics Auto-Suggested' column"
+else
+  ok "KPI_Output has no 'Metrics Auto-Suggested' column"
+fi
 
 # -------------------------
 # 5) Bulk: One-row flow + download integrity
@@ -474,16 +567,8 @@ require_json "Bulk finalize 1-row /api/bulkFinalizeExport" "$FINAL"
 DL=$(echo "$FINAL" | jq -r '.download_url')
 [[ -n "$DL" && "$DL" != "null" ]] && ok "Bulk finalize download_url present" || bad "Bulk finalize download_url missing"
 
-BULK_ROW_JSON=$(bulk_first_row_from_download_url "$DL")
-[[ -n "$BULK_ROW_JSON" ]] && ok "Decoded bulk first row json from download_url" || bad "Could not decode bulk first row json from download_url"
-
 OUT="KPI_Output.xlsx"
-# Decode the objective directly from the download_url payload (source-of-truth for what will be written to XLSX)
-DATA=$(extract_download_data_param "$DL")
-OBJ_BULK_DECODED=$(DATA="$DATA" bulk_objective_from_download_url "$DL")
-[[ -n "$OBJ_BULK_DECODED" ]] && ok "Decoded bulk objective from download_url" || bad "Could not decode bulk objective from download_url"
-
-get_file "$BASE$DL" "$OUT"
+get_file "$DL" "$OUT"
 
 # File signature sanity
 FILETYPE=$(file "$OUT" | tr -d '\n')
@@ -495,6 +580,22 @@ if unzip -t "$OUT" >/dev/null 2>&1; then
 else
   bad "XLSX zip integrity failed (file corrupt)"
 fi
+
+# Header contract checks
+if xlsx_has_header "$OUT" "Row ID"; then
+  bad "KPI_Output must not include 'Row ID' column"
+else
+  ok "KPI_Output has no 'Row ID' column"
+fi
+
+if xlsx_has_header "$OUT" "Metrics Auto-Suggested"; then
+  bad "KPI_Output must not include 'Metrics Auto-Suggested' column"
+else
+  ok "KPI_Output has no 'Metrics Auto-Suggested' column"
+fi
+
+OBJ_CELL=$(xlsx_get_cell_by_header "$OUT" 1 "Objective")
+[[ -n "$OBJ_CELL" ]] && ok "Objective present in first data row (XLSX)" || bad "Objective missing in first data row (XLSX)"
 
 # -------------------------
 # 6) Bulk vs Single parity: metrics family for Design+Project missing metrics
@@ -518,37 +619,22 @@ S6_STATUS=$(echo "$S_PAR" | jq -r '.rows[0].status')
 S6_RES=$(echo "$S_PAR" | jq -r '.rows[0].resolved_metrics | "\(.output_metric) | \(.quality_metric) | \(.improvement_metric)"')
 assert_eq "Single Design missing metrics => NEEDS_REVIEW" "$S6_STATUS" "NEEDS_REVIEW"
 
-# Use decoded bulk objective instead of fragile XLSX parsing
-OBJ_BULK="$OBJ_BULK_DECODED"
-[[ -n "$OBJ_BULK" ]] && ok "Bulk objective available for checks" || bad "Bulk objective missing (decode failed)"
+# Use XLSX as the source of truth (Blob URL no longer carries a JSON payload)
+OBJ_BULK=$(xlsx_get_cell_by_header "$OUT" 1 "Objective")
 
-# Exact resolved metrics assertions (parity):
-# Compare bulk-resolved metrics against the single-row /api/kpi pipeline using the same inputs.
-if [[ -n "$BULK_ROW_JSON" ]]; then
-  BULK_OUT=$(echo "$BULK_ROW_JSON" | jq -r '.output_metric // ""')
-  BULK_QUAL=$(echo "$BULK_ROW_JSON" | jq -r '.quality_metric // ""')
-  BULK_IMP=$(echo "$BULK_ROW_JSON" | jq -r '.improvement_metric // ""')
-  BULK_AUTO=$(echo "$BULK_ROW_JSON" | jq -r '.metrics_auto_suggested // ""')
+# Exact resolved metrics assertions (parity) using XLSX columns
+BULK_OUT=$(xlsx_get_cell_by_header "$OUT" 1 "Output Metric")
+BULK_QUAL=$(xlsx_get_cell_by_header "$OUT" 1 "Quality Metric")
+BULK_IMP=$(xlsx_get_cell_by_header "$OUT" 1 "Improvement Metric")
 
-  if [[ -z "$BULK_OUT" && -z "$BULK_QUAL" && -z "$BULK_IMP" ]]; then
-    bad "Bulk download payload missing resolved metrics fields (output/quality/improvement). Ensure bulkFinalizeExport includes them in encoded result rows + XLSX."
-  else
-    # Expected metrics from SINGLE pipeline (same input as bulk CSV row)
-    EXP_OUT=$(echo "$S_PAR" | jq -r '.rows[0].resolved_metrics.output_metric // ""')
-    EXP_QUAL=$(echo "$S_PAR" | jq -r '.rows[0].resolved_metrics.quality_metric // ""')
-    EXP_IMP=$(echo "$S_PAR" | jq -r '.rows[0].resolved_metrics.improvement_metric // ""')
-    EXP_AUTO=$(echo "$S_PAR" | jq -r '.rows[0].metrics_auto_suggested // ""')
+# Expected metrics from SINGLE pipeline (same input as bulk CSV row)
+EXP_OUT=$(echo "$S_PAR" | jq -r '.rows[0].resolved_metrics.output_metric // ""')
+EXP_QUAL=$(echo "$S_PAR" | jq -r '.rows[0].resolved_metrics.quality_metric // ""')
+EXP_IMP=$(echo "$S_PAR" | jq -r '.rows[0].resolved_metrics.improvement_metric // ""')
 
-    assert_eq "Bulk exact output_metric (parity with single)" "$BULK_OUT" "$EXP_OUT"
-    assert_eq "Bulk exact quality_metric (parity with single)" "$BULK_QUAL" "$EXP_QUAL"
-    assert_eq "Bulk exact improvement_metric (parity with single)" "$BULK_IMP" "$EXP_IMP"
-
-    # If ANY metric is auto-filled, both flows should report metrics_auto_suggested=true
-    assert_eq "Bulk metrics_auto_suggested (parity with single)" "$BULK_AUTO" "$EXP_AUTO"
-  fi
-else
-  bad "Bulk row json not available; cannot assert exact metrics"
-fi
+assert_eq "Bulk exact output_metric (parity with single)" "$BULK_OUT" "$EXP_OUT"
+assert_eq "Bulk exact quality_metric (parity with single)" "$BULK_QUAL" "$EXP_QUAL"
+assert_eq "Bulk exact improvement_metric (parity with single)" "$BULK_IMP" "$EXP_IMP"
 
 # Detect dev-ish leak
 if looks_devish_metrics "$OBJ_BULK"; then
@@ -602,11 +688,16 @@ PT_P=$(echo "$PRE_P" | jq -r '.prep_token')
 FIN_P=$(post_json "/api/bulkFinalizeExport" "$(jq -n --arg t "$PT_P" '{prep_token:$t}')")
 require_json "Bulk finalize partial /api/bulkFinalizeExport" "$FIN_P"
 DL_P=$(echo "$FIN_P" | jq -r '.download_url')
-ROW_P=$(bulk_first_row_from_download_url "$DL_P")
+OUT_P="KPI_Output_partial.xlsx"
+get_file "$DL_P" "$OUT_P"
 
-assert_eq "Bulk partial output_metric parity" "$(echo "$ROW_P" | jq -r '.output_metric')" "$EXP_P_OUT"
-assert_eq "Bulk partial quality_metric parity" "$(echo "$ROW_P" | jq -r '.quality_metric')" "$EXP_P_QUAL"
-assert_eq "Bulk partial improvement_metric parity" "$(echo "$ROW_P" | jq -r '.improvement_metric')" "$EXP_P_IMP"
+B_OUT_P=$(xlsx_get_cell_by_header "$OUT_P" 1 "Output Metric")
+B_QUAL_P=$(xlsx_get_cell_by_header "$OUT_P" 1 "Quality Metric")
+B_IMP_P=$(xlsx_get_cell_by_header "$OUT_P" 1 "Improvement Metric")
+
+assert_eq "Bulk partial output_metric parity" "$B_OUT_P" "$EXP_P_OUT"
+assert_eq "Bulk partial quality_metric parity" "$B_QUAL_P" "$EXP_P_QUAL"
+assert_eq "Bulk partial improvement_metric parity" "$B_IMP_P" "$EXP_P_IMP"
 
 # -------------------------
 # 7) Bulk normalization drift tests (whitespace/casing)
@@ -623,7 +714,7 @@ PT2=$(echo "$PRE2" | jq -r '.prep_token')
 FIN2=$(post_json "/api/bulkFinalizeExport" "$(jq -n --arg t "$PT2" '{prep_token:$t}')")
 require_json "Bulk finalize whitespace /api/bulkFinalizeExport" "$FIN2"
 DL2=$(echo "$FIN2" | jq -r '.download_url')
-get_file "$BASE$DL2" "KPI_Output_ws.xlsx"
+get_file "$DL2" "KPI_Output_ws.xlsx"
 unzip -t "KPI_Output_ws.xlsx" >/dev/null 2>&1 && ok "Bulk whitespace XLSX ok" || bad "Bulk whitespace XLSX corrupt"
 
 # -------------------------
@@ -657,12 +748,19 @@ PT_L=$(echo "$PRE_L" | jq -r '.prep_token')
 FIN_L=$(post_json "/api/bulkFinalizeExport" "$(jq -n --arg t "$PT_L" '{prep_token:$t}')")
 require_json "Bulk finalize lead /api/bulkFinalizeExport" "$FIN_L"
 DL_L=$(echo "$FIN_L" | jq -r '.download_url')
-ROW_L=$(bulk_first_row_from_download_url "$DL_L")
+OUT_L="KPI_Output_lead.xlsx"
+get_file "$DL_L" "$OUT_L"
 
-[[ -n "$(echo "$ROW_L" | jq -r '.objective')" ]] && ok "Bulk lead objective generated" || bad "Bulk lead objective missing"
+# Verify objective exists in the XLSX (first data row)
+LEAD_OBJ=$(xlsx_get_cell_by_header "$OUT_L" 1 "Objective")
+[[ -n "$LEAD_OBJ" ]] && ok "Bulk lead objective generated" || bad "Bulk lead objective missing"
 
 # -------------------------
 # 7C) Bulk multi-row matrix coverage: all team roles (exact metric parity)
+# NOTE:
+# Row ID participates in variation_seed.
+# Single and Bulk parity MUST use the same row_id values,
+# otherwise metric variants are expected to differ by design.
 # -------------------------
 section "7C) Bulk multi-row coverage: exact resolved-metrics parity across all team roles"
 
@@ -691,9 +789,11 @@ require_json "Bulk finalize multi /api/bulkFinalizeExport" "$FIN_M"
 DL_M=$(echo "$FIN_M" | jq -r '.download_url')
 [[ -n "$DL_M" && "$DL_M" != "null" ]] && ok "Bulk multi download_url present" || bad "Bulk multi download_url missing"
 
-ROWS_M=$(bulk_rows_from_download_url "$DL_M")
-COUNT_M=$(echo "$ROWS_M" | jq -r 'length')
-[[ "$COUNT_M" -ge 6 ]] && ok "Bulk multi decoded rows >= 6 ($COUNT_M)" || bad "Bulk multi decoded row count too small ($COUNT_M)"
+OUT_M="KPI_Output_multi.xlsx"
+get_file "$DL_M" "$OUT_M"
+
+# Basic integrity
+unzip -t "$OUT_M" >/dev/null 2>&1 && ok "Bulk multi XLSX zip integrity ok" || bad "Bulk multi XLSX zip integrity failed"
 
 # Helper to run single /api/kpi and return resolved metrics for an id
 single_resolved_for() {
@@ -708,99 +808,91 @@ single_resolved_for() {
     '{rows:[{row_id:$row_id,team_role:$team_role,task_type:$task_type,task_name:$task_name,dead_line:$dead_line,strategic_benefit:$strategic_benefit}]}')"
 }
 
-# Loop the 6 rows and assert exact parity per-row
-for RID in 101 102 103 104 105 106; do
-  BULK_ROW=$(bulk_row_by_id_from_download_url "$DL_M" "$RID")
-  if [[ -z "$BULK_ROW" ]]; then
-    bad "Bulk row_id=$RID missing in download payload"
-    continue
-  fi
+# Without Row ID in KPI_Output, we assert parity by comparing the first 6 data rows in-order
+# with the same inputs sent to /api/kpi (order preserved by the CSV fixture).
+for IDX in 1 2 3 4 5 6; do
+  # Extract bulk row values from XLSX by row index
+  B_ROLE=$(xlsx_get_cell_by_header "$OUT_M" "$IDX" "Team Role")
+  B_TYPE=$(xlsx_get_cell_by_header "$OUT_M" "$IDX" "Task Type")
+  B_NAME=$(xlsx_get_cell_by_header "$OUT_M" "$IDX" "Task Name")
+  B_DL=$(xlsx_get_cell_by_header "$OUT_M" "$IDX" "Deadline")
 
-  B_ROLE=$(echo "$BULK_ROW" | jq -r '.team_role')
-  B_TYPE=$(echo "$BULK_ROW" | jq -r '.task_type')
-  B_NAME=$(echo "$BULK_ROW" | jq -r '.task_name')
-  B_DL=$(echo "$BULK_ROW" | jq -r '.dead_line')
-  B_OBJ=$(echo "$BULK_ROW" | jq -r '.objective')
-  B_OUT=$(echo "$BULK_ROW" | jq -r '.output_metric')
-  B_QUAL=$(echo "$BULK_ROW" | jq -r '.quality_metric')
-  B_IMP=$(echo "$BULK_ROW" | jq -r '.improvement_metric')
-  B_AUTO=$(echo "$BULK_ROW" | jq -r '.metrics_auto_suggested')
+  B_OUT=$(xlsx_get_cell_by_header "$OUT_M" "$IDX" "Output Metric")
+  B_QUAL=$(xlsx_get_cell_by_header "$OUT_M" "$IDX" "Quality Metric")
+  B_IMP=$(xlsx_get_cell_by_header "$OUT_M" "$IDX" "Improvement Metric")
+  B_OBJ=$(xlsx_get_cell_by_header "$OUT_M" "$IDX" "Objective")
 
-  # Pull the same benefit used in the CSV (hardcoded map)
-  case "$RID" in
-    101) BENEFIT="Improve content relevance.";;
-    102) BENEFIT="Improve cross-team alignment.";;
-    103) BENEFIT="Enhance the organization’s digital presence.";;
-    104) BENEFIT="Increase consistency and efficiency.";;
-    105) BENEFIT="Improve system reliability.";;
-    106) BENEFIT="Reduce risk and improve maintainability.";;
+  case "$IDX" in
+    1) BENEFIT="Improve content relevance.";;
+    2) BENEFIT="Improve cross-team alignment.";;
+    3) BENEFIT="Enhance the organization’s digital presence.";;
+    4) BENEFIT="Increase consistency and efficiency.";;
+    5) BENEFIT="Improve system reliability.";;
+    6) BENEFIT="Reduce risk and improve maintainability.";;
   esac
 
-  SINGLE=$(single_resolved_for "$RID" "$B_ROLE" "$B_TYPE" "$B_NAME" "$B_DL" "$BENEFIT")
+ case "$IDX" in
+  1) RID=101; BENEFIT="Improve content relevance.";;
+  2) RID=102; BENEFIT="Improve cross-team alignment.";;
+  3) RID=103; BENEFIT="Enhance the organization’s digital presence.";;
+  4) RID=104; BENEFIT="Increase consistency and efficiency.";;
+  5) RID=105; BENEFIT="Improve system reliability.";;
+  6) RID=106; BENEFIT="Reduce risk and improve maintainability.";;
+esac
+
+SINGLE=$(single_resolved_for "$RID" "$B_ROLE" "$B_TYPE" "$B_NAME" "$B_DL" "$BENEFIT")
+
+  require_json "Single parity for bulk row index=$IDX" "$SINGLE"
+
   S_STATUS=$(echo "$SINGLE" | jq -r '.rows[0].status')
-  S_AUTO=$(echo "$SINGLE" | jq -r '.rows[0].metrics_auto_suggested')
   S_OUT=$(echo "$SINGLE" | jq -r '.rows[0].resolved_metrics.output_metric')
   S_QUAL=$(echo "$SINGLE" | jq -r '.rows[0].resolved_metrics.quality_metric')
   S_IMP=$(echo "$SINGLE" | jq -r '.rows[0].resolved_metrics.improvement_metric')
 
-  # All these rows have missing metrics → should be NEEDS_REVIEW in your contract
-  assert_eq "Single status NEEDS_REVIEW (row_id=$RID)" "$S_STATUS" "NEEDS_REVIEW"
+  assert_eq "Single status NEEDS_REVIEW (bulk row index=$IDX)" "$S_STATUS" "NEEDS_REVIEW"
 
-  assert_eq "Bulk output_metric parity (row_id=$RID)" "$B_OUT" "$S_OUT"
-  assert_eq "Bulk quality_metric parity (row_id=$RID)" "$B_QUAL" "$S_QUAL"
-  assert_eq "Bulk improvement_metric parity (row_id=$RID)" "$B_IMP" "$S_IMP"
-  assert_eq "Bulk metrics_auto_suggested parity (row_id=$RID)" "$B_AUTO" "$S_AUTO"
+  assert_eq "Bulk output_metric parity (bulk row index=$IDX)" "$B_OUT" "$S_OUT"
+  assert_eq "Bulk quality_metric parity (bulk row index=$IDX)" "$B_QUAL" "$S_QUAL"
+  assert_eq "Bulk improvement_metric parity (bulk row index=$IDX)" "$B_IMP" "$S_IMP"
 
   # Objective regression guards per-row
-  assert_not_contains "Bulk objective no 'in support of supporting' (row_id=$RID)" "$B_OBJ" "in support of supporting"
-  assert_not_contains "Bulk objective no 'to achieve Deliver' (row_id=$RID)" "$B_OBJ" "to achieve Deliver"
-  assert_not_contains "Bulk objective no 'to achieve Ensure' (row_id=$RID)" "$B_OBJ" "to achieve Ensure"
+  assert_not_contains "Bulk objective no 'in support of supporting' (bulk row index=$IDX)" "$B_OBJ" "in support of supporting"
+  assert_not_contains "Bulk objective no 'to achieve Deliver' (bulk row index=$IDX)" "$B_OBJ" "to achieve Deliver"
+  assert_not_contains "Bulk objective no 'to achieve Ensure' (bulk row index=$IDX)" "$B_OBJ" "to achieve Ensure"
 
 done
 
  # -------------------------
 # 7D) Bulk row_id preservation: non-sequential ids + XLSX column
 # -------------------------
-section "7D) Bulk row_id preservation: non-sequential ids + XLSX column"
-
+# KPI_Output must not expose Row ID. This section now validates the UX contract only.
 CSV_RID='row_id,team_role,task_type,task_name,dead_line,strategic_benefit
 101,Design,Project,RowId test A,2025-10-01,Enhance the organization’s digital presence.
 305,Design,Project,RowId test B,2025-10-02,Enhance the organization’s digital presence.
 999,Design,Project,RowId test C,2025-10-03,Enhance the organization’s digital presence.'
 
 INS_RID=$(post_json "/api/bulkInspectJson" "$(jq -n --arg csv "$CSV_RID" '{excel_csv_text:$csv}')")
+require_json "Bulk inspect row_id fixture /api/bulkInspectJson" "$INS_RID"
 RT_RID=$(echo "$INS_RID" | jq -r '.rows_token')
 [[ -n "$RT_RID" && "$RT_RID" != "null" ]] && ok "Bulk row_id fixture rows_token present" || bad "Bulk row_id fixture rows_token missing"
 
 PRE_RID=$(post_json "/api/bulkPrepareRows" "$(jq -n --arg t "$RT_RID" '{rows_token:$t, generic_mode:true}')")
+require_json "Bulk prepare row_id fixture /api/bulkPrepareRows" "$PRE_RID"
 PT_RID=$(echo "$PRE_RID" | jq -r '.prep_token')
 [[ -n "$PT_RID" && "$PT_RID" != "null" ]] && ok "Bulk row_id fixture prep_token present" || bad "Bulk row_id fixture prep_token missing"
 
 FIN_RID=$(post_json "/api/bulkFinalizeExport" "$(jq -n --arg t "$PT_RID" '{prep_token:$t}')")
+require_json "Bulk finalize row_id fixture /api/bulkFinalizeExport" "$FIN_RID"
 DL_RID=$(echo "$FIN_RID" | jq -r '.download_url')
 [[ -n "$DL_RID" && "$DL_RID" != "null" ]] && ok "Bulk row_id fixture download_url present" || bad "Bulk row_id fixture download_url missing"
 
-# Assert decoded payload contains the exact row_ids (not just count/order)
-ROW_101=$(bulk_row_by_id_from_download_url "$DL_RID" 101)
-ROW_305=$(bulk_row_by_id_from_download_url "$DL_RID" 305)
-ROW_999=$(bulk_row_by_id_from_download_url "$DL_RID" 999)
-
-[[ -n "$ROW_101" ]] && ok "Decoded payload contains row_id=101" || bad "Decoded payload missing row_id=101"
-[[ -n "$ROW_305" ]] && ok "Decoded payload contains row_id=305" || bad "Decoded payload missing row_id=305"
-[[ -n "$ROW_999" ]] && ok "Decoded payload contains row_id=999" || bad "Decoded payload missing row_id=999"
-
-# Download XLSX and assert Row ID column includes the same ids.
 OUT_RID="KPI_Output_rowid.xlsx"
-get_file "$BASE$DL_RID" "$OUT_RID"
+get_file "$DL_RID" "$OUT_RID"
 
-XIDS=$(xlsx_first_col_ids "$OUT_RID" || true)
-
-if [[ -z "$XIDS" ]]; then
-  echo "⚠️  Note: Could not extract Row IDs from XLSX. Ensure runKpiResultDownload writes row_id as the first column (Row ID)."
+if xlsx_has_header "$OUT_RID" "Row ID"; then
+  bad "KPI_Output must not include 'Row ID' column"
 else
-  if echo "$XIDS" | grep -qx "101"; then ok "XLSX contains row_id=101"; else bad "XLSX missing row_id=101"; fi
-  if echo "$XIDS" | grep -qx "305"; then ok "XLSX contains row_id=305"; else bad "XLSX missing row_id=305"; fi
-  if echo "$XIDS" | grep -qx "999"; then ok "XLSX contains row_id=999"; else bad "XLSX missing row_id=999"; fi
+  ok "KPI_Output has no 'Row ID' column (row_id remains internal only)"
 fi
 # ====================
 # 7E) Objective quality intensive suite (enterprise-grade)
