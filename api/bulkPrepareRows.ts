@@ -48,6 +48,47 @@ function applyCompanyStrategy(
   return company;
 }
 
+function applyCompanyPolicy(
+  row: ParsedRow,
+  policy: {
+    mode: 'row_level' | 'single_company';
+    single_company_name?: string | null;
+    overwrite_existing_companies?: boolean;
+    missing_company_policy?: 'use_single_company' | 'generic';
+  }
+): string {
+  const mode = policy.mode;
+  const single_company_name = String(policy.single_company_name ?? '').trim();
+  const overwrite_existing_companies = policy.overwrite_existing_companies === true;
+  const missing_company_policy = policy.missing_company_policy ?? 'generic';
+
+  const existing = String(row.company ?? '').trim();
+
+  // Defensive: if caller selected a single-company mode but provided no name,
+  // do not destroy row-level data; fall back to existing.
+  if (mode === 'single_company' && !single_company_name) {
+    return existing;
+  }
+
+  if (mode === 'single_company') {
+    if (overwrite_existing_companies) {
+      return single_company_name;
+    }
+    // Only fill missing
+    return existing ? existing : single_company_name;
+  }
+
+  // mode === 'row_level'
+  if (existing) return existing;
+
+  if (missing_company_policy === 'use_single_company' && single_company_name) {
+    return single_company_name;
+  }
+
+  // missing_company_policy === 'generic' OR no single company provided
+  return '';
+}
+
 /**
  * IMPORTANT (v10.8): bulkPrepareRows is a *normalization and company-strategy* step.
  * - It may normalize Task Type / Team Role into canonical labels.
@@ -92,12 +133,14 @@ export default function handler(req: VercelRequest, res: VercelResponse) {
   const preparedRows: PreparedRow[] = [];
 
   for (const row of parsedRows) {
-    const finalCompany = applyCompanyStrategy(row, {
-      selected_company: body.selected_company,
-      generic_mode: body.generic_mode,
-      apply_to_missing: body.apply_to_missing,
-      mismatched_strategy: body.mismatched_strategy
-    });
+    const finalCompany = body.company_policy
+      ? applyCompanyPolicy(row, body.company_policy)
+      : applyCompanyStrategy(row, {
+          selected_company: body.selected_company,
+          generic_mode: body.generic_mode,
+          apply_to_missing: body.apply_to_missing,
+          mismatched_strategy: body.mismatched_strategy
+        });
 
     // Normalize team_role and task_type using the same helpers as the single-row API.
     const teamRoleResult = normalizeTeamRole(row.team_role);
@@ -107,7 +150,7 @@ export default function handler(req: VercelRequest, res: VercelResponse) {
     // - Always normalize via the same normalizer as single-row flow.
     // - Overwrite dead_line with ISO before the engine sees it.
     // - Keep trimmed raw only when invalid (diagnostics/export only).
-    const rawDeadline = String((row as any).dead_line_iso ?? (row as any).dead_line_normalized ?? row.dead_line ?? '').trim();
+    const rawDeadline = String(row.dead_line ?? '').trim();
     const nDeadline = normalizeDeadline(rawDeadline);
     const dead_line = (nDeadline.isValid && nDeadline.normalized)
       ? nDeadline.normalized
@@ -173,6 +216,8 @@ export default function handler(req: VercelRequest, res: VercelResponse) {
     has_company_column: summaryMeta.has_company_column,
     unique_companies: summaryMeta.unique_companies,
     missing_company_count: summaryMeta.missing_company_count,
+    company_summary: summaryMeta.company_summary,
+    company_decision_options: summaryMeta.company_decision_options,
     benefit_company_signals: summaryMeta.benefit_company_signals,
     company_case: summaryMeta.company_case,
     needs_company_decision: summaryMeta.needs_company_decision,

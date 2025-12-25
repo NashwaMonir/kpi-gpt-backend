@@ -9,16 +9,23 @@ import {
   BulkInspectJsonResponse,
   BulkInspectOption,
   CompanyCase,
+  CompanyDecisionOption,
   RowsTokenPayload,
   encodeRowsToken
 } from '../engine/bulkTypes';
 import { normalizeDeadline } from '../engine/normalizeFields';
+import { ErrorCodes } from '../engine/errorCodes';
 
 function toStringSafe(value: unknown): string {
   if (value === null || value === undefined) return '';
   if (typeof value === 'string') return value.trim();
   return String(value).trim();
 }
+
+function normalizeCompany(value: unknown): string {
+  return toStringSafe(value);
+}
+
 
 /**
  * Robust CSV → KpiJsonRowIn[]
@@ -45,11 +52,18 @@ export function parseCsvToKpiJsonRows(csvText: string): KpiJsonRowIn[] {
     return [];
   }
 
-  const records = parse(csvText, {
-    columns: true,
-    skip_empty_lines: true,
-    trim: true
-  }) as Record<string, string | null | undefined>[];
+  let records: Record<string, string | null | undefined>[] = [];
+  try {
+    records = parse(csvText, {
+      columns: true,
+      skip_empty_lines: true,
+      trim: true
+    }) as Record<string, string | null | undefined>[];
+  } catch (err) {
+    const msg = err instanceof Error ? err.message : String(err);
+    // Marker string used by the handler to map to a stable error code.
+    throw new Error(`BULK_CSV_PARSE_FAILED: ${msg}`);
+  }
 
   const rows: KpiJsonRowIn[] = [];
 
@@ -128,7 +142,7 @@ export function normalizeAndValidateRows(
     const nd = normalizeDeadline(dead_line_raw);
     const dead_line = nd.isValid && nd.normalized ? nd.normalized : dead_line_raw;
 
-    const company = toStringSafe(raw.company);
+    const company = normalizeCompany(raw.company);
     const strategic_benefit = toStringSafe(raw.strategic_benefit);
     const output_metric = toStringSafe(raw.output_metric);
     const quality_metric = toStringSafe(raw.quality_metric);
@@ -192,7 +206,7 @@ export function normalizeAndValidateRows(
   }
 
   const needs_company_decision =
-    company_case === 'multi_company_column' || company_case === 'no_company_data';
+    unique_companies.length > 1 || missing_company_count > 0;
 
   const benefit_company_signals: string[] = []; // extension point
 
@@ -213,33 +227,44 @@ export function normalizeAndValidateRows(
 function buildOptions(meta: {
   company_case: CompanyCase;
   unique_companies: string[];
+  missing_company_count: number;
+  needs_company_decision: boolean;
 }): BulkInspectOption[] {
   const opts: BulkInspectOption[] = [];
 
-  if (meta.company_case === 'single_company_column') {
-    opts.push({
-      code: 'use_sheet_company',
-      label: 'Use the company from the data for all rows. (validation will run during export)'
-    });
-    opts.push({
-      code: 'generic_mode',
-      label: 'Ignore company and generate generic objectives. (validation will run during export)'
-    });
-  } else if (meta.company_case === 'multi_company_column') {
+  // If no decision is required, return no options so GPT can proceed automatically.
+  if (!meta.needs_company_decision) return opts;
+
+  // Decision needed: either multiple companies or some rows missing company.
+  if (meta.unique_companies.length > 1) {
     opts.push({
       code: 'keep_existing_companies',
       label: 'Keep the company in each row as-is. (validation will run during export)'
     });
+  } else if (meta.unique_companies.length === 1) {
     opts.push({
-      code: 'generic_mode',
-      label: 'Ignore company and generate generic objectives. (validation will run during export)'
-    });
-  } else {
-    opts.push({
-      code: 'generic_mode',
-      label: 'No company info detected. Generate generic objectives. (validation will run during export)'
+      code: 'use_sheet_company',
+      label: `Use the company from the data for all rows ("${meta.unique_companies[0]}"). (validation will run during export)`
     });
   }
+
+  // Missing companies present: offer single-company fill OR generic.
+  if (meta.missing_company_count > 0) {
+    opts.push({
+      code: 'fill_missing_with_single_company',
+      label: 'Fill missing company cells using a single company name you provide. (applied during preparation)'
+    });
+    opts.push({
+      code: 'generic_for_missing',
+      label: 'Keep rows with missing company generic (uses “the organization”). (validation will run during export)'
+    });
+  }
+
+  // Always allow fully generic mode as an explicit choice.
+  opts.push({
+    code: 'generic_mode',
+    label: 'Ignore company and generate generic objectives for all rows. (validation will run during export)'
+  });
 
   return opts;
 }
@@ -248,20 +273,27 @@ function buildPrompt(meta: {
   row_count: number;
   company_case: CompanyCase;
   unique_companies: string[];
+  missing_company_count: number;
+  needs_company_decision: boolean;
 }): string {
-  const { row_count, company_case, unique_companies } = meta;
+  const { row_count, unique_companies, missing_company_count, needs_company_decision } = meta;
 
-  if (company_case === 'single_company_column' && unique_companies.length === 1) {
-    return `Detected ${row_count} row(s). All rows use company "${unique_companies[0]}". Choose how to proceed. (Note: full validation occurs during export.)`;
+  if (!needs_company_decision) {
+    // Single company and no missing values: proceed automatically.
+    return `Detected ${row_count} row(s). Company data is consistent. Proceeding to preparation and export. (Note: full validation occurs during export.)`;
   }
 
-  if (company_case === 'multi_company_column') {
+  if (unique_companies.length > 1) {
     return `Detected ${row_count} row(s) with multiple companies (${unique_companies.join(
       ', '
-    )}). Choose how to proceed. (Note: full validation occurs during export.)`;
+    )}). Choose how to handle company. (Note: full validation occurs during export.)`;
   }
 
-  return `Detected ${row_count} row(s). No reliable company column detected. Choose how to proceed. (Note: full validation occurs during export.)`;
+  if (missing_company_count > 0 && unique_companies.length === 1) {
+    return `Detected ${row_count} row(s). Company "${unique_companies[0]}" is present in some rows, but ${missing_company_count} row(s) are missing company. Choose how to handle the missing values. (Note: full validation occurs during export.)`;
+  }
+
+  return `Detected ${row_count} row(s). Company is missing in all rows. Choose whether to provide a company name or keep output generic. (Note: full validation occurs during export.)`;
 }
 
 export default function handler(req: VercelRequest, res: VercelResponse) {
@@ -280,7 +312,21 @@ export default function handler(req: VercelRequest, res: VercelResponse) {
         body.excel_csv_text.trim().length > 0
       ) {
         // CSV path (Custom GPT)
-        inputRows = parseCsvToKpiJsonRows(body.excel_csv_text);
+        try {
+          inputRows = parseCsvToKpiJsonRows(body.excel_csv_text);
+        } catch (err) {
+          const msg = err instanceof Error ? err.message : String(err);
+          if (msg.startsWith('BULK_CSV_PARSE_FAILED:')) {
+            return res.status(400).json({
+              error: true,
+              code: ErrorCodes.BULK_CSV_PARSE_FAILED,
+              message:
+                msg.replace(/^BULK_CSV_PARSE_FAILED:\s*/i, '').trim() ||
+                'Bulk CSV text could not be parsed. Ensure the CSV has a header row and valid commas/newlines.'
+            });
+          }
+          throw err;
+        }
       } else if (Array.isArray(body.rows)) {
         // Legacy JSON rows path
         inputRows = body.rows;
@@ -317,6 +363,17 @@ export default function handler(req: VercelRequest, res: VercelResponse) {
       });
     }
 
+    const company_summary = {
+      unique_companies,
+      missing_company_count
+    };
+
+    const company_decision_options: CompanyDecisionOption[] = [
+      'ROW_LEVEL',
+      'SINGLE_COMPANY',
+      'GENERIC_FOR_MISSING'
+    ];
+
     // summaryMeta must match RowsTokenPayload['summaryMeta'] exactly
     const summaryMeta: RowsTokenPayload['summaryMeta'] = {
       row_count,
@@ -324,6 +381,8 @@ export default function handler(req: VercelRequest, res: VercelResponse) {
       has_company_column,
       unique_companies,
       missing_company_count,
+      company_summary,
+      company_decision_options,
       benefit_company_signals,
       company_case,
       needs_company_decision,
@@ -336,12 +395,20 @@ export default function handler(req: VercelRequest, res: VercelResponse) {
     };
 
     const rows_token = encodeRowsToken(rowsPayload);
+
     const ui_prompt = buildPrompt({
       row_count,
       company_case,
-      unique_companies
+      unique_companies,
+      missing_company_count,
+      needs_company_decision
     });
-    const options = buildOptions({ company_case, unique_companies });
+    const options = buildOptions({
+      company_case,
+      unique_companies,
+      missing_company_count,
+      needs_company_decision
+    });
 
     const response: BulkInspectJsonResponse = {
       rows_token,
@@ -350,6 +417,8 @@ export default function handler(req: VercelRequest, res: VercelResponse) {
       has_company_column,
       unique_companies,
       missing_company_count,
+      company_summary,
+      company_decision_options,
       benefit_company_signals,
       company_case,
       needs_company_decision,

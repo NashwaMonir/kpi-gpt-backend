@@ -11,6 +11,11 @@ export type CompanyCase =
   | 'multi_company_column'
   | 'benefit_signal_only';
 
+export type CompanyDecisionOption =
+  | 'ROW_LEVEL'
+  | 'SINGLE_COMPANY'
+  | 'GENERIC_FOR_MISSING';
+
 // Input row shape from GPT (Step 1 JSON payload)
 export interface KpiJsonRowIn {
   row_id?: number;
@@ -101,6 +106,19 @@ export interface BulkInspectSummary {
   unique_companies: string[];
   missing_company_count: number;
 
+  /**
+   * v10.8: Compact summary used by GPT to decide whether to ask the user.
+   */
+  company_summary: {
+    unique_companies: string[];
+    missing_company_count: number;
+  };
+
+  /**
+   * v10.8: Enumerates valid UX decisions when company data is incomplete or mixed.
+   */
+  company_decision_options: CompanyDecisionOption[];
+
   benefit_company_signals: string[];
 
   company_case: CompanyCase;
@@ -121,6 +139,11 @@ export interface RowsTokenPayload {
     has_company_column: boolean;
     unique_companies: string[];
     missing_company_count: number;
+    company_summary: {
+      unique_companies: string[];
+      missing_company_count: number;
+    };
+    company_decision_options: CompanyDecisionOption[];
     benefit_company_signals: string[];
     company_case: CompanyCase;
     needs_company_decision: boolean;
@@ -135,6 +158,11 @@ export interface BulkPrepareTokenPayload {
     has_company_column: boolean;
     unique_companies: string[];
     missing_company_count: number;
+    company_summary: {
+      unique_companies: string[];
+      missing_company_count: number;
+    };
+    company_decision_options: CompanyDecisionOption[];
     benefit_company_signals: string[];
     company_case: CompanyCase;
     needs_company_decision: boolean;
@@ -143,7 +171,15 @@ export interface BulkPrepareTokenPayload {
   };
   preparedRows: PreparedRow[];
 }
+export type CompanyPolicyMode = 'row_level' | 'single_company';
+export type MissingCompanyPolicy = 'use_single_company' | 'generic';
 
+export interface CompanyPolicy {
+  mode: CompanyPolicyMode;
+  single_company_name?: string | null;
+  overwrite_existing_companies?: boolean; // default false
+  missing_company_policy?: MissingCompanyPolicy; // default 'generic'
+}
 // API contracts
 
 export interface BulkInspectJsonRequest {
@@ -171,6 +207,7 @@ export interface BulkPrepareRowsRequest {
    * deterministic INVALID / NEEDS_REVIEW statuses.
    */
   invalid_handling?: 'skip' | 'keep';
+  company_policy?: CompanyPolicy;
 }
 
 export interface BulkPrepareRowsResponse {

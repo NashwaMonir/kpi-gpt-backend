@@ -52,12 +52,12 @@ export const ErrorCodes = {
   INVALID_TRANSPORT_PAYLOAD: 'E605',      // a row is not a plain object
   INVALID_TRANSPORT_SANITIZATION: 'E606', // script/template injection in body
   INTERNAL_ENGINE_ERROR: 'E607',
+  BULK_CSV_PARSE_FAILED: 'E608',
 
 } as const;
 
 export type ErrorCodeKey = keyof typeof ErrorCodes;
 export type ErrorCode = (typeof ErrorCodes)[keyof typeof ErrorCodes];
-
 
 // Optional human-readable descriptions (for logs / future UI)
 export const ErrorCodeDescriptions: Record<ErrorCode, string> = {
@@ -90,6 +90,7 @@ export const ErrorCodeDescriptions: Record<ErrorCode, string> = {
   [ErrorCodes.INVALID_TRANSPORT_PAYLOAD]: 'One or more rows are not valid objects.',
   [ErrorCodes.INVALID_TRANSPORT_SANITIZATION]: 'Request contains unsafe or non-JSON-safe characters.',
   [ErrorCodes.INTERNAL_ENGINE_ERROR]: 'Internal backend processing failure.',
+  [ErrorCodes.BULK_CSV_PARSE_FAILED]: 'Bulk CSV text could not be parsed into rows (invalid CSV format or header).',
 };
 
 export const ERROR_COMMENTS: Record<ErrorCode, string> = {
@@ -122,6 +123,7 @@ export const ERROR_COMMENTS: Record<ErrorCode, string> = {
   [ErrorCodes.INVALID_TRANSPORT_PAYLOAD]: 'Row entries must be objects.',
   [ErrorCodes.INVALID_TRANSPORT_SANITIZATION]: 'Request contains unsafe or non-JSON-safe characters.',
   [ErrorCodes.INTERNAL_ENGINE_ERROR]: 'Internal KPI engine error.',
+  [ErrorCodes.BULK_CSV_PARSE_FAILED]: 'Bulk CSV parse failed (invalid CSV format or missing header).',
 };
 
 // Helper: add an error code only once, preserving insertion order
