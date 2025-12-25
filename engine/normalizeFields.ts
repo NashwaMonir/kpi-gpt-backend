@@ -31,6 +31,38 @@ export function toSafeTrimmedString(value: unknown): string {
 }
 
 // ------------------------------------------------------------
+// Company normalization
+// ------------------------------------------------------------
+
+export interface NormalizedCompanyResult {
+  raw: string;          // trimmed original
+  normalized: string;   // stable canonical form for summaries/comparisons
+  hasValue: boolean;
+}
+
+/**
+ * Normalize company for stable comparisons.
+ *
+ * Rules:
+ * - Trim leading/trailing whitespace
+ * - Collapse internal whitespace to a single space
+ * - Keep original casing (do NOT uppercase/lowercase) to avoid unintended brand changes
+ *
+ * NOTE:
+ * - This does NOT apply any company policy/decision.
+ * - Company policy is applied in bulkPrepareRows.
+ */
+export function normalizeCompany(raw: unknown): NormalizedCompanyResult {
+  const trimmed = toSafeTrimmedString(raw);
+  const normalized = trimmed.replace(/\s+/g, ' ');
+  return {
+    raw: trimmed,
+    normalized,
+    hasValue: normalized.length > 0
+  };
+}
+
+// ------------------------------------------------------------
 // Task Type normalization
 // ------------------------------------------------------------
 

@@ -129,8 +129,8 @@ function startsWithImperativeVerb(text: string): boolean {
   const s = String(text || '').trim();
   // Common imperative verbs used in KPI metrics.
   // Keep intentionally tight to avoid false positives (e.g., nouns).
-  return /^(reduce|increase|improve|decrease|lower|raise|maximize|minimize|achieve|deliver|publish|complete|implement|roll\s+out|rollout|launch|ship|optimize|streamline|ensure)\b/i.test(s);
-}
+    return /^(reduce|increase|improve|decrease|lower|raise|maximize|minimize|achieve|deliver|provide|support|publish|complete|implement|roll\s+out|rollout|launch|ship|optimize|streamline|ensure)\b/i.test(s);
+  }
 
 function lowerFirst(text: string): string {
   const s = String(text || '').trim();
@@ -220,7 +220,15 @@ function buildMetricsClause(row: PreparedRow, mode: 'simple' | 'complex'): strin
   else if (metricParts.length === 2) metricsJoined = metricParts.join(' and ');
   else metricsJoined = metricParts.slice(0, -1).join(', ') + ', and ' + metricParts[metricParts.length - 1];
 
-  const connector = pickMetricsConnector(row, mode);
+  let connector = pickMetricsConnector(row, mode);
+
+  // v10.8 grammar guard: never produce "to achieve Deliver/Provide" (or similar).
+  // If the metrics phrase starts with an imperative verb, force a safe connector and normalize casing.
+  if (startsWithImperativeVerb(metricsJoined)) {
+    if (/\bto\s+achieve\b/i.test(connector)) connector = ' to ';
+    return connector + lowerFirst(metricsJoined);
+  }
+
   return connector + metricsJoined;
 }
 // -----------------------------
@@ -705,7 +713,15 @@ function buildEnterpriseMetricsClause(row: PreparedRow, mode: ObjectiveMode): st
   else if (parts.length === 2) joined = parts.join(' and ');
   else joined = parts.slice(0, -1).join(', ') + ', and ' + parts[parts.length - 1];
 
-  const connector = pickMetricsConnector(row, mode === 'simple' ? 'simple' : 'complex');
+  let connector = pickMetricsConnector(row, mode === 'simple' ? 'simple' : 'complex');
+
+  // v10.8 grammar guard: if the metrics phrase starts with an imperative verb,
+  // avoid connectors like "to achieve" and avoid "to Deliver" casing.
+  if (startsWithImperativeVerb(joined)) {
+    if (/\bto\s+achieve\b/i.test(connector)) connector = ' to ';
+    return connector + lowerFirst(joined);
+  }
+
   return connector + joined;
 }
 // Enterprise clause-order needs atomic metric clauses (performance/quality/improvement),
@@ -957,7 +973,8 @@ function finalizeObjectiveText(objective: string): string {
 
   // Minimal trust fix: remove duplicate support phrase when pattern + tail collide
   s = s.replace(/\bin support of supporting\b/gi, 'in support of');
-
+  // Grammar: avoid "Deliver scoped delivery of ..." duplication.
+  s = s.replace(/\bDeliver\s+scoped\s+delivery\s+of\b/gi, 'Deliver scoped execution of');
   return s;
 }
 
@@ -1102,7 +1119,11 @@ function pickMetricsConnector(row: PreparedRow, mode: 'simple' | 'complex'): str
     `metrics_connector|complex|${kind}|${row.team_role}|${row.task_type}`,
     variants
   );
-
+  // v10.8 safety: if the imperative bucket accidentally contains "to achieve",
+  // force a safe connector to prevent "to achieve Deliver/Provide".
+  if (kind === 'imperative' && picked && /\bto\s+achieve\b/i.test(String(picked))) {
+    return startsWithEnsure(out) ? ' to ensure ' : ' to ';
+  }
   return (picked as any) || (isImperative ? (startsWithEnsure(out) ? ' to ensure ' : ' to ') : ' to ');
 }
 

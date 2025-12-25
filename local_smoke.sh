@@ -15,9 +15,11 @@
 
 set -euo pipefail
 
-BASE="${BASE:-http://localhost:3000}"
-BASE="${BASE%/}"
+##BASE="${BASE:-http://localhost:3000}"
+##BASE="${BASE%/}"
 
+BASE="${BASE:-http://localhost:3000}"
+KPI_URL="${KPI_URL:-$BASE/api/kpi}"
 # NOTE: Do not hardcode expected metrics in this script.
 # For exact assertions, derive expectations from the single-row /api/kpi pipeline using the same inputs.
 
