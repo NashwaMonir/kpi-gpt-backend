@@ -250,7 +250,7 @@ for role in "${roles[@]}"; do
   first_obj=""
 
   for i in $(seq 1 "$REPEAT_N"); do
-    r=$(single_kpi 500 "Org" "$role" "Project" "Determinism check" "2025-10-01" "Improve consistency" "" "" "")
+    r=$(single_kpi 500 "Org" "$role" "Project" "Determinism check" "2026-10-01" "Improve consistency" "" "" "")
 
     rm=$(echo "$r" | jq -c '.rows[0].resolved_metrics')
     obj=$(echo "$r" | jq -r '.rows[0].objective')
@@ -285,21 +285,21 @@ for role in "${roles[@]}"; do
   for tt in "${TASK_TYPES[@]}"; do
 
     # Case 1: all metrics missing => E501 + NEEDS_REVIEW
-    r1=$(single_kpi 600 "Org" "$role" "$tt" "Matrix all-missing" "2025-10-01" "Improve performance" "" "" "")
+    r1=$(single_kpi 600 "Org" "$role" "$tt" "Matrix all-missing" "2026-10-01" "Improve performance" "" "" "")
     s1=$(echo "$r1" | jq -r '.rows[0].status')
     e1=$(echo "$r1" | jq -r '.rows[0].error_codes[]?' | tr '\n' ' ')
     assert_eq "$s1" "NEEDS_REVIEW" "Matrix all-missing status ($role/$tt)"
     if echo "$e1" | grep -q "E501"; then pass "Matrix all-missing includes E501 ($role/$tt)"; else fail "Matrix all-missing missing E501 ($role/$tt)"; fi
 
     # Case 2: partial metrics missing => E502 + NEEDS_REVIEW
-    r2=$(single_kpi 601 "Org" "$role" "$tt" "Matrix partial" "2025-10-01" "Improve performance" "Publish UI" "" "")
+    r2=$(single_kpi 601 "Org" "$role" "$tt" "Matrix partial" "2026-10-01" "Improve performance" "Publish UI" "" "")
     s2=$(echo "$r2" | jq -r '.rows[0].status')
     e2=$(echo "$r2" | jq -r '.rows[0].error_codes[]?' | tr '\n' ' ')
     assert_eq "$s2" "NEEDS_REVIEW" "Matrix partial status ($role/$tt)"
     if echo "$e2" | grep -q "E502"; then pass "Matrix partial includes E502 ($role/$tt)"; else fail "Matrix partial missing E502 ($role/$tt)"; fi
 
     # Case 3: all metrics present => expect VALID unless other rules fail
-    r3=$(single_kpi 602 "Org" "$role" "$tt" "Matrix full" "2025-10-01" "Improve performance" "Deliver X" "≤2% defects" "Improve Y by 10%")
+    r3=$(single_kpi 602 "Org" "$role" "$tt" "Matrix full" "2026-10-01" "Improve performance" "Deliver X" "≤2% defects" "Improve Y by 10%")
     s3=$(echo "$r3" | jq -r '.rows[0].status')
     if [[ "$s3" == "VALID" || "$s3" == "NEEDS_REVIEW" ]]; then
       # allow NEEDS_REVIEW if your dangerous-text heuristics trip; still track
@@ -325,7 +325,7 @@ done
 section "A.3) Deadline pack"
 
 # Valid year
-rv=$(single_kpi 700 "Org" "Design" "Project" "Deadline valid" "2025-10-01" "Benefit" "" "" "")
+rv=$(single_kpi 700 "Org" "Design" "Project" "Deadline valid" "2026-10-01" "Benefit" "" "" "")
 sv=$(echo "$rv" | jq -r '.rows[0].status')
 assert_true "$([[ "$sv" == "NEEDS_REVIEW" || "$sv" == "VALID" ]] && echo true || echo false)" "Deadline valid year accepted"
 
@@ -339,8 +339,8 @@ ri=$(single_kpi 702 "Org" "Design" "Project" "Deadline invalid format" "tomorrow
 si=$(echo "$ri" | jq -r '.rows[0].status')
 assert_eq "$si" "INVALID" "Deadline invalid format => INVALID"
 
-# ISO with time (must normalize and still be treated as 2025-10-01)
-rt=$(single_kpi 703 "Org" "Design" "Project" "Deadline iso time" "2025-10-01T00:00:00Z" "Benefit" "" "" "")
+# ISO with time (must normalize and still be treated as 2026-10-01)
+rt=$(single_kpi 703 "Org" "Design" "Project" "Deadline iso time" "2026-10-01T00:00:00Z" "Benefit" "" "" "")
 st=$(echo "$rt" | jq -r '.rows[0].status')
 assert_true "$([[ "$st" == "NEEDS_REVIEW" || "$st" == "VALID" ]] && echo true || echo false)" "Deadline ISO with time accepted"
 
@@ -349,7 +349,7 @@ assert_true "$([[ "$st" == "NEEDS_REVIEW" || "$st" == "VALID" ]] && echo true ||
 # Add a dedicated high-signal objective for additional lint.
 # --------------------
 section "A.4) Objective quality lint pack (dedicated)"
-rx=$(single_kpi 800 "Org" "Development" "Project" "Lint special" "2025-06-30" "Improve reliability" "" "" "")
+rx=$(single_kpi 800 "Org" "Development" "Project" "Lint special" "2026-06-30" "Improve reliability" "" "" "")
 ox=$(echo "$rx" | jq -r '.rows[0].objective')
 lint_objective "$ox" "Lint dedicated"
 
@@ -358,7 +358,7 @@ lint_objective "$ox" "Lint dedicated"
 # --------------------
 section "A.5) Bulk vs Single exact parity (fixed CSV fixture)"
 
-csv_fixed=$'row_id,team_role,task_type,task_name,dead_line,strategic_benefit,output_metric,quality_metric,improvement_metric,company\n101,Design,Project,Homepage redesign,2025-10-01,Increase presence,,,,Org\n305,Development,Project,API Rate-Limit Upgrade,2025-06-30,Improve reliability,,,,Org\n999,Content,Consultation,Editorial guidelines,2025-09-15,Improve consistency,,,,Org'
+csv_fixed=$'row_id,team_role,task_type,task_name,dead_line,strategic_benefit,output_metric,quality_metric,improvement_metric,company\n101,Design,Project,Homepage redesign,2026-10-01,Increase presence,,,,Org\n305,Development,Project,API Rate-Limit Upgrade,2026-06-30,Improve reliability,,,,Org\n999,Content,Consultation,Editorial guidelines,2026-09-15,Improve consistency,,,,Org'
 
 bi=$(bulk_inspect_csv "$csv_fixed")
 rows_token=$(echo "$bi" | jq -r '.rows_token')
@@ -407,9 +407,9 @@ fi
 # Bulk output correctness is asserted via XLSX signature + zip integrity above.
 for rid in 101 305 999; do
   case "$rid" in
-    101) sresp=$(single_kpi 101 "Org" "Design" "Project" "Homepage redesign" "2025-10-01" "Increase presence" "" "" "") ;;
-    305) sresp=$(single_kpi 305 "Org" "Development" "Project" "API Rate-Limit Upgrade" "2025-06-30" "Improve reliability" "" "" "") ;;
-    999) sresp=$(single_kpi 999 "Org" "Content" "Consultation" "Editorial guidelines" "2025-09-15" "Improve consistency" "" "" "") ;;
+    101) sresp=$(single_kpi 101 "Org" "Design" "Project" "Homepage redesign" "2026-10-01" "Increase presence" "" "" "") ;;
+    305) sresp=$(single_kpi 305 "Org" "Development" "Project" "API Rate-Limit Upgrade" "2026-06-30" "Improve reliability" "" "" "") ;;
+    999) sresp=$(single_kpi 999 "Org" "Content" "Consultation" "Editorial guidelines" "2026-09-15" "Improve consistency" "" "" "") ;;
   esac
 
   s_status=$(echo "$sresp" | jq -r '.rows[0].status')
@@ -426,7 +426,7 @@ done
 # --------------------
 section "A.6) Row ID preservation (non-sequential ids + XLSX column)"
 
-csv_ids=$'row_id,team_role,task_type,task_name,dead_line,strategic_benefit,output_metric,quality_metric,improvement_metric,company\n101,Design,Project,RowId test A,2025-10-01,Increase presence,,,,Org\n305,Development,Project,RowId test B,2025-06-30,Improve reliability,,,,Org\n999,Content,Consultation,RowId test C,2025-09-15,Improve consistency,,,,Org'
+csv_ids=$'row_id,team_role,task_type,task_name,dead_line,strategic_benefit,output_metric,quality_metric,improvement_metric,company\n101,Design,Project,RowId test A,2026-10-01,Increase presence,,,,Org\n305,Development,Project,RowId test B,2026-06-30,Improve reliability,,,,Org\n999,Content,Consultation,RowId test C,2026-09-15,Improve consistency,,,,Org'
 
 bi2=$(bulk_inspect_csv "$csv_ids")
 rt2=$(echo "$bi2" | jq -r '.rows_token')
@@ -473,7 +473,7 @@ pass "A.6 Row ID checks skipped (row_id not exposed in XLSX by design)"
 # Task type variants: unsupported values should be INVALID
 # --------------------
 section "8) Task type variants: unsupported values should be INVALID (not fallback)"
-ru=$(single_kpi 900 "Org" "Design" "Bogus" "Unsupported type" "2025-10-01" "Benefit" "" "" "")
+ru=$(single_kpi 900 "Org" "Design" "Bogus" "Unsupported type" "2026-10-01" "Benefit" "" "" "")
 su=$(echo "$ru" | jq -r '.rows[0].status')
 assert_eq "$su" "INVALID" "Unsupported task_type correctly INVALID"
 

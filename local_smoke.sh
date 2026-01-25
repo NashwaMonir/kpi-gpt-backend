@@ -424,7 +424,7 @@ R2=$(post_json "/api/kpi" '{
       "team_role":"Design",
       "task_type":"Project",
       "task_name":"Homepage redesign",
-      "dead_line":"2025-10-01",
+      "dead_line":"2026-10-01",
       "strategic_benefit":"Enhance the organization’s digital presence.",
       "output_metric":"Publish approved homepage screens",
       "quality_metric":"Achieve WCAG 2.1 AA compliance in UI deliverables",
@@ -462,7 +462,7 @@ R3=$(post_json "/api/kpi" '{
       "team_role":"Development",
       "task_type":"Project",
       "task_name":"API Rate-Limit Upgrade",
-      "dead_line":"2025-06-30",
+      "dead_line":"2026-06-30",
       "strategic_benefit":"Improve system reliability."
     }
   ]
@@ -509,7 +509,7 @@ assert_eq "Single wrong-year autosuggest=false" "$S4_AUTO" "false"
 # -------------------------
 section "4B) Bulk: INVALID hard-stop (missing required fields)"
 CSV_INV='row_id,team_role,task_type,task_name,dead_line,strategic_benefit
-1,Design,Project,,2025-10-01,Enhance the organization’s digital presence.'
+1,Design,Project,,2026-10-01,Enhance the organization’s digital presence.'
 INS_INV=$(post_json "/api/bulkInspectJson" "$(jq -n --arg csv "$CSV_INV" '{excel_csv_text:$csv}')")
 require_json "Bulk inspect INVALID /api/bulkInspectJson" "$INS_INV"
 RT_INV=$(echo "$INS_INV" | jq -r '.rows_token')
@@ -548,7 +548,7 @@ fi
 # -------------------------
 section "5) Bulk: 1-row flow + download integrity (no xargs)"
 CSV='row_id,team_role,task_type,task_name,dead_line,strategic_benefit
-1,Design,Project,Homepage redesign,2025-10-01,Enhance the organization’s digital presence.'
+1,Design,Project,Homepage redesign,2026-10-01,Enhance the organization’s digital presence.'
 INSPECT=$(post_json "/api/bulkInspectJson" "$(jq -n --arg csv "$CSV" '{excel_csv_text:$csv}')")
 require_json "Bulk inspect 1-row /api/bulkInspectJson" "$INSPECT"
 
@@ -611,7 +611,7 @@ S_PAR=$(post_json "/api/kpi" '{
       "team_role":"Design",
       "task_type":"Project",
       "task_name":"Homepage redesign",
-      "dead_line":"2025-10-01",
+      "dead_line":"2026-10-01",
       "strategic_benefit":"Enhance the organization’s digital presence."
     }
   ]
@@ -667,7 +667,7 @@ R_PART=$(post_json "/api/kpi" '{
       "team_role":"Design",
       "task_type":"Project",
       "task_name":"Pricing page update",
-      "dead_line":"2025-09-15",
+      "dead_line":"2026-09-15",
       "strategic_benefit":"Improve conversion rate.",
       "output_metric":"Publish updated pricing UI"
     }
@@ -680,7 +680,7 @@ EXP_P_QUAL=$(echo "$R_PART" | jq -r '.rows[0].resolved_metrics.quality_metric')
 EXP_P_IMP=$(echo "$R_PART" | jq -r '.rows[0].resolved_metrics.improvement_metric')
 
 CSV_PART='row_id,team_role,task_type,task_name,dead_line,strategic_benefit,output_metric
-61,Design,Project,Pricing page update,2025-09-15,Improve conversion rate.,Publish updated pricing UI'
+61,Design,Project,Pricing page update,2026-09-15,Improve conversion rate.,Publish updated pricing UI'
 INS_P=$(post_json "/api/bulkInspectJson" "$(jq -n --arg csv "$CSV_PART" '{excel_csv_text:$csv}')")
 require_json "Bulk inspect partial /api/bulkInspectJson" "$INS_P"
 RT_P=$(echo "$INS_P" | jq -r '.rows_token')
@@ -706,7 +706,7 @@ assert_eq "Bulk partial improvement_metric parity" "$B_IMP_P" "$EXP_P_IMP"
 # -------------------------
 section "7) Bulk normalization drift: whitespace/casing should still hit correct matrix"
 CSV2='row_id,team_role,task_type,task_name,dead_line,strategic_benefit
-1," Design "," Project ",Homepage redesign,2025-10-01,Enhance the organization’s digital presence.'
+1," Design "," Project ",Homepage redesign,2026-10-01,Enhance the organization’s digital presence.'
 INS2=$(post_json "/api/bulkInspectJson" "$(jq -n --arg csv "$CSV2" '{excel_csv_text:$csv}')")
 require_json "Bulk inspect whitespace /api/bulkInspectJson" "$INS2"
 RT2=$(echo "$INS2" | jq -r '.rows_token')
@@ -730,7 +730,7 @@ R_LEAD=$(post_json "/api/kpi" '{
       "team_role":"Design Lead",
       "task_type":"Project",
       "task_name":"Design system rollout",
-      "dead_line":"2025-11-01",
+      "dead_line":"2026-11-01",
       "strategic_benefit":"Improve cross-team consistency."
     }
   ]
@@ -740,7 +740,7 @@ LEAD_MODE=$(echo "$R_LEAD" | jq -r '.rows[0].objective_mode')
 [[ "$LEAD_MODE" == "complex" ]] && ok "Single lead role forces complex mode" || bad "Lead role did not force complex mode"
 
 CSV_LEAD='row_id,team_role,task_type,task_name,dead_line,strategic_benefit
-1,Design Lead,Project,Design system rollout,2025-11-01,Improve cross-team consistency.'
+1,Design Lead,Project,Design system rollout,2026-11-01,Improve cross-team consistency.'
 INS_L=$(post_json "/api/bulkInspectJson" "$(jq -n --arg csv "$CSV_LEAD" '{excel_csv_text:$csv}')")
 require_json "Bulk inspect lead /api/bulkInspectJson" "$INS_L"
 RT_L=$(echo "$INS_L" | jq -r '.rows_token')
@@ -769,12 +769,12 @@ section "7C) Bulk multi-row coverage: exact resolved-metrics parity across all t
 # NOTE: Use allowed task types from your constants. If 'Consultation' is not allowed,
 # change it to another allowed value (e.g., 'Change Request').
 CSV_M='row_id,team_role,task_type,task_name,dead_line,strategic_benefit
-101,Content,Project,Content calendar refresh,2025-10-15,Improve content relevance.
-102,Content Lead,Consultation,Editorial governance review,2025-10-20,Improve cross-team alignment.
-103,Design,Project,Homepage redesign,2025-10-01,Enhance the organization’s digital presence.
-104,Design Lead,Consultation,Design system adoption plan,2025-11-01,Increase consistency and efficiency.
-105,Development,Project,API Rate-Limit Upgrade,2025-06-30,Improve system reliability.
-106,Development Lead,Consultation,API governance and standards,2025-07-15,Reduce risk and improve maintainability.'
+101,Content,Project,Content calendar refresh,2026-10-15,Improve content relevance.
+102,Content Lead,Consultation,Editorial governance review,2026-10-20,Improve cross-team alignment.
+103,Design,Project,Homepage redesign,2026-10-01,Enhance the organization’s digital presence.
+104,Design Lead,Consultation,Design system adoption plan,2026-11-01,Increase consistency and efficiency.
+105,Development,Project,API Rate-Limit Upgrade,2026-06-30,Improve system reliability.
+106,Development Lead,Consultation,API governance and standards,2026-07-15,Reduce risk and improve maintainability.'
 
 INS_M=$(post_json "/api/bulkInspectJson" "$(jq -n --arg csv "$CSV_M" '{excel_csv_text:$csv}')")
 require_json "Bulk inspect multi /api/bulkInspectJson" "$INS_M"
@@ -869,9 +869,9 @@ done
 # -------------------------
 # KPI_Output must not expose Row ID. This section now validates the UX contract only.
 CSV_RID='row_id,team_role,task_type,task_name,dead_line,strategic_benefit
-101,Design,Project,RowId test A,2025-10-01,Enhance the organization’s digital presence.
-305,Design,Project,RowId test B,2025-10-02,Enhance the organization’s digital presence.
-999,Design,Project,RowId test C,2025-10-03,Enhance the organization’s digital presence.'
+101,Design,Project,RowId test A,2026-10-01,Enhance the organization’s digital presence.
+305,Design,Project,RowId test B,2026-10-02,Enhance the organization’s digital presence.
+999,Design,Project,RowId test C,2026-10-03,Enhance the organization’s digital presence.'
 
 INS_RID=$(post_json "/api/bulkInspectJson" "$(jq -n --arg csv "$CSV_RID" '{excel_csv_text:$csv}')")
 require_json "Bulk inspect row_id fixture /api/bulkInspectJson" "$INS_RID"
@@ -972,12 +972,12 @@ assert_role_family_tail_safety() {
 
 # Intensive role/type/metric shapes (imperative + non-imperative + lead vs IC + generic company)
 QUALITY_ROWS_JSON='[
-  {"row_id":901,"company":"Org","team_role":"Design","task_type":"Project","task_name":"Homepage redesign","dead_line":"2025-10-01","strategic_benefit":"Increase company presence","output_metric":"Achieve ≥95% in-scope journeys have approved UX/UI designs at design freeze","quality_metric":"≤3% usability or accessibility defects identified post-launch","improvement_metric":"Increase task success rate in prioritized journeys by 15%"},
-  {"row_id":902,"company":"Org","team_role":"Design","task_type":"Project","task_name":"Checkout redesign","dead_line":"2025-10-01","strategic_benefit":"Improve conversion","output_metric":"Ensure ≥90% adherence to the design system for new or updated screens","quality_metric":"≤2% cross-platform visual or interaction inconsistencies in QA","improvement_metric":"Reduce cross-platform UX defects reported after launch by 25%"},
-  {"row_id":903,"company":"Org","team_role":"Content","task_type":"Consultation","task_name":"Editorial guidelines","dead_line":"2025-09-15","strategic_benefit":"Improve consistency","output_metric":"Publish updated content governance guidelines covering ≥95% priority use cases","quality_metric":"≥4.3/5 internal rating for clarity and usability of guidelines","improvement_metric":"Increase adoption of content guidelines to ≥80% of new assets"},
-  {"row_id":904,"company":"Org","team_role":"Development","task_type":"Project","task_name":"API Rate-Limit Upgrade","dead_line":"2025-06-30","strategic_benefit":"Improve reliability","output_metric":"Achieve ≥99.5% uptime for the in-scope services over the measurement period","quality_metric":"≤0.5% of incidents caused by regressions from this project","improvement_metric":"Improve service response times by 20%"},
-  {"row_id":905,"company":"Org","team_role":"Design Lead","task_type":"Project","task_name":"Design system rollout","dead_line":"2025-08-31","strategic_benefit":"Standardize UX","output_metric":"Deliver design system v1.0 with token and component documentation","quality_metric":"≤2 critical design debt items per release post-rollout","improvement_metric":"Reduce design-to-dev rework cycles by 20%"},
-  {"row_id":906,"company":"Generic","team_role":"Design","task_type":"Project","task_name":"Pricing page refresh","dead_line":"2025-10-01","strategic_benefit":"Increase digital presence","output_metric":"Publish updated pricing page UI","quality_metric":"≥4.3/5 internal review score for clarity and tone","improvement_metric":"Reduce user confusion-related support contacts by 15%"}
+  {"row_id":901,"company":"Org","team_role":"Design","task_type":"Project","task_name":"Homepage redesign","dead_line":"2026-10-01","strategic_benefit":"Increase company presence","output_metric":"Achieve ≥95% in-scope journeys have approved UX/UI designs at design freeze","quality_metric":"≤3% usability or accessibility defects identified post-launch","improvement_metric":"Increase task success rate in prioritized journeys by 15%"},
+  {"row_id":902,"company":"Org","team_role":"Design","task_type":"Project","task_name":"Checkout redesign","dead_line":"2026-10-01","strategic_benefit":"Improve conversion","output_metric":"Ensure ≥90% adherence to the design system for new or updated screens","quality_metric":"≤2% cross-platform visual or interaction inconsistencies in QA","improvement_metric":"Reduce cross-platform UX defects reported after launch by 26%"},
+  {"row_id":903,"company":"Org","team_role":"Content","task_type":"Consultation","task_name":"Editorial guidelines","dead_line":"2026-09-15","strategic_benefit":"Improve consistency","output_metric":"Publish updated content governance guidelines covering ≥95% priority use cases","quality_metric":"≥4.3/5 internal rating for clarity and usability of guidelines","improvement_metric":"Increase adoption of content guidelines to ≥80% of new assets"},
+  {"row_id":904,"company":"Org","team_role":"Development","task_type":"Project","task_name":"API Rate-Limit Upgrade","dead_line":"2026-06-30","strategic_benefit":"Improve reliability","output_metric":"Achieve ≥99.5% uptime for the in-scope services over the measurement period","quality_metric":"≤0.5% of incidents caused by regressions from this project","improvement_metric":"Improve service response times by 20%"},
+  {"row_id":905,"company":"Org","team_role":"Design Lead","task_type":"Project","task_name":"Design system rollout","dead_line":"2026-08-31","strategic_benefit":"Standardize UX","output_metric":"Deliver design system v1.0 with token and component documentation","quality_metric":"≤2 critical design debt items per release post-rollout","improvement_metric":"Reduce design-to-dev rework cycles by 20%"},
+  {"row_id":906,"company":"Generic","team_role":"Design","task_type":"Project","task_name":"Pricing page refresh","dead_line":"2026-10-01","strategic_benefit":"Increase digital presence","output_metric":"Publish updated pricing page UI","quality_metric":"≥4.3/5 internal review score for clarity and tone","improvement_metric":"Reduce user confusion-related support contacts by 15%"}
 ]'
 
 QUALITY_RES=$(curl -sS -X POST "$BASE/api/kpi" \
@@ -1043,7 +1043,7 @@ R8=$(post_json "/api/kpi" '{
       "team_role":"Design",
       "task_type":"ChangeRequest",
       "task_name":"Update pricing page UI",
-      "dead_line":"2025-09-15",
+      "dead_line":"2026-09-15",
       "strategic_benefit":"Improve conversion rate."
     }
   ]

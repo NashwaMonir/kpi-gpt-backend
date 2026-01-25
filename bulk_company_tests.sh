@@ -12,10 +12,10 @@ set -euo pipefail
 # - Arabic/special chars safety (no JSON break)
 # - Grammar/tail checks are now automated by downloading and scanning the XLSX export contents (no Python dependencies).
 
-BASE_URL="${BASE_URL:-http://localhost:3000}"
-INSPECT_URL="${BASE_URL}/api/bulkInspectJson"
-PREP_URL="${BASE_URL}/api/bulkPrepareRows"
-EXPORT_URL="${BASE_URL}/api/bulkFinalizeExport"
+BASE="${BASE:-http://localhost:3000}"
+INSPECT_URL="${BASE}/api/bulkInspectJson"
+PREP_URL="${BASE}/api/bulkPrepareRows"
+EXPORT_URL="${BASE}/api/bulkFinalizeExport"
 
 
 # ---------------------------
@@ -338,55 +338,55 @@ run_bulk() {
 
 # INT1: 9 combos (Design/Dev/Content × Project/CR/Consultation), metrics empty, company mixed
 CSV_COMBOS_MIXED=$'row_id,team_role,task_type,task_name,company,dead_line,strategic_benefit,output_metric,quality_metric,improvement_metric\n'\
-$'301,Design,Project,Website Redesign,ABC,2025-10-05,Improve digital conversion,,,\n'\
-$'302,Design,Change Request,Accessibility Fixes,,2025-10-06,Improve compliance posture,,,\n'\
-$'303,Design,Consultation,UX Audit Advisory,ABC,2025-10-07,Improve user experience,,,\n'\
-$'304,Development,Project,API Platform Upgrade,XYZ,2025-10-08,Improve reliability,,,\n'\
-$'305,Development,Change Request,Security Patch Rollout,,2025-10-09,Reduce production risk,,,\n'\
-$'306,Development,Consultation,Architecture Review,XYZ,2025-10-10,Improve scalability,,,\n'\
-$'307,Content,Project,Product Launch Content,ABC,2025-10-11,Improve acquisition,,,\n'\
-$'308,Content,Change Request,Legal Copy Update,,2025-10-12,Reduce legal risk,,,\n'\
-$'309,Content,Consultation,Content Strategy Advisory,ABC,2025-10-13,Improve publishing alignment,,,\n'
+$'301,Design,Project,Website Redesign,ABC,2026-10-05,Improve digital conversion,,,\n'\
+$'302,Design,Change Request,Accessibility Fixes,,2026-10-06,Improve compliance posture,,,\n'\
+$'303,Design,Consultation,UX Audit Advisory,ABC,2026-10-07,Improve user experience,,,\n'\
+$'304,Development,Project,API Platform Upgrade,XYZ,2026-10-08,Improve reliability,,,\n'\
+$'305,Development,Change Request,Security Patch Rollout,,2026-10-09,Reduce production risk,,,\n'\
+$'306,Development,Consultation,Architecture Review,XYZ,2026-10-10,Improve scalability,,,\n'\
+$'307,Content,Project,Product Launch Content,ABC,2026-10-11,Improve acquisition,,,\n'\
+$'308,Content,Change Request,Legal Copy Update,,2026-10-12,Reduce legal risk,,,\n'\
+$'309,Content,Consultation,Content Strategy Advisory,ABC,2026-10-13,Improve publishing alignment,,,\n'
 
 # INT2: Lead roles sweep (ensure lead complex + governance/risk only for leads; grammar still clean)
 CSV_LEADS=$'row_id,team_role,task_type,task_name,company,dead_line,strategic_benefit,output_metric,quality_metric,improvement_metric\n'\
-$'401,Design Lead,Project,Design System Rollout,ABC,2025-10-05,Improve cross-team consistency,,,\n'\
-$'402,Development Lead,Project,Platform Reliability Program,ABC,2025-10-06,Improve uptime and resilience,,,\n'\
-$'403,Content Lead,Project,Enterprise Content Governance Program,ABC,2025-10-07,Improve brand compliance,,,\n'
+$'401,Design Lead,Project,Design System Rollout,ABC,2026-10-05,Improve cross-team consistency,,,\n'\
+$'402,Development Lead,Project,Platform Reliability Program,ABC,2026-10-06,Improve uptime and resilience,,,\n'\
+$'403,Content Lead,Project,Enterprise Content Governance Program,ABC,2026-10-07,Improve brand compliance,,,\n'
 
 # INT3A: Row_id canonicalization + invalid fallback (NO duplicates)
 CSV_ROWID_CANON=$'row_id,team_role,task_type,task_name,company,dead_line,strategic_benefit,output_metric,quality_metric,improvement_metric\n'\
-$'"901",Design,Project,RowId String,ABC,2025-10-05,Improve conversion,,,\n'\
-$'" 0902 ",Design,Project,RowId Padded,ABC,2025-10-06,Improve UX,,,\n'\
-$'"abc",Design,Project,RowId Invalid,ABC,2025-10-07,Improve UX,,,\n'
+$'"901",Design,Project,RowId String,ABC,2026-10-05,Improve conversion,,,\n'\
+$'" 0902 ",Design,Project,RowId Padded,ABC,2026-10-06,Improve UX,,,\n'\
+$'"abc",Design,Project,RowId Invalid,ABC,2026-10-07,Improve UX,,,\n'
 
 # INT3B: Duplicate row_id strict error
 CSV_ROWID_DUPLICATE=$'row_id,team_role,task_type,task_name,company,dead_line,strategic_benefit,output_metric,quality_metric,improvement_metric\n'\
-$'777,Design,Project,Duplicate A,ABC,2025-10-08,Improve UX,,,\n'\
-$'777,Design,Project,Duplicate B,ABC,2025-10-09,Improve UX,,,\n'
+$'777,Design,Project,Duplicate A,ABC,2026-10-08,Improve UX,,,\n'\
+$'777,Design,Project,Duplicate B,ABC,2026-10-09,Improve UX,,,\n'
 
 # INT4: Whitespace/newlines/tabs + Arabic/special characters
 CSV_TEXT_STRESS=$'row_id,team_role,task_type,task_name,company,dead_line,strategic_benefit,output_metric,quality_metric,improvement_metric\n'\
-$'501,Design,Project,"Website   Redesign\t",ABC,2025-10-05,"Improve  digital   conversion\nand acquisition",,,\n'\
-$'502,Content,Change Request,"تحديث النص القانوني (Legal Copy) — v2",ABC,2025-10-06,"تقليل المخاطر القانونية + تحسين الوضوح",,,\n'
+$'501,Design,Project,"Website   Redesign\t",ABC,2026-10-05,"Improve  digital   conversion\nand acquisition",,,\n'\
+$'502,Content,Change Request,"تحديث النص القانوني (Legal Copy) — v2",ABC,2026-10-06,"تقليل المخاطر القانونية + تحسين الوضوح",,,\n'
 
 # INT5: Company column absent (missing column)
 CSV_NO_COMPANY_COLUMN=$'row_id,team_role,task_type,task_name,dead_line,strategic_benefit,output_metric,quality_metric,improvement_metric\n'\
-$'601,Design,Project,Website Redesign,2025-10-05,Improve digital conversion,,,\n'\
-$'602,Content,Project,Launch Content,2025-10-06,Improve acquisition,,,\n'
+$'601,Design,Project,Website Redesign,2026-10-05,Improve digital conversion,,,\n'\
+$'602,Content,Project,Launch Content,2026-10-06,Improve acquisition,,,\n'
 
 # INT6: Metrics imperative stress: output starts with Deliver/Provide/Support/Complete/Ensure/Achieve
 # Goal: connectors must not produce "to achieve Deliver/Provide" in objectives.
 CSV_IMPERATIVE_METRICS=$'row_id,team_role,task_type,task_name,company,dead_line,strategic_benefit,output_metric,quality_metric,improvement_metric\n'\
-$'701,Design,Project,Prototype Pack,ABC,2025-10-05,Improve experience,"Deliver validated prototypes for ≥ 3 critical flows",,\n'\
-$'702,Content,Project,Content Briefs,ABC,2025-10-06,Improve publishing,"Provide approved briefs for all launch pages",,\n'\
-$'703,Development,Project,Release Automation,ABC,2025-10-07,Improve throughput,"Ensure automated release pipeline coverage",,\n'\
-$'704,Design,Project,Research Summary,ABC,2025-10-08,Improve insights,"Achieve stakeholder sign-off on research findings",,\n'
+$'701,Design,Project,Prototype Pack,ABC,2026-10-05,Improve experience,"Deliver validated prototypes for ≥ 3 critical flows",,\n'\
+$'702,Content,Project,Content Briefs,ABC,2026-10-06,Improve publishing,"Provide approved briefs for all launch pages",,\n'\
+$'703,Development,Project,Release Automation,ABC,2026-10-07,Improve throughput,"Ensure automated release pipeline coverage",,\n'\
+$'704,Design,Project,Research Summary,ABC,2026-10-08,Improve insights,"Achieve stakeholder sign-off on research findings",,\n'
 
 # INT7: Design/Content tail leakage stress
 CSV_TAIL_LEAKAGE_GUARD=$'row_id,team_role,task_type,task_name,company,dead_line,strategic_benefit,output_metric,quality_metric,improvement_metric\n'\
-$'801,Design,Project,Checkout UX Improvements,ABC,2025-10-05,Improve conversion,,,\n'\
-$'802,Content,Project,SEO Landing Pages,ABC,2025-10-06,Improve acquisition,,,\n'
+$'801,Design,Project,Checkout UX Improvements,ABC,2026-10-05,Improve conversion,,,\n'\
+$'802,Content,Project,SEO Landing Pages,ABC,2026-10-06,Improve acquisition,,,\n'
 
 # ---------------------------
 # Policies
@@ -417,7 +417,7 @@ POLICY_ROW_LEVEL_GENERIC_MISSING='{
 # ---------------------------
 
 main() {
-  echo "BASE_URL=$BASE_URL"
+  echo "BASE=$BASE"
 
   # 1) Mixed combos: multi-company + missing. Run with overwrite-all to lock company before export.
   run_bulk "INT1_COMBOS_MIXED__OVERWRITE_ALL_TO_ABC" "$CSV_COMBOS_MIXED" "$POLICY_SINGLE_OVERWRITE_ALL" || true
