@@ -1,4 +1,8 @@
 // engine/variationSeed.ts
+//Variation_seed Must be:
+	//1.	Row-unique (different rows → different seeds)
+	//2.	Deterministic (same row identity → same seed)
+	//3.	Pipeline-invariant (single and bulk compute from the same canonical inputs)
 import type { KpiRowIn } from './types';
 
 function normalize(s: string | null | undefined): string {
