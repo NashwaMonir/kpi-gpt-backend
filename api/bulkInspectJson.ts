@@ -52,12 +52,18 @@ export function parseCsvToKpiJsonRows(csvText: string): KpiJsonRowIn[] {
     return [];
   }
 
+  // Some tools export UTF-8 CSV with a BOM, which turns the first header into "\ufeffteam_role".
+  // Strip it defensively so required fields are not treated as missing.
+  const cleanedCsvText = String(csvText).replace(/^\uFEFF/, '');
+
   let records: Record<string, string | null | undefined>[] = [];
   try {
-    records = parse(csvText, {
+    records = parse(cleanedCsvText, {
       columns: true,
       skip_empty_lines: true,
-      trim: true
+      trim: true,
+      // Also let the parser handle BOM when present.
+      bom: true
     }) as Record<string, string | null | undefined>[];
   } catch (err) {
     const msg = err instanceof Error ? err.message : String(err);
